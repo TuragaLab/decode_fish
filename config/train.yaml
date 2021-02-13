@@ -1,0 +1,95 @@
+seed: 0
+
+device:
+    gpu_device: cuda 
+  
+run_name: test/test_sub
+
+cfg_path: /groups/turaga/home/speisera/Dropbox (mackelab)/Artur/WorkDB/deepstorm/fishcod/config/train.yaml
+  
+output:
+    save_dir: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/models/fishcod/${run_name}
+    log_dir : /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/fishcod/runs/${run_name}
+  
+data_path: 
+    image_path: /groups/turaga/home/speisera/share_TUM/FishSIM/sim_1/mRNAlevel_200/cell3D/strong/w1_HelaKyoto_Gapdh_2597_p01_cy3__Cell_CP_14__cell3D__1.tif
+#     psf_path: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/decode_fish/data/gaussian_psf.pkl
+    psf_path: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/decode_fish/data/simfish_psf.pkl
+    
+evaluation:
+    image_path: ${data_path.image_path}
+    txt_path: /groups/turaga/home/speisera/share_TUM/FishSIM/sim_1/mRNAlevel_200/cell3D/strong/w1_HelaKyoto_Gapdh_2597_p01_cy3__Cell_CP_14__cell3D__1.txt
+    crop_sl: s_[:,100:250,100:250,25:60]
+    px_size: [100,100,300]
+    
+prob_generator:
+    low: 0.00000001
+    high: 0.005
+    data_min: ${data_path.substract}
+    data_max: ${data_path.scale}
+    
+bg_estimation:
+    _target_: decode_fish.funcs.dataset.EstimateBackground
+    smoothing_filter_size: 6
+    div_factor: 1
+    
+random_crop: 
+    crop_sz: 48
+
+roi_mask:
+    pool_size: [10,10,10]
+    percentile: 70 # Percentage of volume that is removed
+               
+PSF:
+    _target_: decode_fish.engine.psf.LinearInterpolatedPSF 
+    upsample_factor: 1
+    device: ${device.gpu_device}
+    
+noise:
+    _target_: decode_fish.engine.noise.sCMOS
+    theta: 2. 
+    baseline:  0.09
+    
+microscope:
+    multipl: 50
+    psf_extent_zyx : [11,21,21]
+
+dataloader:
+    bs: 2
+    num_iter: 10000
+    
+model:
+    _target_: decode_fish.engine.model.UnetDecodeNoBn
+    depth: 2
+    f_maps: 32
+    inp_scale: 
+    inp_offset: 
+    p_offset: -3.0
+    order: 'ce'
+    
+supervised:
+    num_iter: 5000
+    log_interval: 100
+    lr: 5e-4
+    bl_loss_scale: 0.01
+    p_quantile: 0.
+    grad_clip: 0.001
+    #scheduler
+    gamma: 0.5
+    step_size: 2000
+  
+autoencoder:
+    num_iter: 5000
+    log_interval: 100
+    lr: 1e-5
+    #scheduler
+    gamma: 0.5
+    step_size: 1000
+
+#min intensity when sampling
+pointprocess:
+    min_int: 0.2
+  
+hydra:
+  run:
+    dir: ${output.save_dir}/${now:%H-%M-%S}

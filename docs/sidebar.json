@@ -1,0 +1,22 @@
+{
+  "decode_fish": {
+    "Overview": "/",
+    "DECODE Network": "models.html",
+    "PSF model": "psf.html",
+    "Microscope model": "microscope.html",
+    "Noise model": "noise.html",
+    "Emitter distribution": "pointsource.html",
+    "Loss function": "gmm_loss.html",
+    "Plottings functions": "plotting.html",
+    "File handling": "file_io.html",
+    "Dataset and transformations": "dataset.html",
+    "Transformations of sampled data and model output into emitter dataframes": "output_trafo.html",
+    "Performance evaluation": "evaluation.html",
+    "Functions for working with emitter DFs": "emitter_io.html",
+    "Random assortment of helper functions": "utils.html",
+    "Training loop simulator learning": "train_sl.html",
+    "Training loop": "train_ae.html",
+    "Fitting a PSF": "fit_psf.html",
+    "Visualization tools ": "visualization.html"
+  }
+}

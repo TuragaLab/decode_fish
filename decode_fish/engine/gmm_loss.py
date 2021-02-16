@@ -10,7 +10,7 @@ from torch.distributions import Distribution
 # Cell
 class PointProcessGaussian(Distribution):
     def __init__(self, logits: torch.tensor, xyzi_mu: torch.tensor,
-                 xyzi_sigma: torch.tensor):
+                 xyzi_sigma: torch.tensor, **kwargs):
         "logits: BS, C, H, W, D"
         self.logits = logits
         self.xyzi_mu = xyzi_mu

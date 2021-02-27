@@ -47,7 +47,7 @@ class PointProcessGaussian(Distribution):
         return locations, x_offset, y_offset, z_offset, intensities, output_shape
 
 
-    def log_prob(self, locations_3d, x_offset_3d, y_offset_3d, z_offset_3d, intensities_3d, p_threshold):
+    def log_prob(self, locations_3d, x_offset_3d, y_offset_3d, z_offset_3d, intensities_3d):
 
         batch_size = self.logits.shape[0]
         xyzi, counts, s_mask = get_true_labels(batch_size, locations_3d, x_offset_3d, y_offset_3d, z_offset_3d, intensities_3d )
@@ -64,7 +64,7 @@ class PointProcessGaussian(Distribution):
         mixture_probs = P / P.sum(dim=[2, 3, 4], keepdim=True)
 
         xyz_mu_list, _, _, i_mu_list, x_sigma_list, y_sigma_list, z_sigma_list, i_sigma_list, mixture_probs_l = img_to_coord(
-            batch_size, p_threshold, P, x_mu, y_mu, z_mu, i_mu, x_si, y_si, z_si, i_si, mixture_probs)
+            batch_size, P, x_mu, y_mu, z_mu, i_mu, x_si, y_si, z_si, i_si, mixture_probs)
         xyzi_mu = torch.cat((xyz_mu_list, i_mu_list), dim=-1)
         xyzi_sigma = torch.cat((x_sigma_list, y_sigma_list, z_sigma_list, i_sigma_list), dim=-1) #to avoind NAN
         mix = D.Categorical(mixture_probs_l.squeeze(-1))
@@ -75,7 +75,7 @@ class PointProcessGaussian(Distribution):
         log_prob = count_prob + spatial_prob
         return log_prob
 
-def img_to_coord(bs, p_quantile, locations, x_os, y_os, z_os, *args):
+def img_to_coord(bs, locations, x_os, y_os, z_os, *args):
     """
     Given `locations'  will extract value of x_os, y_os, z_os where probability is more than 0.
     also generates counts of location and returns mask
@@ -91,11 +91,7 @@ def img_to_coord(bs, p_quantile, locations, x_os, y_os, z_os, *args):
 
     if type(locations) == torch.Tensor:
         #this is done for model outputs since they are volumes
-        if p_quantile > 0:
-            threshold = torch.quantile(locations.flatten(1), p_quantile, dim=1)
-            locations = torch.nonzero(locations>threshold[:,None,None,None,None],as_tuple=True)
-        else:
-            locations = torch.nonzero(locations,as_tuple=True)
+        locations = torch.nonzero(locations,as_tuple=True)
         x_os      = x_os[locations]
         y_os      = y_os[locations]
         z_os      = z_os[locations]
@@ -131,6 +127,6 @@ def img_to_coord(bs, p_quantile, locations, x_os, y_os, z_os, *args):
     return (xyz_list, counts, s_mask) + tuple(i_list)
 
 def get_true_labels(bs, locations, x_os, y_os, z_os, ints):
-    xyz_list, counts_true, s_mask, i_1 = img_to_coord(bs, 0., locations, x_os, y_os, z_os, ints)
+    xyz_list, counts_true, s_mask, i_1 = img_to_coord(bs, locations, x_os, y_os, z_os, ints)
     xyzi_true = torch.cat((xyz_list, i_1), dim=-1)
     return xyzi_true, counts_true, s_mask

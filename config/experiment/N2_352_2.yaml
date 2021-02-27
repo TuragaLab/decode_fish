@@ -6,9 +6,12 @@ cfg_path: /groups/turaga/home/speisera/Dropbox (mackelab)/Artur/WorkDB/deepstorm
 output:
   save_dir: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/models/fishcod/${run_name}
   log_dir: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/fishcod/runs/${run_name}
+  log_figs: false
+  log_interval: 100
 data_path:
   image_path: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm//datasets/CodFish/N2_352-1.tif
   psf_path: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm//decode_fish/data/N2_352_psf.pkl
+  model_int: null
 evaluation:
   image_path: ${data_path.image_path}
   txt_path: null
@@ -60,8 +63,7 @@ model:
   p_offset: -3.0
   order: ce
 supervised:
-  num_iter: 5000
-  log_interval: 100
+  num_iter: 1000
   lr: 0.0005
   bl_loss_scale: 0.01
   p_quantile: 0.0
@@ -70,10 +72,9 @@ supervised:
   step_size: 2000
 autoencoder:
   num_iter: 5000
-  log_interval: 100
   lr: 3.0e-05
   gamma: 0.5
-  step_size: 2000
+  step_size: 1000
 pointprocess:
   min_int: 0.2
 hydra:

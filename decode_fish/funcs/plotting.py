@@ -22,8 +22,9 @@ def add_colorbar(im, aspect=20, pad_fraction=0.5, **kwargs):
     return im.axes.figure.colorbar(im, cax=cax, **kwargs)
 
 # Cell
-def sl_plot(x, xsim, background, res):
+def sl_plot(x, xsim, pred_df, background, res):
 
+    pred_df = pred_df[pred_df['frame_idx']==0]
     with torch.no_grad():
         fig = plt.figure(figsize=(20,4))
         plt.subplot(151)
@@ -34,6 +35,7 @@ def sl_plot(x, xsim, background, res):
 
         plt.subplot(152)
         im = plt.imshow(xsim[0][0].cpu().numpy().max(0))
+        plt.scatter(pred_df['x']/100, pred_df['y']/100,facecolors='red', edgecolors='red', marker='+', s=20)
         add_colorbar(im)
         plt.axis('off')
         plt.title('Sim. image')
@@ -106,4 +108,12 @@ def plot_3d_projections(volume, projection='mean', size=6, vmax=None):
         if 'max' in projection:
             im = axes[i].imshow(plot_vol.max(i),vmax=vmax)
         add_colorbar(im)
+
+    axes[0].set_xlabel('x')
+    axes[0].set_ylabel('y')
+    axes[1].set_xlabel('x')
+    axes[1].set_ylabel('z')
+    axes[2].set_xlabel('y')
+    axes[2].set_ylabel('z')
+
     return axes

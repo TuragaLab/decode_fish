@@ -4,7 +4,6 @@ __all__ = ['matching']
 
 # Cell
 from ..imports import *
-from .file_io import load_sim_fish
 from .output_trafo import model_output_to_df
 from scipy.spatial.distance import cdist
 from  decode_fish.funcs.emitter_io import *

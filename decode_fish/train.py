@@ -17,8 +17,7 @@ from torch.utils.tensorboard import SummaryWriter
 from decode_fish.engine.point_process import PointProcessUniform
 from decode_fish.engine.gmm_loss import PointProcessGaussian
 
-from decode_fish.funcs.train_sl import *
-from decode_fish.funcs.train_ae import *
+from decode_fish.funcs.train_funcs import *
 
 @hydra.main(config_path='/groups/turaga/home/speisera/Dropbox (mackelab)/Artur/WorkDB/deepstorm/decode_fish/config', config_name='train')
 def my_app(cfg):
@@ -27,7 +26,7 @@ def my_app(cfg):
     
     img_3d, decode_dl = get_dataloader(cfg)
     
-    psf, noise, micro = load_psf_micro_psf_noise(cfg)
+    psf, noise, micro = load_psf_noise_micro(cfg)
     
     if cfg.model.inp_scale is None or cfg.model.inp_offset is None:
         inp_offset, inp_scale = get_forward_scaling(img_3d)
@@ -51,57 +50,39 @@ def my_app(cfg):
     
     OmegaConf.save(cfg, cfg.output.save_dir + '/train.yaml')
     
-    optim_net = AdamW(model.parameters(), lr=cfg.supervised.lr)
-    sched_net = torch.optim.lr_scheduler.StepLR(optim_net, step_size=cfg.supervised.step_size, gamma=cfg.supervised.gamma)
+    opt_net = AdamW(model.parameters(), lr=cfg.supervised.lr)
+    sched_net = torch.optim.lr_scheduler.StepLR(opt_net, step_size=cfg.supervised.step_size, gamma=cfg.supervised.gamma)
     
-    """ Simulator learning """
+    psf_param = list(psf.parameters()) # + list(model_net.parameters()) + list(micro.parameters())
+    opt_psf  = AdamW(psf_param, lr=cfg.autoencoder.lr)
+    sched_psf = torch.optim.lr_scheduler.StepLR(opt_psf, step_size=cfg.autoencoder.step_size, gamma=cfg.autoencoder.gamma)
+    
+    if cfg.data_path.model_init is not None:
+    
+        model = load_model_state(model, cfg.data_path.model_init).cuda()
+        micro.load_state_dict(torch.load(Path(cfg.data_path.model_init)/'microscope.pkl'))
+        opt_net.load_state_dict(torch.load(Path(cfg.data_path.model_init)/'opt_net.pkl'))
+        opt_psf.load_state_dict(torch.load(Path(cfg.data_path.model_init)/'opt_psf.pkl'))
+        psf.load_state_dict(torch.load(Path(cfg.data_path.model_init)/'psf.pkl'))
         
-    train_sl(model=model, 
-             dl=decode_dl, 
-             num_iter=cfg.supervised.num_iter,
-             optim_net=optim_net, 
-             sched_net=sched_net, 
-             psf=psf,
-             min_int=cfg.pointprocess.min_int, 
-             microscope=micro, 
-             log_interval=cfg.supervised.log_interval, 
-             save_dir=cfg.output.save_dir,
-             log_dir=cfg.output.log_dir,
-             bl_loss_scale=cfg.supervised.bl_loss_scale,
-             p_quantile=cfg.supervised.p_quantile,
-             grad_clip=cfg.supervised.grad_clip,
-             eval_dict=eval_dict)
-    
-    """ Autoencoder learning """
-
-    ae_param = list(micro.parameters())  + list(psf.parameters())
-    optim_psf  = AdamW(ae_param, lr=cfg.autoencoder.lr)
-    sched_psf = torch.optim.lr_scheduler.StepLR(optim_psf, step_size=cfg.autoencoder.step_size, gamma=cfg.autoencoder.gamma)
-    
-    if not cfg.supervised.num_iter:
-    
-        model_sl = load_model_state(cfg, 'model_sl.pkl').cuda()
-        micro.load_state_dict(torch.load(Path(cfg.output.save_dir)/'microscope_sl.pkl'))
-        optim_net.load_state_dict(torch.load(Path(cfg.output.save_dir)/'opt_sl.pkl'))
-        sched_net = torch.optim.lr_scheduler.StepLR(optim_net, step_size=cfg.supervised.step_size, gamma=cfg.supervised.gamma)
-
-    train_ae(model=model, 
-             dl=decode_dl, 
-             num_iter=cfg.autoencoder.num_iter,
-             optim_net=optim_net, 
-             optim_psf=optim_psf, 
-             sched_net=sched_net, 
-             sched_psf=sched_psf, 
-             min_int=cfg.pointprocess.min_int, 
-             psf=psf,
-             microscope=micro, 
-             log_interval=cfg.supervised.log_interval,  
-             save_dir=cfg.output.save_dir,
-             log_dir=cfg.output.log_dir,
-             bl_loss_scale=cfg.supervised.bl_loss_scale,
-             p_quantile=cfg.supervised.p_quantile,
-             grad_clip=cfg.supervised.grad_clip,
-             eval_dict=eval_dict)
+    train(model=model, 
+         dl=decode_dl, 
+         num_iter_sl=cfg.supervised.num_iter,
+         num_iter_ae=cfg.autoencoder.num_iter,
+         optim_net=opt_net, 
+         optim_psf=opt_psf, 
+         sched_net=sched_net, 
+         sched_psf=sched_psf, 
+         min_int=cfg.pointprocess.min_int, 
+         psf=psf,
+         microscope=micro, 
+         log_interval=cfg.output.log_interval,  
+         save_dir=cfg.output.save_dir,
+         log_dir=cfg.output.log_dir,
+         bl_loss_scale=cfg.supervised.bl_loss_scale,
+         grad_clip=cfg.supervised.grad_clip,
+         eval_dict=eval_dict,
+         log_figs=cfg.output.log_figs)
         
 if __name__ == "__main__":
     my_app()

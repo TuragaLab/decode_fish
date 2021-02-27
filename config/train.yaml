@@ -5,16 +5,19 @@ device:
   
 run_name: test/test_sub
 
-cfg_path: /groups/turaga/home/speisera/Dropbox (mackelab)/Artur/WorkDB/deepstorm/fishcod/config/train.yaml
+cfg_path: /groups/turaga/home/speisera/Dropbox (mackelab)/Artur/WorkDB/deepstorm/decode_fish/config/train.yaml
   
 output:
     save_dir: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/models/fishcod/${run_name}
-    log_dir : /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/fishcod/runs/${run_name}
+    log_dir : /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/decode_fish/runs/${run_name}
+    log_figs : False
+    log_interval: 100
   
 data_path: 
     image_path: /groups/turaga/home/speisera/share_TUM/FishSIM/sim_1/mRNAlevel_200/cell3D/strong/w1_HelaKyoto_Gapdh_2597_p01_cy3__Cell_CP_14__cell3D__1.tif
 #     psf_path: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/decode_fish/data/gaussian_psf.pkl
     psf_path: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/decode_fish/data/simfish_psf.pkl
+    model_init:
     
 evaluation:
     image_path: ${data_path.image_path}
@@ -68,8 +71,7 @@ model:
     order: 'ce'
     
 supervised:
-    num_iter: 5000
-    log_interval: 100
+    num_iter: 1000
     lr: 5e-4
     bl_loss_scale: 0.01
     p_quantile: 0.
@@ -80,7 +82,6 @@ supervised:
   
 autoencoder:
     num_iter: 5000
-    log_interval: 100
     lr: 1e-5
     #scheduler
     gamma: 0.5

@@ -40,8 +40,11 @@ def get_simulation_statistics(decode_dl, micro, int_threshold=1, samples = 1):
 
             x = x[0,0,z_ind].cpu().numpy()
 
-            xsim = micro(*PointProcessUniform(local_rate, min_int=decode_dl.min_int).sample())
+            sim_vars = PointProcessUniform(local_rate, min_int=decode_dl.min_int).sample()
+            xsim = micro(*sim_vars)
             xsim_noise = micro.noise(xsim, background).sample()
+            sim_df = sample_to_df(*sim_vars[:-1])
+            sim_df = sim_df[sim_df['frame_idx'] == 0]
 
             xsim_noise = xsim_noise.cpu().numpy()[0,0,z_ind]
             background = background[0,0].cpu().numpy()
@@ -61,34 +64,35 @@ def get_simulation_statistics(decode_dl, micro, int_threshold=1, samples = 1):
             im = plt.imshow(xsim_noise)
             add_colorbar(im)
             plt.title('Sim. Image ')
+            plt.scatter(sim_df['x']/100,sim_df['y']/100, color='red', s=5.)
 
             plt.show()
 
 # Cell
-def get_prediction(model, img, micro=None, cuda=True, px_size=np.array([100.,100.,100.]), return_rec=False, threshold=0.1):
+def get_prediction(model, post_proc, img, micro=None, cuda=True, return_rec=False):
 
     with torch.no_grad():
 
         img = img[(None,)*(5-img.ndim)]
         model.eval().cuda() if cuda else model.eval().cpu()
         res_dict = model(img.cuda()) if cuda else model(img)
-        pred_df = model_output_to_df(res_dict, threshold, px_size=px_size)
+        pred_df = post_proc(res_dict)
 
         if return_rec:
-            ae_img_3d = micro(*model_output_to_micro_input(res_dict, threshold=threshold))
-            return pred_df, ae_img_3d + res_dict['background']
+            ae_img_3d = micro(*post_proc(res_dict, ret='micro'))
+            return pred_df, ae_img_3d + res_dict['background'], res_dict
 
         return pred_df
 
-def eval_random_crop(decode_dl, model, micro, projection='mean', px_size=np.array([100.,100.,100.]), cuda=False, threshold=0.1, samples=1):
+def eval_random_crop(decode_dl, model, post_proc, micro, projection='mean', cuda=False, samples=1):
 
     with torch.no_grad():
 
         for _ in range(samples):
 
             x, local_rate, background = next(iter(decode_dl))
-            pred_df, rec = get_prediction(model, x[:1], micro=micro, cuda=True, return_rec=True, threshold=threshold)
-            pred_df = nm_to_px(pred_df, px_size)
+            pred_df, rec, res_dict = get_prediction(model, post_proc, x[:1], micro=micro, cuda=True, return_rec=True)
+            pred_df = nm_to_px(pred_df, post_proc.px_size)
 
             x = x[0,0].cpu().numpy()
             rec = rec[0,0].cpu().numpy()
@@ -104,7 +108,9 @@ def eval_random_crop(decode_dl, model, micro, projection='mean', px_size=np.arra
 
             axes[1].set_title('Reconstruction', size=16)
 
-def eval_random_sim(decode_dl, model, micro, projection='mean', px_size=np.array([100.,100.,100.]), cuda=False, threshold=0.1, samples=1):
+            pred_df, rec,res_dict
+
+def eval_random_sim(decode_dl, model, post_proc, micro, projection='mean', plot_gt=True, cuda=True, samples=1):
 
     with torch.no_grad():
 
@@ -115,14 +121,21 @@ def eval_random_sim(decode_dl, model, micro, projection='mean', px_size=np.array
             sim_vars = PointProcessUniform(local_rate, min_int=decode_dl.min_int).sample()
             xsim = micro(*sim_vars)
             x = micro.noise(xsim, background).sample()
-
-            pred_df, rec = get_prediction(model, x[:1], micro=micro, cuda=True, return_rec=True, threshold=threshold)
-            pred_df = nm_to_px(pred_df, px_size)
+            pred_df, rec, res_dict = get_prediction(model, post_proc, x[:1], micro=micro, cuda=True, return_rec=True)
+            pred_df = nm_to_px(pred_df, post_proc.px_size)
+            sim_df = nm_to_px(sample_to_df(*sim_vars[:-1]))
+            sim_df = sim_df[sim_df['frame_idx']==0]
 
             x = x[0,0].cpu().numpy()
             rec = rec[0,0].cpu().numpy()
 
             axes = plot_3d_projections(x, projection=projection)
+
+            if plot_gt:
+                axes[0].scatter(sim_df['x'],sim_df['y'], color='black', marker='x', s=25.)
+                axes[1].scatter(sim_df['x'],sim_df['z'], color='black', marker='x', s=25.)
+                axes[2].scatter(sim_df['y'],sim_df['z'], color='black', marker='x', s=25.)
+
             axes[0].scatter(pred_df['x'],pred_df['y'], color='red', s=5.)
             axes[1].scatter(pred_df['x'],pred_df['z'], color='red', s=5.)
             axes[2].scatter(pred_df['y'],pred_df['z'], color='red', s=5.)

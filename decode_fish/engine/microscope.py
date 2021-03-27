@@ -44,9 +44,9 @@ class Microscope(nn.Module):
 
     def __init__(self,
                  parametric_psf: List[torch.nn.Module]=None,
-                 empirical_psf : List[torch.nn.Module] = None ,
-                 noise: Union[torch.nn.Module,  None]=None,
-                 scale: float = 10000., multipl = 100
+                 empirical_psf : List[torch.nn.Module]=None ,
+                 noise: Union[torch.nn.Module, None]=None,
+                 scale: float = 10000., multipl=100
                  ):
 
         super().__init__()
@@ -74,14 +74,14 @@ class Microscope(nn.Module):
                 for emper_psf in self.empirical_psf:
                     psf += emper_psf(x_os_val, y_os_val, z_os_val)
             #normalizing psf
+            torch.clamp_min_(psf,0)
             psf = psf.div(psf.sum(dim=[2, 3, 4], keepdim=True))
             #applying intenseties (N_Emitters, C, H, W, D)
 
-            #try * self.scale
             psf = psf * i_val[:,None,None,None,None]
             xsim = place_psf(locations, psf, output_shape)
             xsim = self.scale * xsim * self.multipl
-            torch.clamp_min_(xsim,0)
+#             torch.clamp_min_(xsim,0)
             #torch.clamp_max_(xsim,255)
             if eval_:
                 return xsim, psf

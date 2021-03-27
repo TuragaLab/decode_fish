@@ -1,0 +1,26 @@
+{
+    "os": "Linux-4.15.0-45-generic-x86_64-with-debian-buster-sid",
+    "python": "3.7.7",
+    "heartbeatAt": "2021-03-26T20:45:55.381433",
+    "startedAt": "2021-03-26T20:45:53.655627",
+    "docker": null,
+    "gpu": "NVS 510",
+    "gpu_count": 3,
+    "cpu_count": 56,
+    "cuda": null,
+    "args": [
+        "-f",
+        "/groups/turaga/home/speisera/.local/share/jupyter/runtime/kernel-22979c2a-c376-4f72-9ece-9131bf9318a3.json"
+    ],
+    "state": "running",
+    "program": "<python with no main file>",
+    "git": {
+        "remote": "https://github.com/TuragaLab/decode_fish.git",
+        "commit": "8e8b30f7c04bba5661119a4168e6389c770d8edd"
+    },
+    "email": "arturspeiser@googlemail.com",
+    "root": "/groups/turaga/home/speisera/Dropbox (mackelab)/Artur/WorkDB/deepstorm/decode_fish",
+    "host": "turagas-ws1",
+    "username": "speisera",
+    "executable": "/groups/turaga/home/speisera/anaconda3/envs/decode2_dev/bin/python"
+}

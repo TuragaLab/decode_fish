@@ -17,27 +17,28 @@ class PointProcessUniform(Distribution):
         bg(bool): if returns sampled backround
 
     """
-    def __init__(self, local_rate: torch.tensor, min_int: float):
+    def __init__(self, local_rate: torch.tensor, min_int: float, sim_iters: int = 5):
 
         self.local_rate = local_rate
         self.device = self._get_device(self.local_rate)
         self.min_int = torch.tensor(min_int, device=self.device)
+        self.sim_iters = sim_iters
 
-    def sample(self, N:int =1):
+    def sample(self):
 
-        if N == 1: return self._sample()
-        else:
-            res_ = [self._sample() for i in range(N)]
-            locations = torch.cat([i[0] for i in res_], dim=1)
-            x_offset = torch.cat([i[1] for i in res_], dim=1)
-            y_offset = torch.cat([i[2] for i in res_], dim=1)
-            z_offset = torch.cat([i[3] for i in res_], dim=1)
-            intensities = torch.cat([i[4] for i in res_], dim=1)
-            return locations, x_offset, y_offset, z_offset, intensities
+        res_ = [self._sample(self.local_rate/self.sim_iters) for i in range(self.sim_iters)]
+        locations = torch.cat([i[0] for i in res_], dim=0)
+        x_offset = torch.cat([i[1] for i in res_], dim=0)
+        y_offset = torch.cat([i[2] for i in res_], dim=0)
+        z_offset = torch.cat([i[3] for i in res_], dim=0)
+        intensities = torch.cat([i[4] for i in res_], dim=0)
 
-    def _sample(self):
+        return tuple(locations.T), x_offset, y_offset, z_offset, intensities, res_[0][5]
 
-        locations = D.Bernoulli(self.local_rate).sample()
+    def _sample(self, local_rate):
+
+        local_rate = torch.clamp_max(local_rate, 1.)
+        locations = D.Bernoulli(local_rate).sample()
         n_emitter = int(locations.sum().item())
         zero_point_five = torch.tensor(0.5, device=self.device)
         x_offset = D.Uniform(low=0 - zero_point_five, high=0 + zero_point_five).sample(sample_shape=[n_emitter])
@@ -46,7 +47,7 @@ class PointProcessUniform(Distribution):
         intensities = D.Uniform(low=self.min_int, high=1.0).sample(sample_shape=[n_emitter])
 
         output_shape = tuple(locations.shape)
-        locations = locations.nonzero(as_tuple=True)
+        locations = locations.nonzero(as_tuple=False)
         return locations, x_offset, y_offset, z_offset, intensities, output_shape
 
 

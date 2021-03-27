@@ -22,9 +22,10 @@ def add_colorbar(im, aspect=20, pad_fraction=0.5, **kwargs):
     return im.axes.figure.colorbar(im, cax=cax, **kwargs)
 
 # Cell
-def sl_plot(x, xsim, pred_df, background, res):
+def sl_plot(x, xsim, pred_df, target_df, background, res):
 
     pred_df = pred_df[pred_df['frame_idx']==0]
+    target_df = target_df[target_df['frame_idx']==0]
     with torch.no_grad():
         fig = plt.figure(figsize=(20,4))
         plt.subplot(151)
@@ -35,7 +36,8 @@ def sl_plot(x, xsim, pred_df, background, res):
 
         plt.subplot(152)
         im = plt.imshow(xsim[0][0].cpu().numpy().max(0))
-        plt.scatter(pred_df['x']/100, pred_df['y']/100,facecolors='red', edgecolors='red', marker='+', s=20)
+        plt.scatter(target_df['x']/100, target_df['y']/100,facecolors='black', edgecolors='black', marker='x', s=25.)
+        plt.scatter(pred_df['x']/100, pred_df['y']/100,facecolors='red', edgecolors='red', marker='o', s=5.)
         add_colorbar(im)
         plt.axis('off')
         plt.title('Sim. image')
@@ -85,7 +87,7 @@ def gt_plot(x, pred_df, gt_df, px_size, gt_rec=None):
             im = plt.imshow(gt_rec.max(0), vmax=vmax)
             add_colorbar(im)
             plt.axis('off')
-            plt.title('RMSE ' + str(np.round(np.sqrt(((x-gt_rec)**2).max()),2)))
+            plt.title('RMSE ' + str(np.round(np.sqrt(((x-gt_rec)**2).mean()),2)))
 
             plt.subplot(133)
             im = plt.imshow(max_proj - gt_rec.max(0))

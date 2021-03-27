@@ -33,6 +33,7 @@ def my_app(cfg):
     else:
         inp_offset, inp_scale = cfg.model.inp_scale, cfg.model.inp_offset
     model = hydra.utils.instantiate(cfg.model, inp_scale=float(inp_scale), inp_offset=float(inp_offset))
+    post_proc = hydra.utils.instantiate(cfg.post_proc)
     
     psf  .to(cfg.device.gpu_device)
     model.to(cfg.device.gpu_device)
@@ -75,11 +76,13 @@ def my_app(cfg):
          sched_psf=sched_psf, 
          min_int=cfg.pointprocess.min_int, 
          psf=psf,
+         post_proc=post_proc,
          microscope=micro, 
          log_interval=cfg.output.log_interval,  
          save_dir=cfg.output.save_dir,
          log_dir=cfg.output.log_dir,
          bl_loss_scale=cfg.supervised.bl_loss_scale,
+         cnt_loss_scale=cfg.supervised.cnt_loss_scale,
          grad_clip=cfg.supervised.grad_clip,
          eval_dict=eval_dict,
          log_figs=cfg.output.log_figs)

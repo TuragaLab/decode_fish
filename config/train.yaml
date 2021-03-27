@@ -58,8 +58,16 @@ microscope:
     psf_extent_zyx : [11,21,21]
 
 dataloader:
-    bs: 2
+    bs: 4
     num_iter: 10000
+    
+foci:
+    _target_: decode_fish.funcs.dataset.AddFoci
+    n_foci_avg: 3.
+    rad_range: [100,300]
+    n_mol_range: [5,20]
+    px_size_xyz: ${evaluation.px_size}
+    mode: 'binary'
     
 model:
     _target_: decode_fish.engine.model.UnetDecodeNoBn
@@ -67,16 +75,31 @@ model:
     f_maps: 32
     inp_scale: 
     inp_offset: 
-    p_offset: -3.0
+    p_offset: -4.0
     order: 'ce'
+    
+# post_proc:
+#     _target_: decode_fish.funcs.output_trafo.SIPostProcess
+#     m1_threshold: 0.03
+#     m2_threshold: 0.25
+#     samp_threshold: 0.1
+#     px_size: ${evaluation.px_size}
+#     diag: 0
+
+post_proc:
+    _target_: decode_fish.funcs.output_trafo.ISIPostProcess
+    m1_threshold: 0.05
+    samp_threshold: 0.3
+    px_size: ${evaluation.px_size}
+    diag: True
     
 supervised:
     num_iter: 1000
     lr: 5e-4
     bl_loss_scale: 0.01
+    cnt_loss_scale: 1
     p_quantile: 0.
     grad_clip: 0.001
-    #scheduler
     gamma: 0.5
     step_size: 2000
   

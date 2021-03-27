@@ -52,6 +52,6 @@ def plot_tb_logs(exps, metric='Sim. Metrics/eff_3d', window_len=1):
         all_vals.append(vals)
 
     for v,e in zip(all_vals,exps):
-        plt.plot(smooth(v, window_len), label=e)
-        print(np.array(v).max().round(2), np.array(v).min().round(2), len(v), e)
+        plt.plot(smooth(v, window_len), label=e.split('/')[-1])
+#         print(np.array(v).max().round(2), np.array(v).min().round(2), len(v), e)
     plt.legend()

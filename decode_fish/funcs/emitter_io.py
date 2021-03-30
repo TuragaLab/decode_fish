@@ -44,10 +44,10 @@ def cat_emitter_dfs(df_list):
     return ret_df
 
 #export
-def crop_df(df, fxyz_sl=np.s_[:,:,:,:], shift=True, px_size=[1.,1.,1.]):
+def crop_df(df, fzyx_sl=np.s_[:,:,:,:], shift=True, px_size=[1.,1.,1.]):
 
     df_crop = df.copy()
-    for sl, key, px_s in zip(fxyz_sl, ['frame_idx','x','y','z'], [1] + px_size):
+    for sl, key, px_s in zip(fxyz_sl, ['frame_idx','z','y','x'], [1] + px_size):
         if sl.start:
             df_crop = df_crop[df_crop[key] > px_s*sl.start]
         if sl.stop:

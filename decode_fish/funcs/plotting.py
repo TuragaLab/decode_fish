@@ -62,11 +62,11 @@ def sl_plot(x, xsim, pred_df, target_df, background, res):
 
     return fig
 
-def gt_plot(x, pred_df, gt_df, px_size, gt_rec=None):
+def gt_plot(x, pred_df, gt_df, px_size, gt_rec=None, psf=None):
 
     with torch.no_grad():
-        fig = plt.figure(figsize=(18,6))
-        plt.subplot(131)
+        fig = plt.figure(figsize=(24,6))
+        plt.subplot(141)
 
         x = x[0].cpu().numpy()
 
@@ -83,16 +83,21 @@ def gt_plot(x, pred_df, gt_df, px_size, gt_rec=None):
 
             gt_rec = gt_rec[0].cpu().numpy()
 
-            plt.subplot(132)
+            plt.subplot(142)
             im = plt.imshow(gt_rec.max(0), vmax=vmax)
             add_colorbar(im)
             plt.axis('off')
             plt.title('RMSE ' + str(np.round(np.sqrt(((x-gt_rec)**2).mean()),2)))
 
-            plt.subplot(133)
-            im = plt.imshow(max_proj - gt_rec.max(0))
+            plt.subplot(143)
+            im = plt.imshow(abs(x - gt_rec).max(0))
             add_colorbar(im)
             plt.axis('off')
+
+            if psf is not None:
+                plt.subplot(144)
+                im = plt.imshow(psf.psf_volume[0].detach().cpu().numpy().mean(1))
+                plt.axis('off')
 
     return fig
 

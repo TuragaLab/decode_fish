@@ -104,9 +104,11 @@ def eval_random_crop(decode_dl, model, post_proc, micro, projection='mean', cuda
 
             axes[1].set_title('Predictions', size=16)
 
-            axes = plot_3d_projections(rec, projection=projection)
+            diff = abs(x-rec)
+            axes = plot_3d_projections(diff, projection=projection)
+            rmse = np.sqrt(((diff)**2).mean())
 
-            axes[1].set_title('Reconstruction', size=16)
+            axes[1].set_title(f'Reconstruction {rmse:.2f}', size=16)
 
             pred_df, rec,res_dict
 
@@ -144,4 +146,4 @@ def eval_random_sim(decode_dl, model, post_proc, micro, projection='mean', plot_
 
             axes = plot_3d_projections(rec, projection=projection)
 
-            axes[1].set_title('Reconstruction', size=16)
+            axes[1].set_title(f'Reconstruction', size=16)

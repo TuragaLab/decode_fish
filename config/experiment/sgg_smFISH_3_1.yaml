@@ -4,9 +4,11 @@ device:
 run_name: sgg_smFISH_3_1
 cfg_path: /groups/turaga/home/speisera/Dropbox (mackelab)/Artur/WorkDB/deepstorm/decode_fish/config/train.yaml
 output:
-  save_dir: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/models/fishcod/${run_name}
-  log_dir: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/decode_fish/runs/${run_name}
-  log_figs: false
+  project: sgg_smFISH
+  group: nb_run
+  save_dir: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/models/fishcod/${output.project}/${output.group}/${run_name}
+  log_dir: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/decode_fish/runs/
+  log_figs: true
   log_interval: 100
 data_path:
   image_path: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm//datasets/CodFish/smFISH_data_Titlow/sgg_smFISH_3.tif
@@ -23,8 +25,6 @@ evaluation:
 prob_generator:
   low: 0.005
   high: 0.02
-  data_min: ${data_path.substract}
-  data_max: ${data_path.scale}
 bg_estimation:
   _target_: decode_fish.funcs.dataset.EstimateBackground
   smoothing_filter_size: 6
@@ -51,33 +51,48 @@ microscope:
   - 17
   - 17
   - 17
+  psf_noise: 0.0001
 dataloader:
   bs: 2
-  num_iter: 10000
+foci:
+  _target_: decode_fish.funcs.dataset.AddFoci
+  n_foci_avg: 2.0
+  rad_range:
+  - 25
+  - 200
+  n_mol_range:
+  - 5
+  - 30
+  px_size_xyz: ${evaluation.px_size}
+  mode: gaussian
 model:
   _target_: decode_fish.engine.model.UnetDecodeNoBn
   depth: 2
   f_maps: 32
   inp_scale: null
   inp_offset: null
-  p_offset: -3.0
+  p_offset: -4.0
   order: ce
+post_proc:
+  _target_: decode_fish.funcs.output_trafo.ISIPostProcess
+  m1_threshold: 0.05
+  samp_threshold: 0.3
+  px_size: ${evaluation.px_size}
+  diag: true
 supervised:
-  num_iter: 10000
-  lr: 0.0005
+  num_iter: 12000
+  lr: 0.001
   bl_loss_scale: 0.01
+  cnt_loss_scale: 1
   p_quantile: 0.0
   grad_clip: 0.001
   gamma: 0.5
-  step_size: 2000
+  step_size: 6000
 autoencoder:
-  num_iter: 10000
-  lr: 5.0e-05
+  num_iter: 12000
+  lr: 3.0e-05
   gamma: 0.5
-  step_size: 1000
+  step_size: 6000
 pointprocess:
   min_int: 0.3
-hydra:
-  run:
-    dir: ${output.save_dir}/${now:%H-%M-%S}
 ground_truth: null

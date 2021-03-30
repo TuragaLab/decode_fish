@@ -46,7 +46,8 @@ class Microscope(nn.Module):
                  parametric_psf: List[torch.nn.Module]=None,
                  empirical_psf : List[torch.nn.Module]=None ,
                  noise: Union[torch.nn.Module, None]=None,
-                 scale: float = 10000., multipl=100
+                 scale: float = 10000., multipl=100,
+                 psf_noise=None, clamp_mode = 'cp'
                  ):
 
         super().__init__()
@@ -56,6 +57,13 @@ class Microscope(nn.Module):
         self.scale = scale
         self.noise = noise
         self.multipl = multipl
+        self.psf_noise = psf_noise
+        self.clamp_mode = clamp_mode
+
+    def add_psf_noise(self, psf_stack):
+
+        noise = torch.distributions.Normal(loc=0, scale=self.psf_noise).sample(psf_stack.shape).to(psf_stack.device)
+        return psf_stack + noise
 
     def forward(self, locations, x_os_val, y_os_val, z_os_val, i_val,output_shape, bg=None, eval_=None, scale_x=None, scale_y=None, scale_z=None):
 
@@ -73,16 +81,19 @@ class Microscope(nn.Module):
             if self.empirical_psf:
                 for emper_psf in self.empirical_psf:
                     psf += emper_psf(x_os_val, y_os_val, z_os_val)
+
+            if self.clamp_mode == 'cp':
+                torch.clamp_min_(psf,0)
             #normalizing psf
-            torch.clamp_min_(psf,0)
             psf = psf.div(psf.sum(dim=[2, 3, 4], keepdim=True))
+            if self.psf_noise: psf = self.add_psf_noise(psf)
             #applying intenseties (N_Emitters, C, H, W, D)
 
             psf = psf * i_val[:,None,None,None,None]
             xsim = place_psf(locations, psf, output_shape)
             xsim = self.scale * xsim * self.multipl
-#             torch.clamp_min_(xsim,0)
-            #torch.clamp_max_(xsim,255)
+            if self.clamp_mode == 'cx':
+                torch.clamp_min_(xsim,0)
             if eval_:
                 return xsim, psf
             return xsim

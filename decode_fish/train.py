@@ -18,6 +18,7 @@ from decode_fish.engine.point_process import PointProcessUniform
 from decode_fish.engine.gmm_loss import PointProcessGaussian
 
 from decode_fish.funcs.train_funcs import *
+import wandb
 
 @hydra.main(config_path='/groups/turaga/home/speisera/Dropbox (mackelab)/Artur/WorkDB/deepstorm/decode_fish/config', config_name='train')
 def my_app(cfg):
@@ -25,7 +26,6 @@ def my_app(cfg):
     """ General setup """
     
     img_3d, decode_dl = get_dataloader(cfg)
-    
     psf, noise, micro = load_psf_noise_micro(cfg)
     
     if cfg.model.inp_scale is None or cfg.model.inp_offset is None:
@@ -51,12 +51,19 @@ def my_app(cfg):
     
     OmegaConf.save(cfg, cfg.output.save_dir + '/train.yaml')
     
+    _ = wandb.init(project=cfg.output.project, 
+                   config=OmegaConf.to_container(cfg, resolve=True),
+                   dir=cfg.output.log_dir,
+                   group=cfg.output.group,
+                   name=cfg.run_name
+              )
+
     opt_net = AdamW(model.parameters(), lr=cfg.supervised.lr)
-    sched_net = torch.optim.lr_scheduler.StepLR(opt_net, step_size=cfg.supervised.step_size, gamma=cfg.supervised.gamma)
+    scheduler_net = torch.optim.lr_scheduler.StepLR(opt_net, step_size=cfg.supervised.step_size, gamma=cfg.supervised.gamma)
     
     psf_param = list(psf.parameters()) # + list(model_net.parameters()) + list(micro.parameters())
     opt_psf  = AdamW(psf_param, lr=cfg.autoencoder.lr)
-    sched_psf = torch.optim.lr_scheduler.StepLR(opt_psf, step_size=cfg.autoencoder.step_size, gamma=cfg.autoencoder.gamma)
+    scheduler_psf = torch.optim.lr_scheduler.StepLR(opt_psf, step_size=cfg.autoencoder.step_size, gamma=cfg.autoencoder.gamma)
     
     if cfg.data_path.model_init is not None:
     
@@ -66,26 +73,17 @@ def my_app(cfg):
         opt_psf.load_state_dict(torch.load(Path(cfg.data_path.model_init)/'opt_psf.pkl'))
         psf.load_state_dict(torch.load(Path(cfg.data_path.model_init)/'psf.pkl'))
         
-    train(model=model, 
+    train(cfg=cfg,
+         model=model, 
          dl=decode_dl, 
-         num_iter_sl=cfg.supervised.num_iter,
-         num_iter_ae=cfg.autoencoder.num_iter,
          optim_net=opt_net, 
          optim_psf=opt_psf, 
-         sched_net=sched_net, 
-         sched_psf=sched_psf, 
-         min_int=cfg.pointprocess.min_int, 
+         sched_net=scheduler_net, 
+         sched_psf=scheduler_psf, 
          psf=psf,
          post_proc=post_proc,
          microscope=micro, 
-         log_interval=cfg.output.log_interval,  
-         save_dir=cfg.output.save_dir,
-         log_dir=cfg.output.log_dir,
-         bl_loss_scale=cfg.supervised.bl_loss_scale,
-         cnt_loss_scale=cfg.supervised.cnt_loss_scale,
-         grad_clip=cfg.supervised.grad_clip,
-         eval_dict=eval_dict,
-         log_figs=cfg.output.log_figs)
-        
+         eval_dict=eval_dict)
+
 if __name__ == "__main__":
     my_app()

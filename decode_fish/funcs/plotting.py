@@ -62,10 +62,10 @@ def sl_plot(x, xsim, pred_df, target_df, background, res):
 
     return fig
 
-def gt_plot(x, pred_df, gt_df, px_size, gt_rec=None, psf=None):
+def gt_plot(x, pred_df, gt_df, px_size, gt_rec=None, psf=None, fig_size=(24,6)):
 
     with torch.no_grad():
-        fig = plt.figure(figsize=(24,6))
+        fig = plt.figure(figsize=fig_size)
         plt.subplot(141)
 
         x = x[0].cpu().numpy()

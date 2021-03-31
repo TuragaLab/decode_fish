@@ -111,6 +111,6 @@ def load_psf_noise_micro(cfg):
         psf = crop_psf(psf,cfg.microscope.psf_extent_zyx)
 
     noise = hydra.utils.instantiate(cfg.noise)
-    micro = Microscope(parametric_psf=[psf], noise=noise, multipl=cfg.microscope.multipl, psf_noise=cfg.microscope.psf_noise).cuda()
+    micro = Microscope(parametric_psf=[psf], noise=noise, multipl=cfg.microscope.multipl, psf_noise=cfg.microscope.psf_noise, clamp_mode=cfg.microscope.clamp_mode).cuda()
 
     return psf, noise, micro

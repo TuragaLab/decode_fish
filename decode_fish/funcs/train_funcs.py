@@ -32,15 +32,15 @@ def eval_logger(pred_df, target_df, iteration, data_str='Sim. '):
         pred_corr = shift_df(pred_df, shift)
         perf_dict, _, _ = matching(target_df, pred_corr, print_res=False)
 
-    wandb.log({data_str +'Metrics/eff_3d': perf_dict['eff_3d']})
-    wandb.log({data_str +'Metrics/jaccard': perf_dict['jaccard']})
-    wandb.log({data_str +'Metrics/rmse_vol': perf_dict['rmse_vol']})
+    wandb.log({data_str +'Metrics/eff_3d': perf_dict['eff_3d']}, step=iteration)
+    wandb.log({data_str +'Metrics/jaccard': perf_dict['jaccard']}, step=iteration)
+    wandb.log({data_str +'Metrics/rmse_vol': perf_dict['rmse_vol']}, step=iteration)
 
-    wandb.log({data_str +'Metrics/precision': perf_dict['precision']})
-    wandb.log({data_str +'Metrics/recall': perf_dict['recall']})
-    wandb.log({data_str +'Metrics/rmse_x': perf_dict['rmse_x']})
-    wandb.log({data_str +'Metrics/rmse_y': perf_dict['rmse_y']})
-    wandb.log({data_str +'Metrics/rmse_z': perf_dict['rmse_z']})
+    wandb.log({data_str +'Metrics/precision': perf_dict['precision']}, step=iteration)
+    wandb.log({data_str +'Metrics/recall': perf_dict['recall']}, step=iteration)
+    wandb.log({data_str +'Metrics/rmse_x': perf_dict['rmse_x']}, step=iteration)
+    wandb.log({data_str +'Metrics/rmse_y': perf_dict['rmse_y']}, step=iteration)
+    wandb.log({data_str +'Metrics/rmse_z': perf_dict['rmse_z']}, step=iteration)
 
 def load_from_eval_dict(eval_dict):
 
@@ -159,14 +159,14 @@ def train(cfg,
 
         # Logging
         if batch_idx % 10 == 0:
-            wandb.log({'SL Losses/gmm_loss': gmm_loss.detach().cpu()})
-            wandb.log({'SL Losses/count_loss': (-count_prob.mean()).detach().cpu()})
-            wandb.log({'SL Losses/bg_loss': background_loss.detach().cpu()})
+            wandb.log({'SL Losses/gmm_loss': gmm_loss.detach().cpu()}, step=batch_idx)
+            wandb.log({'SL Losses/count_loss': (-count_prob.mean()).detach().cpu()}, step=batch_idx)
+            wandb.log({'SL Losses/bg_loss': background_loss.detach().cpu()}, step=batch_idx)
             if batch_idx > cfg.supervised.num_iter:
                 if batch_idx % cfg.autoencoder.freq_ae == 0:
-                    wandb.log({'AE Losses/p_x_given_z': log_p_x_given_z.detach().cpu()})
-                    wandb.log({'AE Losses/RMSE(rec)': torch.sqrt(((x-(ae_img+out_inp['background']))**2).mean()).detach().cpu()})
-                    wandb.log({'AE Losses/sum(psf)': psf.psf_volume[0].sum().detach().cpu()})
+                    wandb.log({'AE Losses/p_x_given_z': log_p_x_given_z.detach().cpu()}, step=batch_idx)
+                    wandb.log({'AE Losses/RMSE(rec)': torch.sqrt(((x-(ae_img+out_inp['background']))**2).mean()).detach().cpu()}, step=batch_idx)
+                    wandb.log({'AE Losses/sum(psf)': psf.psf_volume[0].sum().detach().cpu()}, step=batch_idx)
 
         if batch_idx % cfg.output.log_interval == 0:
             print(batch_idx)
@@ -174,18 +174,21 @@ def train(cfg,
                 pred_df = post_proc(out_sim, ret='df')
                 target_df = sample_to_df(*sim_vars[:-1])
                 eval_logger(pred_df, target_df, batch_idx, data_str='Sim. ')
-                wandb.log({'Sim. Metrics/prob_fac': torch.sigmoid(out_sim['logits']).sum().item()/len(target_df)})
-                wandb.log({'Sim. Metrics/n_em_fac': len(pred_df)/len(target_df)})
+                wandb.log({'Sim. Metrics/prob_fac': torch.sigmoid(out_sim['logits']).sum().item()/len(target_df)}, step=batch_idx)
+                wandb.log({'Sim. Metrics/n_em_fac': len(pred_df)/len(target_df)}, step=batch_idx)
+                wandb.log({'Prob hist': wandb.Image(plot_prob_hist(out_sim))}, step=batch_idx)
 
                 if cfg.output.log_figs:
                     sl_fig = sl_plot(x, xsim_noise, pred_df, target_df, background, out_sim)
                     plt.show()
-                    wandb.log({'SL summary': sl_fig})
+                    wandb.log({'SL summary': sl_fig}, step=batch_idx)
 
                 if eval_dict is not None:
                     res_eval = model(eval_img[None].cuda())
                     ae_img = microscope(*post_proc(res_eval, ret='micro'))
                     pred_eval_df = post_proc(res_eval, ret='df')
+                    wandb.log({'AE Losses/N preds(eval)': len(pred_eval_df)}, step=batch_idx)
+
                     print(pred_eval_df['int'].mean())
                     if eval_df is not None:
                         eval_logger(pred_eval_df, eval_df, batch_idx, data_str='Inp. ')
@@ -193,7 +196,7 @@ def train(cfg,
                     if cfg.output.log_figs:
                         eval_fig = gt_plot(eval_img, pred_eval_df, eval_df, eval_dict['px_size'],ae_img[0]+res_eval['background'][0], psf)
                         plt.show()
-                        wandb.log({'GT': eval_fig})
+                        wandb.log({'GT': eval_fig}, step=batch_idx)
 
             # storing
             if batch_idx > 0 and abs(cfg.supervised.num_iter - batch_idx)<cfg.output.log_interval:

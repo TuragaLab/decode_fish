@@ -6,6 +6,7 @@ __all__ = ['sample_to_df', 'SIPostProcess', 'ISIPostProcess']
 from ..imports import *
 import torch.nn.functional as F
 from .plotting import *
+from .emitter_io import *
 
 # Cell
 def sample_to_df(locs, x_os, y_os, z_os, ints, px_size=[100,100,100]):
@@ -44,6 +45,7 @@ class SIPostProcess(torch.nn.Module):
             d1 = 0; d2 = 0
         else:
             d1 = 1/np.sqrt(2); d2 = 1/np.sqrt(3)
+#             d1 = 1; d2 = 1
         self.filt = torch.FloatTensor([[[d2,d1,d2],[d1,1,d1],[d2,d1,d2]],
                                        [[d1, 1,d1],[1, 1, 1],[d1, 1,d1]],
                                        [[d2,d1,d2],[d1,1,d1],[d2,d1,d2]]])[None,None]
@@ -128,6 +130,8 @@ class SIPostProcess(torch.nn.Module):
 
             return res_dict
 
+# p_col = []
+
 #export
 class ISIPostProcess(SIPostProcess):
 
@@ -156,18 +160,32 @@ class ISIPostProcess(SIPostProcess):
                 pool = F.max_pool3d(p_clip,3,1,padding=1)
                 max_mask1 = torch.eq(p, pool).float()
                 max_mask1[p==0] = 0
-                max_mask1 *= tot_mask
 
                 tot_mask *= (torch.ones_like(max_mask1) - max_mask1)
 
                 # Add probability values from the adjacent pixels
                 conv = F.conv3d(p, self.filt.to(device) ,padding=1)
-                p_ps = torch.clamp_max(max_mask1 * conv, 1)
+                p_ps = max_mask1 * conv
 
-                p_ret += p_ps
+                p_ret += torch.clamp_max(p_ps, 1)
 
-                p_proc = F.conv3d(max_mask1, self.filt.to(device),padding=1)*p
-                p_proc = p_proc/p_proc.sum() * p_ps.sum()
+                p_fac = 1/p_ps
+                p_fac[torch.isinf(p_fac)] = 0
+                p_fac = torch.clamp_max(p_fac, 1)
+                p_proc = F.conv3d(p_fac, self.filt.to(device),padding=1)*p
+
+#                 plt.figure(figsize=(20,5))
+#                 plt.subplot(141)
+#                 plt.imshow(cpu(p[0,0][sl[1:]]).sum(0))
+#                 plt.subplot(142)
+#                 plt.imshow(cpu(p_ps[0,0][sl[1:]]).sum(0))
+#                 plt.title(cpu(p_ps[0,0][sl[1:]]).sum())
+#                 plt.colorbar()
+#                 plt.subplot(143)
+#                 plt.imshow(cpu(p_proc[0,0][sl[1:]]).sum(0))
+#                 plt.title(cpu(p_proc[0,0][sl[1:]]).sum())
+#                 plt.colorbar()
+#                 plt.show()
 
                 p = p - p_proc
                 torch.clamp_min_(p, 0)

@@ -28,7 +28,7 @@ evaluation:
     px_size: [100,100,300]
     
 prob_generator:
-    low: 0.00000001
+    low: 1e-8
     high: 0.005
     
 bg_estimation:
@@ -54,17 +54,17 @@ noise:
     baseline:  0.09
     
 microscope:
-    multipl: 50
+    multipl: 200
     psf_extent_zyx : [11,21,21]
     psf_noise: 
-    clamp_mode: 'cp'
+    clamp_mode: 'cx'
 
 dataloader:
     bs: 2
     
 foci:
     _target_: decode_fish.funcs.dataset.AddFoci
-    n_foci_avg: 2.
+    n_foci_avg: 0.
     rad_range: [25,200]
     n_mol_range: [5,30]
     px_size_xyz: ${evaluation.px_size}
@@ -79,35 +79,46 @@ model:
     p_offset: -4.0
     order: 'ce'
     
-post_proc:
+post_proc_isi:
     _target_: decode_fish.funcs.output_trafo.ISIPostProcess
-    m1_threshold: 0.05
-    samp_threshold: 0.3
+    m1_threshold: 0.03
+    samp_threshold: 0.5
     px_size: ${evaluation.px_size}
     diag: True
     
+post_proc_si:
+    _target_: decode_fish.funcs.output_trafo.SIPostProcess
+    m1_threshold: 0.03
+    m2_threshold: 0.5
+    samp_threshold: 0.1
+    px_size: ${evaluation.px_size}
+    diag: False
+    
 supervised:
-    num_iter: 12000
+    num_iter: 10000
     lr: 5e-4
     bl_loss_scale: 0.01
     cnt_loss_scale: 1
     p_quantile: 0.
-    grad_clip: 0.03
+    grad_clip: 0.001
     gamma: 0.5
-    step_size: 6000
+    step_size: 2000
   
 autoencoder:
-    num_iter: 12000
+    num_iter: 13000
     lr: 5e-5
-    grad_clip: 0.03
+    grad_clip: 0.001
     gamma: 0.5
-    step_size: 6000
+    step_size: 1000
     freq_ae: 1
     norm_reg: 0
+    
+other:
+    pp: 'si'
 
 #min intensity when sampling
 pointprocess:
-    min_int: 0.2
+    min_int: 0.3
   
 # hydra:
 #   run:

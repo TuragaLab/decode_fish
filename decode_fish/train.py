@@ -33,7 +33,7 @@ def my_app(cfg):
     else:
         inp_offset, inp_scale = cfg.model.inp_scale, cfg.model.inp_offset
     model = hydra.utils.instantiate(cfg.model, inp_scale=float(inp_scale), inp_offset=float(inp_offset))
-    post_proc = hydra.utils.instantiate(cfg.post_proc)
+    post_proc = load_post_proc(cfg)
     
     psf  .to(cfg.device.gpu_device)
     model.to(cfg.device.gpu_device)

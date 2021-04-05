@@ -22,6 +22,7 @@ from torch.utils.tensorboard import SummaryWriter
 from ..engine.point_process import PointProcessUniform
 from ..engine.gmm_loss import PointProcessGaussian
 import wandb
+from madgrad import MADGRAD
 # from decode_fish.funcs.visualization vimport get_simulation_statistics
 
 # Cell
@@ -145,12 +146,12 @@ def train(cfg,
                 ae_img = microscope(*post_proc(out_inp, ret='micro'))
                 log_p_x_given_z = - microscope.noise(ae_img,out_inp['background']).log_prob(x).mean()
                 if cfg.autoencoder.norm_reg:
-                    log_p_x_given_z += cfg.autoencoder.norm_reg * torch.norm(psf.psf_volume.sum(), 1)
+                    log_p_x_given_z += cfg.autoencoder.norm_reg * torch.norm(torch.nn.ReLU().forward(-psf.psf_volume).sum(), 1)
 
     #             Update PSF parameters
                 log_p_x_given_z.backward()
 
-                if cfg.supervised.grad_clip:
+                if cfg.autoencoder.grad_clip:
                     torch.nn.utils.clip_grad_norm_(optim_psf.param_groups[0]['params'], max_norm=cfg.autoencoder.grad_clip, norm_type=2)
 
                 optim_psf.step()

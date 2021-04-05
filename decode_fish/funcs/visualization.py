@@ -64,7 +64,7 @@ def get_simulation_statistics(decode_dl, micro, int_threshold=1, samples = 1):
             im = plt.imshow(xsim_noise)
             add_colorbar(im)
             plt.title('Sim. Image ')
-            plt.scatter(sim_df['x']/100,sim_df['y']/100, color='red', s=5.)
+#             plt.scatter(sim_df['x']/100,sim_df['y']/100, color='red', s=5.)
 
             plt.show()
 

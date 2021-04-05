@@ -47,6 +47,7 @@ PSF:
     _target_: decode_fish.engine.psf.LinearInterpolatedPSF 
     upsample_factor: 1
     device: ${device.gpu_device}
+    gauss_radii: [1,1,1]
     
 noise:
     _target_: decode_fish.engine.noise.sCMOS
@@ -82,7 +83,7 @@ model:
 post_proc_isi:
     _target_: decode_fish.funcs.output_trafo.ISIPostProcess
     m1_threshold: 0.03
-    samp_threshold: 0.5
+    samp_threshold: 0.7
     px_size: ${evaluation.px_size}
     diag: True
     
@@ -96,25 +97,31 @@ post_proc_si:
     
 supervised:
     num_iter: 10000
-    lr: 5e-4
     bl_loss_scale: 0.01
     cnt_loss_scale: 1
-    p_quantile: 0.
-    grad_clip: 0.001
+    grad_clip: 0.005
     gamma: 0.5
-    step_size: 2000
+    step_size: 6000
+    opt:
+     _target_: torch.optim.AdamW
+     lr: 5e-4
+#      momentum: 0.
+#      weight_decay: 0.
+     
   
 autoencoder:
     num_iter: 13000
-    lr: 5e-5
     grad_clip: 0.001
     gamma: 0.5
     step_size: 1000
     freq_ae: 1
     norm_reg: 0
+    opt:
+     _target_: torch.optim.AdamW
+     lr: 5e-5
     
 other:
-    pp: 'si'
+    pp: 'isi'
 
 #min intensity when sampling
 pointprocess:

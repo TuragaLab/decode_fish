@@ -18,6 +18,7 @@ from decode_fish.engine.point_process import PointProcessUniform
 from decode_fish.engine.gmm_loss import PointProcessGaussian
 
 from decode_fish.funcs.train_funcs import *
+from madgrad import MADGRAD
 import wandb
 
 @hydra.main(config_path='/groups/turaga/home/speisera/Dropbox (mackelab)/Artur/WorkDB/deepstorm/decode_fish/config', config_name='train')
@@ -58,11 +59,11 @@ def my_app(cfg):
                    name=cfg.run_name
               )
 
-    opt_net = AdamW(model.parameters(), lr=cfg.supervised.lr)
+    opt_net = hydra.utils.instantiate(cfg.supervised.opt, params=model.parameters())
     scheduler_net = torch.optim.lr_scheduler.StepLR(opt_net, step_size=cfg.supervised.step_size, gamma=cfg.supervised.gamma)
     
     psf_param = list(psf.parameters()) # + list(model_net.parameters()) + list(micro.parameters())
-    opt_psf  = AdamW(psf_param, lr=cfg.autoencoder.lr)
+    opt_psf  = hydra.utils.instantiate(cfg.supervised.opt, params=psf_param)
     scheduler_psf = torch.optim.lr_scheduler.StepLR(opt_psf, step_size=cfg.autoencoder.step_size, gamma=cfg.autoencoder.gamma)
     
     if cfg.data_path.model_init is not None:
@@ -70,7 +71,7 @@ def my_app(cfg):
         model = load_model_state(model, cfg.data_path.model_init).cuda()
         micro.load_state_dict(torch.load(Path(cfg.data_path.model_init)/'microscope.pkl'))
         opt_net.load_state_dict(torch.load(Path(cfg.data_path.model_init)/'opt_net.pkl'))
-        opt_psf.load_state_dict(torch.load(Path(cfg.data_path.model_init)/'opt_psf.pkl'))
+#         opt_psf.load_state_dict(torch.load(Path(cfg.data_path.model_init)/'opt_psf.pkl'))
         psf.load_state_dict(torch.load(Path(cfg.data_path.model_init)/'psf.pkl'))
         
     train(cfg=cfg,

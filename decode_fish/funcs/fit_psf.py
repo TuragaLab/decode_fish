@@ -4,7 +4,7 @@ __all__ = ['get_peaks_3d', 'plot_detection', 'extract_roi', 'fit_psf']
 
 # Cell
 from ..imports import *
-from .file_io import *
+# from decode_fish.funcs.file_io import *
 from .utils import *
 from .plotting import *
 from .dataset import EstimateBackground

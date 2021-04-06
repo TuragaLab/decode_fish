@@ -146,7 +146,7 @@ def train(cfg,
                 ae_img = microscope(*post_proc(out_inp, ret='micro'))
                 log_p_x_given_z = - microscope.noise(ae_img,out_inp['background']).log_prob(x).mean()
                 if cfg.autoencoder.norm_reg:
-                    log_p_x_given_z += cfg.autoencoder.norm_reg * torch.norm(torch.nn.ReLU().forward(-psf.psf_volume).sum(), 1)
+                    log_p_x_given_z += cfg.autoencoder.norm_reg * (torch.norm(torch.nn.ReLU().forward(-psf.psf_volume).sum(), 1) + torch.norm(psf.psf_volume.sum() - 1, 1))
 
     #             Update PSF parameters
                 log_p_x_given_z.backward()

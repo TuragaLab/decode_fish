@@ -63,7 +63,7 @@ def my_app(cfg):
     scheduler_net = torch.optim.lr_scheduler.StepLR(opt_net, step_size=cfg.supervised.step_size, gamma=cfg.supervised.gamma)
     
     psf_param = list(psf.parameters()) # + list(model_net.parameters()) + list(micro.parameters())
-    opt_psf  = hydra.utils.instantiate(cfg.supervised.opt, params=psf_param)
+    opt_psf  = hydra.utils.instantiate(cfg.autoencoder.opt, params=psf_param)
     scheduler_psf = torch.optim.lr_scheduler.StepLR(opt_psf, step_size=cfg.autoencoder.step_size, gamma=cfg.autoencoder.gamma)
     
     if cfg.data_path.model_init is not None:

@@ -28,7 +28,7 @@ def get_simulation_statistics(decode_dl, micro, int_threshold=1, samples = 1):
 
 
     """
-    z_ind = 24
+    z_ind = decode_dl.dataset.dataset_tfms[0].crop_sz[0]//2
     with torch.no_grad():
 
         for _ in range(samples):
@@ -38,35 +38,35 @@ def get_simulation_statistics(decode_dl, micro, int_threshold=1, samples = 1):
                 x, local_rate, background = next(iter(decode_dl))
                 xmax = x[0,0,z_ind].max()
 
-            x = x[0,0,z_ind].cpu().numpy()
-
             sim_vars = PointProcessUniform(local_rate, min_int=decode_dl.min_int).sample()
             xsim = micro(*sim_vars)
-            xsim_noise = micro.noise(xsim, background).sample()
+            xsim = micro.noise(xsim, background).sample()
             sim_df = sample_to_df(*sim_vars[:-1])
             sim_df = sim_df[sim_df['frame_idx'] == 0]
 
-            xsim_noise = xsim_noise.cpu().numpy()[0,0,z_ind]
-            background = background[0,0].cpu().numpy()
+            fig, axes = plt.subplots(ncols=3, figsize=(15,5))
+            fig.suptitle('z slice')
 
-            fig = plt.figure(figsize=(18,6))
-            plt.subplot(131)
-            im = plt.imshow(x)
+            x = cpu(x[0,0])
+            xsim = cpu(xsim[0,0])
+
+            im = axes[0].imshow(x[z_ind])
             add_colorbar(im)
-            plt.title('Real Image ')
+            axes[0].set_title('Recording')
 
-            plt.subplot(132)
-            im = plt.imshow(background.mean(0))
+            im = axes[1].imshow(cpu(background[0,0])[z_ind])
             add_colorbar(im)
-            plt.title('Background')
+            axes[1].set_title('Background')
 
-            plt.subplot(133)
-            im = plt.imshow(xsim_noise)
+            im = axes[2].imshow(xsim[z_ind])
             add_colorbar(im)
-            plt.title('Sim. Image ')
-#             plt.scatter(sim_df['x']/100,sim_df['y']/100, color='red', s=5.)
+            axes[2].set_title('Simulation')
 
-            plt.show()
+            axes = plot_3d_projections(x, 'max')
+            axes[1].set_title('Recording, max proj')
+
+            axes = plot_3d_projections(xsim, 'max')
+            axes[1].set_title('Simulation, max proj')
 
 # Cell
 def get_prediction(model, post_proc, img, micro=None, cuda=True, return_rec=False):

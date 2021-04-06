@@ -41,22 +41,26 @@ PSF:
   _target_: decode_fish.engine.psf.LinearInterpolatedPSF
   upsample_factor: 1
   device: ${device.gpu_device}
+  gauss_radii:
+  - 1.5
+  - 1
+  - 1
 noise:
   _target_: decode_fish.engine.noise.sCMOS
   theta: 2.0
   baseline: 0.09
 microscope:
-  multipl: 12
+  multipl: 20
   psf_extent_zyx:
   - 17
   - 17
   - 17
-  psf_noise: 0.0001
+  psf_noise: 0.0005
 dataloader:
   bs: 2
 foci:
   _target_: decode_fish.funcs.dataset.AddFoci
-  n_foci_avg: 2.0
+  n_foci_avg: 2
   rad_range:
   - 25
   - 200
@@ -94,5 +98,5 @@ autoencoder:
   gamma: 0.5
   step_size: 6000
 pointprocess:
-  min_int: 0.3
+  min_int: 0.15
 ground_truth: null

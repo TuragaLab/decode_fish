@@ -45,7 +45,6 @@ roi_mask:
                
 PSF:
     _target_: decode_fish.engine.psf.LinearInterpolatedPSF 
-    upsample_factor: 1
     device: ${device.gpu_device}
     gauss_radii: [1,1,1]
     

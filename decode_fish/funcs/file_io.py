@@ -103,7 +103,7 @@ def load_tiff_image(image_path: str):
 
 # Cell
 def get_gaussian_psf(size_zyx, radii):
-    PSF = LinearInterpolatedPSF(size_zyx,1, device='cuda')
+    PSF = LinearInterpolatedPSF(size_zyx, device='cuda')
     state_dict = PSF.state_dict()
     gauss_vol = gaussian_sphere(size_zyx, radii, [size_zyx[0]//2,size_zyx[1]//2,size_zyx[2]//2])
     gauss_vol = gauss_vol/gauss_vol.sum()
@@ -116,15 +116,15 @@ def load_psf_noise_micro(cfg):
 
     if cfg.data_path.psf_path:
         psf_state = torch.load(cfg.data_path.psf_path)
-        psf = LinearInterpolatedPSF(psf_state['psf_volume'].shape[-3:], cfg.PSF.upsample_factor, cfg.PSF.device)
+        psf = LinearInterpolatedPSF(psf_state['psf_volume'].shape[-3:], cfg.PSF.device)
         psf.load_state_dict(psf_state)
 
-        if cfg.microscope.psf_extent_zyx:
-            psf = crop_psf(psf,cfg.microscope.psf_extent_zyx)
+        if cfg.PSF.psf_extent_zyx:
+            psf = crop_psf(psf,cfg.PSF.psf_extent_zyx)
 
     else:
 
-        psf = get_gaussian_psf(cfg.microscope.psf_extent_zyx, cfg.PSF.gauss_radii)
+        psf = get_gaussian_psf(cfg.PSF.psf_extent_zyx, cfg.PSF.gauss_radii)
 
     noise = hydra.utils.instantiate(cfg.noise)
     micro = Microscope(parametric_psf=[psf], noise=noise, multipl=cfg.microscope.multipl, psf_noise=cfg.microscope.psf_noise, clamp_mode=cfg.microscope.clamp_mode).cuda()

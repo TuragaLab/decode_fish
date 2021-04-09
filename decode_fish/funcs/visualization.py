@@ -69,7 +69,7 @@ def get_simulation_statistics(decode_dl, micro, int_threshold=1, samples = 1):
             axes[1].set_title('Simulation, max proj')
 
 # Cell
-def get_prediction(model, post_proc, img, micro=None, cuda=True, return_rec=False):
+def get_prediction(model, post_proc, img, micro=None, cuda=True, return_rec=False, min_int=0.):
 
     with torch.no_grad():
 
@@ -77,9 +77,12 @@ def get_prediction(model, post_proc, img, micro=None, cuda=True, return_rec=Fals
         model.eval().cuda() if cuda else model.eval().cpu()
         res_dict = model(img.cuda()) if cuda else model(img)
         pred_df = post_proc(res_dict)
+        pred_df = pred_df[pred_df['int'] > min_int]
 
         if return_rec:
-            ae_img_3d = micro(*post_proc(res_dict, ret='micro'))
+            locations, x_os_3d, y_os_3d, z_os_3d, ints_3d, output_shape = post_proc(res_dict, ret='micro')
+            inds = torch.where(ints_3d > min_int)[0]
+            ae_img_3d = micro([l[inds] for l in locations], x_os_3d[inds], y_os_3d[inds], z_os_3d[inds], ints_3d[inds], output_shape)
             return pred_df, ae_img_3d + res_dict['background'], res_dict
 
         return pred_df

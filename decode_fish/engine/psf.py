@@ -17,26 +17,26 @@ class LinearInterpolatedPSF(nn.Module):
     Linearly interpolates psf volume with offsets
     """
 
-    def __init__(self, size_zyx ,upsample_factor=3, device='cuda'):
+    def __init__(self, size_zyx, device='cuda'):
         super().__init__()
 
-        self.upsampled_psf_size = list((upsample_factor*(np.array(size_zyx)-1)+1).astype('int'))
+        self.psf_size = list(np.array(size_zyx).astype('int'))
         # +- /sz so that the values correspond to the pixel centers
-        v = [torch.linspace(-1+1/sz, 1-1/sz, int(sz)) for sz in self.upsampled_psf_size]
+        v = [torch.linspace(-1+1/sz, 1-1/sz, int(sz)) for sz in self.psf_size]
 
         self.register_buffer('x', v[2])
         self.register_buffer('y', v[1])
         self.register_buffer('z', v[0])
         self.device=device
-        self.psf_volume = nn.Parameter(0.01*torch.rand(1, *self.upsampled_psf_size))
+        self.psf_volume = nn.Parameter(0.01*torch.rand(1, *self.psf_size))
 
     def forward(self, x_offset_val, y_offset_val, z_offset_val):
 
         N_em = x_offset_val.shape[0]
         # Scale offsets by size. Factor of two because range [-1,1]
-        x_offset = 2 * x_offset_val.view(-1) / self.upsampled_psf_size[2]
-        y_offset = 2 * y_offset_val.view(-1) / self.upsampled_psf_size[1]
-        z_offset = 2 * z_offset_val.view(-1) / self.upsampled_psf_size[0]
+        x_offset = 2 * x_offset_val.view(-1) / self.psf_size[2]
+        y_offset = 2 * y_offset_val.view(-1) / self.psf_size[1]
+        z_offset = 2 * z_offset_val.view(-1) / self.psf_size[0]
         i_img, x_grid, y_grid, z_grid = torch.meshgrid(torch.arange(N_em, dtype=torch.float32).to(self.device), self.x.to(self.device), self.y.to(self.device), self.z.to(self.device))
 
         x_grid = x_grid - x_offset[:, None, None, None]
@@ -48,11 +48,37 @@ class LinearInterpolatedPSF(nn.Module):
 
         return psf_out.transpose(-3,-1)
 
+    def get_com(self):
+
+        x_grid, y_grid, z_grid = torch.meshgrid(torch.arange(self.psf_size[2]),torch.arange(self.psf_size[1]),torch.arange(self.psf_size[0]))
+        m_grid = torch.stack([x_grid, y_grid, z_grid], -1).to(self.device)
+
+        vol = self.psf_volume[0]**2
+
+        zc = (m_grid[:,:,:,0] * vol).sum()/vol.sum()
+        yc = (m_grid[:,:,:,1] * vol).sum()/vol.sum()
+        xc = (m_grid[:,:,:,2] * vol).sum()/vol.sum()
+
+        return zc, yc, xc
+#         return torch.stack((zc, yc, xc)).to(self.device)
+
+    def com_loss(self):
+
+        return torch.norm(torch.stack(self.get_com()) - torch.tensor(self.psf_size).to(self.device)//2, 2)
+
+    def clip_loss(self):
+
+        return torch.norm(torch.nn.ReLU().forward(-self.psf_volume).sum(), 2)
+
+    def sum_loss(self, target=1):
+
+        return torch.norm(self.psf_volume.sum() - 1, 2)
+
 # Cell
 def crop_psf(psf, extent_zyx):
 
     cropped_vol = center_crop(psf.psf_volume, extent_zyx)
-    cropped_psf = LinearInterpolatedPSF(extent_zyx, upsample_factor= 1)
+    cropped_psf = LinearInterpolatedPSF(extent_zyx)
     cropped_psf.psf_volume.data = cropped_vol
 
     return cropped_psf

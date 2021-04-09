@@ -146,7 +146,12 @@ def train(cfg,
                 ae_img = microscope(*post_proc(out_inp, ret='micro'))
                 log_p_x_given_z = - microscope.noise(ae_img,out_inp['background']).log_prob(x).mean()
                 if cfg.autoencoder.norm_reg:
-                    log_p_x_given_z += cfg.autoencoder.norm_reg * (torch.norm(torch.nn.ReLU().forward(-psf.psf_volume).sum(), 1) + torch.norm(psf.psf_volume.sum() - 1, 1))
+#                     log_p_x_given_z += cfg.autoencoder.norm_reg * (psf.clip_loss() + psf.sum_loss() + psf.com_loss())
+                    log_p_x_given_z += cfg.autoencoder.norm_reg * (psf.sum_loss() + psf.com_loss())
+
+#                 if cfg.autoencoder.l1_decay:
+#                     l1_norm = sum(p.abs().sum() for p in optim_psf.param_groups[0]['params'])
+#                     log_p_x_given_z += cfg.autoencoder.l1_decay * l1_norm
 
     #             Update PSF parameters
                 log_p_x_given_z.backward()
@@ -190,7 +195,6 @@ def train(cfg,
                     pred_eval_df = post_proc(res_eval, ret='df')
                     wandb.log({'AE Losses/N preds(eval)': len(pred_eval_df)}, step=batch_idx)
 
-                    print(pred_eval_df['int'].mean())
                     if eval_df is not None:
                         eval_logger(pred_eval_df, eval_df, batch_idx, data_str='Inp. ')
 

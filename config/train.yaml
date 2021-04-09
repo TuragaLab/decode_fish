@@ -47,6 +47,7 @@ PSF:
     _target_: decode_fish.engine.psf.LinearInterpolatedPSF 
     device: ${device.gpu_device}
     gauss_radii: [1,1,1]
+    psf_extent_zyx : [21,21,21]
     
 noise:
     _target_: decode_fish.engine.noise.sCMOS
@@ -55,8 +56,7 @@ noise:
     
 microscope:
     multipl: 200
-    psf_extent_zyx : [11,21,21]
-    psf_noise: 
+    psf_noise: 2e-5
     clamp_mode: 'cx'
 
 dataloader:
@@ -109,15 +109,16 @@ supervised:
      
   
 autoencoder:
-    num_iter: 13000
-    grad_clip: 0.001
+    num_iter: 8000
+    grad_clip: 0.1
     gamma: 0.5
-    step_size: 1000
+    step_size: 2000
     freq_ae: 1
-    norm_reg: 0
+    norm_reg: 0.5
     opt:
-     _target_: torch.optim.AdamW
-     lr: 5e-5
+     _target_: torch.optim.SGD
+     lr: 5e-4
+     momentum: 0
     
 other:
     pp: 'isi'

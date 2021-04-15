@@ -45,8 +45,8 @@ def eval_logger(pred_df, target_df, iteration, data_str='Sim. '):
 
 def load_from_eval_dict(eval_dict):
 
-    eval_img = load_tiff_image(eval_dict['image_path'])
-    eval_img = crop_vol(eval_img, eval_dict['crop_sl'])
+    eval_img = load_tiff_image(sorted(glob.glob(eval_dict['image_path']))[eval_dict['img_ind']])
+    eval_img = eval_img[eval_dict['crop_sl']]
     if eval_dict['txt_path'] is not None:
         eval_df = simfish_to_df(eval_dict['txt_path'], px_size=eval_dict['px_size'])
         eval_df = crop_df(eval_df, eval_dict['crop_sl'], px_size=eval_dict['px_size'])
@@ -78,7 +78,6 @@ def train(cfg,
     """
     Training loop for autoencoder learning. Alternates between a simulator training step to train the inference network
     and an autoencoder step to train the PSF (and microscope) parameters.
-
     Args:
         model (torch.nn.Module): DECODE 3D UNet.
         num_iter (int): Number of training iterations for pure sl learning(batches).
@@ -97,7 +96,6 @@ def train(cfg,
         bl_loss_scale  (float): The background loss gets scaled by this factor when added to the GMM loss.
         grad_clip  (float): Gradient clipping threshold.
         eval_dict  (dict, optional): Dictionary with evaluation parameters
-
     """
 
     save_dir = Path(cfg.output.save_dir)
@@ -178,11 +176,11 @@ def train(cfg,
             print(batch_idx)
             with torch.no_grad():
                 pred_df = post_proc(out_sim, ret='df')
-                target_df = sample_to_df(*sim_vars[:-1])
+                target_df = sample_to_df(*sim_vars[:-1], px_size=cfg.evaluation.px_size)
                 eval_logger(pred_df, target_df, batch_idx, data_str='Sim. ')
                 wandb.log({'Sim. Metrics/prob_fac': torch.sigmoid(out_sim['logits']).sum().item()/len(target_df)}, step=batch_idx)
                 wandb.log({'Sim. Metrics/n_em_fac': len(pred_df)/len(target_df)}, step=batch_idx)
-                wandb.log({'Prob hist': wandb.Image(plot_prob_hist(out_sim))}, step=batch_idx)
+#                 wandb.log({'Prob hist': wandb.Image(plot_prob_hist(out_sim))}, step=batch_idx)
 
                 if cfg.output.log_figs:
                     sl_fig = sl_plot(x, xsim_noise, pred_df, target_df, background, out_sim)

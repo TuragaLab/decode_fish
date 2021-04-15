@@ -25,6 +25,7 @@ evaluation:
     image_path: ${data_path.image_path}
     txt_path: /groups/turaga/home/speisera/share_TUM/FishSIM/sim_1/mRNAlevel_200/cell3D/strong/w1_HelaKyoto_Gapdh_2597_p01_cy3__Cell_CP_14__cell3D__1.txt
     crop_sl: s_[:,100:250,100:250,25:60]
+    img_ind: 0
     px_size: [100,100,300]
     
 prob_generator:

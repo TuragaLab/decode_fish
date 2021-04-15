@@ -87,13 +87,15 @@ def get_prediction(model, post_proc, img, micro=None, cuda=True, return_rec=Fals
 
         return pred_df
 
-def eval_random_crop(decode_dl, model, post_proc, micro, projection='mean', cuda=False, samples=1):
+def eval_random_crop(decode_dl, model, post_proc, micro, projection='mean', cuda=False, samples=1, int_threshold=1):
 
     with torch.no_grad():
 
         for _ in range(samples):
 
-            x, local_rate, background = next(iter(decode_dl))
+            x = torch.zeros(1)
+            while x.max() < int_threshold:
+                x, local_rate, background = next(iter(decode_dl))
             pred_df, rec, res_dict = get_prediction(model, post_proc, x[:1], micro=micro, cuda=True, return_rec=True)
             pred_df = nm_to_px(pred_df, post_proc.px_size)
 
@@ -112,8 +114,8 @@ def eval_random_crop(decode_dl, model, post_proc, micro, projection='mean', cuda
             rmse = np.sqrt(((diff)**2).mean())
 
             axes[1].set_title(f'Reconstruction {rmse:.2f}', size=16)
-
-            pred_df, rec,res_dict
+            plt.show()
+            # pred_df, rec,res_dict
 
 def eval_random_sim(decode_dl, model, post_proc, micro, projection='mean', plot_gt=True, cuda=True, samples=1):
 

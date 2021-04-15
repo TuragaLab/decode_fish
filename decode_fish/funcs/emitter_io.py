@@ -40,7 +40,7 @@ def cat_emitter_dfs(df_list):
         if len(ret_df):
             dfc['frame_idx'] += ret_df['frame_idx'].values[-1] + 1
             dfc['loc_idx'] += ret_df['loc_idx'].values[-1] + 1
-        ret_df = pd.concat([ret_df, dfc])
+        ret_df = pd.concat([ret_df, dfc], ignore_index=True)
     return ret_df
 
 #export

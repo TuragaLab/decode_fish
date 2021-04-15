@@ -30,7 +30,7 @@ def my_app(cfg):
     psf, noise, micro = load_psf_noise_micro(cfg)
     
     if cfg.model.inp_scale is None or cfg.model.inp_offset is None:
-        inp_offset, inp_scale = get_forward_scaling(img_3d)
+        inp_offset, inp_scale = get_forward_scaling(img_3d[0])
     else:
         inp_offset, inp_scale = cfg.model.inp_scale, cfg.model.inp_offset
     model = hydra.utils.instantiate(cfg.model, inp_scale=float(inp_scale), inp_offset=float(inp_offset))

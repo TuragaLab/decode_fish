@@ -10,6 +10,7 @@ from typing import Union
 import skimage.measure
 from torch.utils.data import DataLoader
 import random
+import inspect
 from scipy.ndimage import gaussian_filter
 
 # Cell
@@ -31,26 +32,26 @@ class DecodeDataset:
             bg_transform ([type]): background transformation
             num_iter (int, optional):define lenth of dataset. Defaults to 5000.
             device (str, optional): device cpu or gpu]. Defaults to 'cpu'.
-            scale ([type], optional): scaling image to value. Defaults to None.
-            min_value ([type], optional): minimum value. Defaults to None.
         """
 
         self.image_path = glob.glob(path)
         self.dataset_tfms = dataset_tfms
         self.num_iter = num_iter
-        self.local_rate_tfms = rate_tfms
+        self.rate_tfms = rate_tfms
         self.bg_transform = bg_transform
         self.device = device
 
         self.volumes = [load_tiff_image(f) for f in self.image_path]
+        print(f'{len(self.volumes)} volumes')
 
     def __len__(self):
         return self.num_iter
 
     def __getitem__(self, _):
-        x = random.choice(self.volumes)
+        i = random.randint(0,len(self.volumes)-1)
+        x = self.volumes[i]
         x = self._compose(x, self.dataset_tfms)
-        local_rate = self._compose(x, self.local_rate_tfms)
+        local_rate = self._compose(x, self.rate_tfms, ind = i)
         background = self.bg_transform(x)
         return x.to(self.device), local_rate.to(self.device), background.to(self.device)
 
@@ -63,9 +64,10 @@ class DecodeDataset:
         return ''
 
     @staticmethod
-    def _compose(x, list_func):
+    def _compose(x, list_func, **kwargs):
         if not list_func: list_func.append(lambda x: x)
-        for func in list_func:x = func(x)
+        for func in list_func:
+            x = func(x, **kwargs)
         return x
 
 # Cell
@@ -84,10 +86,10 @@ class TransformBase:
     def __repr__(self):
         print (f'Transform({self.__class__.__name__})')
         name = inspect.signature(self.__class__).parameters.keys()
-        print_clas_signature(self, name)
+        print_class_signature(self, name)
         return ''
 
-    def __call__(self, x):
+    def __call__(self, x, **kwargs):
         assert isinstance(x, torch.Tensor), f'must be torch.tensor not {type(x)}'
 
     @staticmethod
@@ -116,7 +118,7 @@ class ScaleTensor(TransformBase):
         self.data_max = data_max
         self.ratio = (self.high-self.low) /(self.data_max-self.data_min)
 
-    def __call__(self, x) -> torch.Tensor:
+    def __call__(self, x, **kwargs) -> torch.Tensor:
         super().__call__(x)
         return self.ratio * x + self.low- self.data_min * self.ratio
 
@@ -126,7 +128,7 @@ class EstimateBackground(TransformBase):
         self.smoothing_filter_size = smoothing_filter_size
         self.div_factor = div_factor
 
-    def __call__(self, image):
+    def __call__(self, image, **kwargs):
         background = gaussian_filter(image, self.smoothing_filter_size)/self.div_factor
         #background.clamp_min_(1.)
         return torch.tensor(background)
@@ -142,7 +144,7 @@ class RandomCrop3D(TransformBase):
     """
     Ramdomly Crops 3D tensor.
 
-    \nThis class will generate random crop of `crop_sz`. This calss is initilize
+    \nThis class will generate random crop of `crop_sz`. This class is initialized
     with `img_sz` which should be a demension of 4 [Channel, Height, Width, Depth] and
     a `crop_sz` dimesnion of 3 [Height, Width, Depth] of desired crop. For each crop
     dimension `_get_slice` function will calculate random int ranging from 0 to (img_sz-crop_sz).
@@ -152,27 +154,27 @@ class RandomCrop3D(TransformBase):
 
 
     \nParameters:
-    \n`img_sz`     : Size of the 3D image `(C, H, W, D)`
     \n`crop_sz`    : Size of the 3D crop  `(H, W, D)`
 
     \nReturns:
     \nCroped 3D image of the given `crop_sz`
 
     """
-    def __init__(self, crop_sz, roi_mask):
+    def __init__(self, crop_sz, roi_masks):
         assert len(crop_sz) == 3 , f'Lenth of crop_sz should be 3 not {len(crop_sz)}'
         self.crop_sz = tuple(crop_sz)
         self.crop_prod = crop_sz[0]*crop_sz[1]*crop_sz[2]
-        self.roi_mask = roi_mask
+        self.roi_masks = roi_masks
 
-    def __call__(self, x):
+    def __call__(self, x, **kwargs):
         _, h, w, d = x.shape
         img_sz  = tuple((h, w, d))
         assert (img_sz) >  self.crop_sz
-        super().__call__(x)
+        super().__call__(x, **kwargs)
         slice_hwd = [self._get_slice(i, k) for i, k in zip(img_sz, self.crop_sz)]
-        while self._crop(self.roi_mask[None], *slice_hwd).sum()/self.crop_prod < 0.5:
-            slice_hwd = [self._get_slice(i, k) for i, k in zip(img_sz, self.crop_sz)]
+        if 'ind' in kwargs:
+            while self._crop(self.roi_masks[kwargs['ind']][None], *slice_hwd).sum()/self.crop_prod < 0.5:
+                slice_hwd = [self._get_slice(i, k) for i, k in zip(img_sz, self.crop_sz)]
         return self._crop(x, *slice_hwd)
 
 
@@ -215,7 +217,7 @@ class AddFoci(TransformBase):
         arr = np.exp(-position[0]**2 / (2 * (radius[0] ** 2))) * np.exp(-position[1]**2 / (2 * (radius[1] ** 2))) * np.exp(-position[2]**2 / (2 * (radius[2] ** 2))) / (2 * np.pi * (radius[0] * radius[1] * radius[2]))
         return arr
 
-    def __call__(self, x) -> torch.Tensor:
+    def __call__(self, x, **kwargs) -> torch.Tensor:
         super().__call__(x)
 
         prob = self.n_foci_avg/torch.numel(x[0])
@@ -249,15 +251,22 @@ def get_roi_mask(img, pool_size=(10,10,10), percentile=50):
 # Cell
 def get_dataloader(cfg):
 
-    img_3d = load_tiff_image(cfg.data_path.image_path)[0]
+    imgs_3d        = [load_tiff_image(f)[0] for f in sorted(glob.glob(cfg.data_path.image_path))]
     estimate_backg = hydra.utils.instantiate(cfg.bg_estimation)
-    roi_mask       = get_roi_mask(img_3d, tuple(cfg.roi_mask.pool_size), percentile= cfg.roi_mask.percentile)
-    rand_crop      = RandomCrop3D((np.min([img_3d.shape[-3], cfg.random_crop.crop_sz]),cfg.random_crop.crop_sz,cfg.random_crop.crop_sz), roi_mask)
+    roi_masks     = [get_roi_mask(img, tuple(cfg.roi_mask.pool_size), percentile= cfg.roi_mask.percentile) for img in imgs_3d]
+
+    min_shape = tuple(np.stack([v.shape for v in imgs_3d]).min(0)[-3:])
+    crop_zyx = (cfg.random_crop.crop_sz, cfg.random_crop.crop_sz,cfg.random_crop.crop_sz)
+    if crop_zyx > min_shape:
+        crop_zyx = tuple(np.stack([min_shape, crop_zyx]).min(0))
+        print('Crop size larger than volume in at least one dimension. Crop size changed to', crop_zyx)
+
+    rand_crop      = RandomCrop3D(crop_zyx, roi_masks)
 
     probmap_generator = ScaleTensor(low=cfg.prob_generator.low,
                                     high=cfg.prob_generator.high,
-                                    data_min = img_3d.min(),
-                                    data_max = img_3d.max())
+                                    data_min = np.array([i.min() for i in imgs_3d]).min(),
+                                    data_max = np.array([i.max() for i in imgs_3d]).max())
 
     dataset_tfms = [rand_crop]
     rate_tfms = [probmap_generator]
@@ -276,4 +285,4 @@ def get_dataloader(cfg):
     decode_dl = DataLoader(ds, batch_size=cfg.dataloader.bs, num_workers=0)
     decode_dl.min_int = cfg.pointprocess.min_int
 
-    return img_3d, decode_dl
+    return imgs_3d, decode_dl

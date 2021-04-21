@@ -63,13 +63,14 @@ def my_app(cfg):
     scheduler_net = torch.optim.lr_scheduler.StepLR(opt_net, step_size=cfg.supervised.step_size, gamma=cfg.supervised.gamma)
     
     psf_param = list(psf.parameters()) # + list(model_net.parameters()) + list(micro.parameters())
-    opt_psf  = hydra.utils.instantiate(cfg.autoencoder.opt, params=psf_param)
+    opt_psf  = hydra.utils.instantiate(cfg.autoencoder.opt_psf, params=psf_param)
+    opt_mic = hydra.utils.instantiate(cfg.autoencoder.opt_micro,params=list(micro.parameters())[:2])
     scheduler_psf = torch.optim.lr_scheduler.StepLR(opt_psf, step_size=cfg.autoencoder.step_size, gamma=cfg.autoencoder.gamma)
     
     if cfg.data_path.model_init is not None:
     
         model = load_model_state(model, cfg.data_path.model_init).cuda()
-        micro.load_state_dict(torch.load(Path(cfg.data_path.model_init)/'microscope.pkl'))
+#         micro.load_state_dict(torch.load(Path(cfg.data_path.model_init)/'microscope.pkl'))
         opt_net.load_state_dict(torch.load(Path(cfg.data_path.model_init)/'opt_net.pkl'))
 #         opt_psf.load_state_dict(torch.load(Path(cfg.data_path.model_init)/'opt_psf.pkl'))
         psf.load_state_dict(torch.load(Path(cfg.data_path.model_init)/'psf.pkl'))
@@ -79,6 +80,7 @@ def my_app(cfg):
          dl=decode_dl, 
          optim_net=opt_net, 
          optim_psf=opt_psf, 
+         optim_mic=opt_mic,
          sched_net=scheduler_net, 
          sched_psf=scheduler_psf, 
          psf=psf,

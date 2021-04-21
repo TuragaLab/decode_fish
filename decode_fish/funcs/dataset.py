@@ -283,6 +283,5 @@ def get_dataloader(cfg):
                        num_iter=(cfg.supervised.num_iter + cfg.autoencoder.num_iter) * cfg.dataloader.bs)
 
     decode_dl = DataLoader(ds, batch_size=cfg.dataloader.bs, num_workers=0)
-    decode_dl.min_int = cfg.pointprocess.min_int
 
     return imgs_3d, decode_dl

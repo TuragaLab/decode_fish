@@ -68,6 +68,7 @@ def train(cfg,
           dl,
           optim_net,
           optim_psf,
+          optim_mic,
           sched_net,
           sched_psf,
           microscope,
@@ -78,6 +79,7 @@ def train(cfg,
     """
     Training loop for autoencoder learning. Alternates between a simulator training step to train the inference network
     and an autoencoder step to train the PSF (and microscope) parameters.
+
     Args:
         model (torch.nn.Module): DECODE 3D UNet.
         num_iter (int): Number of training iterations for pure sl learning(batches).
@@ -96,6 +98,7 @@ def train(cfg,
         bl_loss_scale  (float): The background loss gets scaled by this factor when added to the GMM loss.
         grad_clip  (float): Gradient clipping threshold.
         eval_dict  (dict, optional): Dictionary with evaluation parameters
+
     """
 
     save_dir = Path(cfg.output.save_dir)
@@ -113,12 +116,14 @@ def train(cfg,
         optim_net.zero_grad()
 
         # Get supervised loss
-        sim_vars = PointProcessUniform(local_rate, min_int=cfg.pointprocess.min_int, sim_iters=5).sample()  # sim_vars = locs_sl, x_os_sl, y_os_sl, z_os_sl, ints_sl, output_shape
+        sim_vars = PointProcessUniform(local_rate, sim_iters=5).sample()  # sim_vars = locs_sl, x_os_sl, y_os_sl, z_os_sl, ints_sl, output_shape
         xsim = microscope(*sim_vars)
         xsim_noise = microscope.noise(xsim, background).sample()
 
         out_sim = model(xsim_noise)
-        count_prob, spatial_prob = PointProcessGaussian(**out_sim).log_prob(*sim_vars[:-1])
+
+        gt_vars = filt_sim_vars(*sim_vars[:5], microscope.int_mu, microscope.int_sig, microscope.min_fac)
+        count_prob, spatial_prob = PointProcessGaussian(**out_sim).log_prob(*gt_vars)
         gmm_loss = -(spatial_prob + cfg.supervised.cnt_loss_scale*count_prob).mean()
 
         background_loss = F.mse_loss(out_sim['background'], background) * cfg.supervised.bl_loss_scale
@@ -139,13 +144,17 @@ def train(cfg,
             if batch_idx % cfg.autoencoder.freq_ae == 0:
 
                 optim_psf.zero_grad()
+                optim_mic.zero_grad()
                 # Get autoencoder loss
                 out_inp = model(x)
-                ae_img = microscope(*post_proc(out_inp, ret='micro'))
+                proc_out_inp = post_proc(out_inp, ret='micro') # locations, x_os_3d, y_os_3d, z_os_3d, ints_3d, output_shape, comb_sig
+                ae_img = microscope(*proc_out_inp[:6])
                 log_p_x_given_z = - microscope.noise(ae_img,out_inp['background']).log_prob(x).mean()
                 if cfg.autoencoder.norm_reg:
-#                     log_p_x_given_z += cfg.autoencoder.norm_reg * (psf.clip_loss() + psf.sum_loss() + psf.com_loss())
                     log_p_x_given_z += cfg.autoencoder.norm_reg * (psf.sum_loss() + psf.com_loss())
+                    if len(proc_out_inp[6]):
+                        good_ints = proc_out_inp[4][proc_out_inp[6] < torch.quantile(proc_out_inp[6], 0.5)]
+                        log_p_x_given_z -= torch.distributions.Normal(microscope.int_mu, microscope.int_sig).log_prob((good_ints*microscope.int_sig.detach()) + microscope.int_mu.detach()).mean()
 
 #                 if cfg.autoencoder.l1_decay:
 #                     l1_norm = sum(p.abs().sum() for p in optim_psf.param_groups[0]['params'])
@@ -158,6 +167,7 @@ def train(cfg,
                     torch.nn.utils.clip_grad_norm_(optim_psf.param_groups[0]['params'], max_norm=cfg.autoencoder.grad_clip, norm_type=2)
 
                 optim_psf.step()
+                optim_mic.step()
                 if sched_psf:
                     sched_psf.step()
 
@@ -171,12 +181,15 @@ def train(cfg,
                     wandb.log({'AE Losses/p_x_given_z': log_p_x_given_z.detach().cpu()}, step=batch_idx)
                     wandb.log({'AE Losses/RMSE(rec)': torch.sqrt(((x-(ae_img+out_inp['background']))**2).mean()).detach().cpu()}, step=batch_idx)
                     wandb.log({'AE Losses/sum(psf)': psf.psf_volume[0].sum().detach().cpu()}, step=batch_idx)
+#                     wandb.log({'AE Losses/theta': microscope.theta.item()}, step=batch_idx)
+                    wandb.log({'AE Losses/int_mu': microscope.int_mu.item()}, step=batch_idx)
+                    wandb.log({'AE Losses/int_sig': microscope.int_sig.item()}, step=batch_idx)
 
         if batch_idx % cfg.output.log_interval == 0:
             print(batch_idx)
             with torch.no_grad():
                 pred_df = post_proc(out_sim, ret='df')
-                target_df = sample_to_df(*sim_vars[:-1], px_size=cfg.evaluation.px_size)
+                target_df = sample_to_df(*gt_vars, px_size=cfg.evaluation.px_size)
                 eval_logger(pred_df, target_df, batch_idx, data_str='Sim. ')
                 wandb.log({'Sim. Metrics/prob_fac': torch.sigmoid(out_sim['logits']).sum().item()/len(target_df)}, step=batch_idx)
                 wandb.log({'Sim. Metrics/n_em_fac': len(pred_df)/len(target_df)}, step=batch_idx)
@@ -189,7 +202,7 @@ def train(cfg,
 
                 if eval_dict is not None:
                     res_eval = model(eval_img[None].cuda())
-                    ae_img = microscope(*post_proc(res_eval, ret='micro'))
+                    ae_img = microscope(*post_proc(res_eval, ret='micro')[:6])
                     pred_eval_df = post_proc(res_eval, ret='df')
                     wandb.log({'AE Losses/N preds(eval)': len(pred_eval_df)}, step=batch_idx)
 

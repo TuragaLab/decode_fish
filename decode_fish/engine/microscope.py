@@ -46,7 +46,10 @@ class Microscope(nn.Module):
                  parametric_psf: List[torch.nn.Module]=None,
                  empirical_psf : List[torch.nn.Module]=None ,
                  noise: Union[torch.nn.Module, None]=None,
-                 scale: float = 10000., multipl=100,
+                 scale: float = 10000.,
+                 int_mu=100,
+                 int_sig=10,
+                 min_fac=0.3,
                  psf_noise=None, clamp_mode = 'cp'
                  ):
 
@@ -56,7 +59,10 @@ class Microscope(nn.Module):
 #         self.scale = torch.nn.Parameter(torch.tensor(scale))
         self.scale = scale
         self.noise = noise
-        self.multipl = multipl
+        self.int_mu = torch.nn.Parameter(torch.tensor(float(int_mu)))
+        self.int_sig = torch.nn.Parameter(torch.tensor(float(int_sig)))
+        self.min_fac = min_fac
+        self.theta = self.noise.theta
         self.psf_noise = psf_noise
         self.clamp_mode = clamp_mode
 
@@ -91,9 +97,10 @@ class Microscope(nn.Module):
             if self.psf_noise: psf = self.add_psf_noise(psf)
             #applying intenseties (N_Emitters, C, H, W, D)
 
-            psf = psf * i_val[:,None,None,None,None]
+            tot_intensity = torch.clamp_min((i_val*self.int_sig) + self.int_mu, 0)
+            psf = psf * tot_intensity[:,None,None,None,None]
             xsim = place_psf(locations, psf, output_shape)
-            xsim = self.scale * xsim * self.multipl
+            xsim = self.scale * xsim
             if self.clamp_mode == 'cx':
                 torch.clamp_min_(xsim,0)
             if eval_:

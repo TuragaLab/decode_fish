@@ -90,28 +90,30 @@ class SIPostProcess(torch.nn.Module):
         if ret == 'df':
 
             res_dict = {k:v.cpu() for (k,v) in res_dict.items()}
-            samples = res_dict['Samples_si']
-            nonz_idx = samples.nonzero(as_tuple=True)
+            locations = res_dict['Samples_si'].nonzero(as_tuple=True)
 
-            pos_x, pos_y, pos_z = nonz_idx[-1] ,nonz_idx[-2], nonz_idx[-3]
-            x = pos_x + res_dict['xyzi_mu'][:,[0]][nonz_idx] + 0.5
-            y = pos_y + res_dict['xyzi_mu'][:,[1]][nonz_idx] + 0.5
-            z = pos_z + res_dict['xyzi_mu'][:,[2]][nonz_idx] + 0.5
+            pos_x, pos_y, pos_z = locations[-1] ,locations[-2], locations[-3]
+            x = pos_x + res_dict['xyzi_mu'][:,[0]][locations] + 0.5
+            y = pos_y + res_dict['xyzi_mu'][:,[1]][locations] + 0.5
+            z = pos_z + res_dict['xyzi_mu'][:,[2]][locations] + 0.5
 
             loc_idx = torch.arange(len(x))
-            frame_idx = nonz_idx[0]
+            frame_idx = locations[0]
 
             df = DF({'loc_idx': loc_idx,
-                               'frame_idx': frame_idx,
-                               'x': x*self.px_size[0],
-                               'y': y*self.px_size[1],
-                               'z': z*self.px_size[2],
-                               'prob': res_dict['Probs_si'][nonz_idx],
-                               'int': res_dict['xyzi_mu'][:,[3]][nonz_idx],
-                               'int_sig': res_dict['xyzi_sigma'][:,[3]][nonz_idx],
-                               'x_sig': res_dict['xyzi_sigma'][:,[0]][nonz_idx]*self.px_size[0],
-                               'y_sig': res_dict['xyzi_sigma'][:,[1]][nonz_idx]*self.px_size[1],
-                               'z_sig': res_dict['xyzi_sigma'][:,[2]][nonz_idx]*self.px_size[2]})
+                     'frame_idx': frame_idx,
+                     'x': x*self.px_size[0],
+                     'y': y*self.px_size[1],
+                     'z': z*self.px_size[2],
+                     'prob': res_dict['Probs_si'][locations],
+                     'int': res_dict['xyzi_mu'][:,[3]][locations],
+                     'int_sig': res_dict['xyzi_sigma'][:,[3]][locations],
+                     'x_sig': res_dict['xyzi_sigma'][:,[0]][locations]*self.px_size[0],
+                     'y_sig': res_dict['xyzi_sigma'][:,[1]][locations]*self.px_size[1],
+                     'z_sig': res_dict['xyzi_sigma'][:,[2]][locations]*self.px_size[2],
+                     'comb_sig': torch.sqrt(res_dict['xyzi_sigma'][:,[0]][locations]**2
+                                           +res_dict['xyzi_sigma'][:,[1]][locations]**2
+                                           +res_dict['xyzi_sigma'][:,[2]][locations])})
 
             return df
 
@@ -123,8 +125,11 @@ class SIPostProcess(torch.nn.Module):
             z_os_3d = res_dict['xyzi_mu'][:,[2]][locations]
             ints_3d = res_dict['xyzi_mu'][:,[3]][locations]
             output_shape  = res_dict['Samples_si'].shape
+            comb_sig = torch.sqrt(res_dict['xyzi_sigma'][:,[0]][locations]**2
+                                 +res_dict['xyzi_sigma'][:,[1]][locations]**2
+                                 +res_dict['xyzi_sigma'][:,[2]][locations])
 
-            return locations, x_os_3d, y_os_3d, z_os_3d, ints_3d, output_shape
+            return locations, x_os_3d, y_os_3d, z_os_3d, ints_3d, output_shape, comb_sig
 
         elif ret == 'dict':
 

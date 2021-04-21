@@ -19,7 +19,8 @@ data_path:
     image_path: /groups/turaga/home/speisera/share_TUM/FishSIM/sim_1/mRNAlevel_200/cell3D/strong/w1_HelaKyoto_Gapdh_2597_p01_cy3__Cell_CP_14__cell3D__1.tif
 #     psf_path: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/decode_fish/data/gaussian_psf.pkl
     psf_path: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/decode_fish/data/simfish_psf.pkl
-    model_init:
+    model_init: 
+#     model_init: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/models/fishcod/Fig_sim_density/${output.group}/${run_name}/sl_save
     
 evaluation:
     image_path: ${data_path.image_path}
@@ -56,7 +57,9 @@ noise:
     baseline:  0.09
     
 microscope:
-    multipl: 200
+    int_mu: 200
+    int_sig: 50
+    min_fac: 0.2
     psf_noise: 2e-5
     clamp_mode: 'cx'
 
@@ -116,17 +119,22 @@ autoencoder:
     step_size: 2000
     freq_ae: 1
     norm_reg: 0.5
-    opt:
+    opt_psf:
      _target_: torch.optim.SGD
      lr: 5e-4
      momentum: 0
-    
+    opt_micro:
+     _target_: torch.optim.SGD
+     lr: 5e-4
+     momentum: 0
+
+
 other:
     pp: 'isi'
 
 #min intensity when sampling
-pointprocess:
-    min_int: 0.3
+# pointprocess:
+#     min_int: 0.3
   
 # hydra:
 #   run:

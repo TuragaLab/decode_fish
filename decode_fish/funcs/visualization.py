@@ -38,7 +38,7 @@ def get_simulation_statistics(decode_dl, micro, int_threshold=1, samples = 1):
                 x, local_rate, background = next(iter(decode_dl))
                 xmax = x[0,0,z_ind].max()
 
-            sim_vars = PointProcessUniform(local_rate, min_int=decode_dl.min_int).sample()
+            sim_vars = PointProcessUniform(local_rate).sample()
             xsim = micro(*sim_vars)
             xsim = micro.noise(xsim, background).sample()
             sim_df = sample_to_df(*sim_vars[:-1])
@@ -69,7 +69,7 @@ def get_simulation_statistics(decode_dl, micro, int_threshold=1, samples = 1):
             axes[1].set_title('Simulation, max proj')
 
 # Cell
-def get_prediction(model, post_proc, img, micro=None, cuda=True, return_rec=False, min_int=0.):
+def get_prediction(model, post_proc, img, micro=None, cuda=True, return_rec=False, min_int=-1000.):
 
     with torch.no_grad():
 
@@ -80,7 +80,7 @@ def get_prediction(model, post_proc, img, micro=None, cuda=True, return_rec=Fals
         pred_df = pred_df[pred_df['int'] > min_int]
 
         if return_rec:
-            locations, x_os_3d, y_os_3d, z_os_3d, ints_3d, output_shape = post_proc(res_dict, ret='micro')
+            locations, x_os_3d, y_os_3d, z_os_3d, ints_3d, output_shape = post_proc(res_dict, ret='micro')[:6]
             inds = torch.where(ints_3d > min_int)[0]
             ae_img_3d = micro([l[inds] for l in locations], x_os_3d[inds], y_os_3d[inds], z_os_3d[inds], ints_3d[inds], output_shape)
             return pred_df, ae_img_3d + res_dict['background'], res_dict
@@ -114,8 +114,8 @@ def eval_random_crop(decode_dl, model, post_proc, micro, projection='mean', cuda
             rmse = np.sqrt(((diff)**2).mean())
 
             axes[1].set_title(f'Reconstruction {rmse:.2f}', size=16)
-            plt.show()
-            # pred_df, rec,res_dict
+
+            pred_df, rec,res_dict
 
 def eval_random_sim(decode_dl, model, post_proc, micro, projection='mean', plot_gt=True, cuda=True, samples=1):
 
@@ -125,7 +125,7 @@ def eval_random_sim(decode_dl, model, post_proc, micro, projection='mean', plot_
 
             x, local_rate, background = next(iter(decode_dl))
 
-            sim_vars = PointProcessUniform(local_rate, min_int=decode_dl.min_int).sample()
+            sim_vars = PointProcessUniform(local_rate).sample()
             xsim = micro(*sim_vars)
             x = micro.noise(xsim, background).sample()
             pred_df, rec, res_dict = get_prediction(model, post_proc, x[:1], micro=micro, cuda=True, return_rec=True)

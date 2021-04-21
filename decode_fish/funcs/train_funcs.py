@@ -48,8 +48,9 @@ def load_from_eval_dict(eval_dict):
     eval_img = load_tiff_image(sorted(glob.glob(eval_dict['image_path']))[eval_dict['img_ind']])
     eval_img = eval_img[eval_dict['crop_sl']]
     if eval_dict['txt_path'] is not None:
-        eval_df = simfish_to_df(eval_dict['txt_path'], px_size=eval_dict['px_size'])
-        eval_df = crop_df(eval_df, eval_dict['crop_sl'], px_size=eval_dict['px_size'])
+        txt_path = sorted(glob.glob(eval_dict['txt_path']))[eval_dict['img_ind']]
+        eval_df = simfish_to_df(txt_path)
+        eval_df = crop_df(eval_df, eval_dict['crop_sl'], px_size_zyx=eval_dict['px_size_zyx'])
     else:
         eval_df = None
     return eval_img, eval_df
@@ -189,14 +190,15 @@ def train(cfg,
             print(batch_idx)
             with torch.no_grad():
                 pred_df = post_proc(out_sim, ret='df')
-                target_df = sample_to_df(*gt_vars, px_size=cfg.evaluation.px_size)
+                px_size = cfg.evaluation.px_size_zyx
+                target_df = sample_to_df(*gt_vars, px_size_zyx=px_size)
                 eval_logger(pred_df, target_df, batch_idx, data_str='Sim. ')
                 wandb.log({'Sim. Metrics/prob_fac': torch.sigmoid(out_sim['logits']).sum().item()/len(target_df)}, step=batch_idx)
                 wandb.log({'Sim. Metrics/n_em_fac': len(pred_df)/len(target_df)}, step=batch_idx)
 #                 wandb.log({'Prob hist': wandb.Image(plot_prob_hist(out_sim))}, step=batch_idx)
 
                 if cfg.output.log_figs:
-                    sl_fig = sl_plot(x, xsim_noise, pred_df, target_df, background, out_sim)
+                    sl_fig = sl_plot(x, xsim_noise, nm_to_px(pred_df, px_size), nm_to_px(target_df, px_size), background, out_sim)
                     plt.show()
                     wandb.log({'SL summary': sl_fig}, step=batch_idx)
 
@@ -210,7 +212,7 @@ def train(cfg,
                         eval_logger(pred_eval_df, eval_df, batch_idx, data_str='Inp. ')
 
                     if cfg.output.log_figs:
-                        eval_fig = gt_plot(eval_img, pred_eval_df, eval_df, eval_dict['px_size'],ae_img[0]+res_eval['background'][0], psf)
+                        eval_fig = gt_plot(eval_img, nm_to_px(pred_eval_df, px_size), nm_to_px(eval_df, px_size), px_size,ae_img[0]+res_eval['background'][0], psf)
                         plt.show()
                         wandb.log({'GT': eval_fig}, step=batch_idx)
 

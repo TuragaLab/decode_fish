@@ -24,21 +24,21 @@ def sig_filt(df, perc = 90, return_low=True):
         return df[df['comb_sig'] > filt_val]
 
 #export
-def nm_to_px(df, px_size=[100.,100.,100.]):
+def nm_to_px(df, px_size_zyx=[100.,100.,100.]):
 
     df_corr = df.copy()
-    df_corr['x'] /= px_size[0]
-    df_corr['y'] /= px_size[1]
-    df_corr['z'] /= px_size[2]
+    df_corr['x'] /= px_size_zyx[2]
+    df_corr['y'] /= px_size_zyx[1]
+    df_corr['z'] /= px_size_zyx[0]
     return df_corr
 
 #export
-def px_to_nm(df, px_size=[100.,100.,100.]):
+def px_to_nm(df, px_size_zyx=[100.,100.,100.]):
 
     df_corr = df.copy()
-    df_corr['x'] *= px_size[0]
-    df_corr['y'] *= px_size[1]
-    df_corr['z'] *= px_size[2]
+    df_corr['x'] *= px_size_zyx[0]
+    df_corr['y'] *= px_size_zyx[1]
+    df_corr['z'] *= px_size_zyx[2]
     return df_corr
 
 #export
@@ -53,10 +53,10 @@ def cat_emitter_dfs(df_list):
     return ret_df
 
 #export
-def crop_df(df, fzyx_sl=np.s_[:,:,:,:], shift=True, px_size=[1.,1.,1.]):
+def crop_df(df, fzyx_sl=np.s_[:,:,:,:], shift=True, px_size_zyx=[1.,1.,1.]):
 
     df_crop = df.copy()
-    for sl, key, px_s in zip(fzyx_sl, ['frame_idx','z','y','x'], [1] + px_size):
+    for sl, key, px_s in zip(fzyx_sl, ['frame_idx','z','y','x'], [1] + px_size_zyx):
         if sl.start:
             df_crop = df_crop[df_crop[key] > px_s*sl.start]
         if sl.stop:

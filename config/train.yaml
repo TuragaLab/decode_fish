@@ -17,17 +17,15 @@ output:
   
 data_path: 
     image_path: /groups/turaga/home/speisera/share_TUM/FishSIM/sim_1/mRNAlevel_200/cell3D/strong/w1_HelaKyoto_Gapdh_2597_p01_cy3__Cell_CP_14__cell3D__1.tif
-#     psf_path: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/decode_fish/data/gaussian_psf.pkl
-    psf_path: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/decode_fish/data/simfish_psf.pkl
+    psf_path: 
     model_init: 
-#     model_init: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/models/fishcod/Fig_sim_density/${output.group}/${run_name}/sl_save
     
 evaluation:
     image_path: ${data_path.image_path}
-    txt_path: /groups/turaga/home/speisera/share_TUM/FishSIM/sim_1/mRNAlevel_200/cell3D/strong/w1_HelaKyoto_Gapdh_2597_p01_cy3__Cell_CP_14__cell3D__1.txt
+    txt_path: 
     crop_sl: s_[:,100:250,100:250,25:60]
     img_ind: 0
-    px_size: [100,100,300]
+    px_size_zyx: [100,100,100]
     
 prob_generator:
     low: 1e-8
@@ -43,7 +41,7 @@ random_crop:
 
 roi_mask:
     pool_size: [10,10,10]
-    percentile: 70 # Percentage of volume that is removed
+    percentile: 50 # Percentage of volume that is removed
                
 PSF:
     _target_: decode_fish.engine.psf.LinearInterpolatedPSF 
@@ -71,7 +69,7 @@ foci:
     n_foci_avg: 0.
     rad_range: [25,200]
     n_mol_range: [5,30]
-    px_size_xyz: ${evaluation.px_size}
+    px_size_zyx: ${evaluation.px_size_zyx}
     mode: 'gaussian'
     
 model:
@@ -87,7 +85,7 @@ post_proc_isi:
     _target_: decode_fish.funcs.output_trafo.ISIPostProcess
     m1_threshold: 0.03
     samp_threshold: 0.7
-    px_size: ${evaluation.px_size}
+    px_size_zyx: ${evaluation.px_size_zyx}
     diag: True
     
 post_proc_si:
@@ -95,7 +93,7 @@ post_proc_si:
     m1_threshold: 0.03
     m2_threshold: 0.5
     samp_threshold: 0.1
-    px_size: ${evaluation.px_size}
+    px_size_zyx: ${evaluation.px_size_zyx}
     diag: False
     
 supervised:
@@ -128,13 +126,8 @@ autoencoder:
      lr: 5e-4
      momentum: 0
 
-
 other:
     pp: 'isi'
-
-#min intensity when sampling
-# pointprocess:
-#     min_int: 0.3
   
 # hydra:
 #   run:

@@ -43,7 +43,7 @@ def my_app(cfg):
     if cfg.evaluation is not None:
         eval_dict = dict(cfg.evaluation)
         eval_dict['crop_sl'] = eval(eval_dict['crop_sl'],{'__builtins__': None},{'s_': np.s_})
-        eval_dict['px_size'] = list(eval_dict['px_size'])
+        eval_dict['px_size_zyx'] = list(eval_dict['px_size_zyx'])
     else:
         eval_dict = None
         

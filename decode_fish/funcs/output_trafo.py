@@ -9,7 +9,7 @@ from .plotting import *
 from .emitter_io import *
 
 # Cell
-def sample_to_df(locs, x_os, y_os, z_os, ints, px_size=[100,100,100]):
+def sample_to_df(locs, x_os, y_os, z_os, ints, px_size_zyx=[100,100,100]):
 
     n_locs = len(ints)
 
@@ -22,9 +22,9 @@ def sample_to_df(locs, x_os, y_os, z_os, ints, px_size=[100,100,100]):
 
     df = DF({'loc_idx': loc_idx.cpu(),
                        'frame_idx': frame_idx.cpu(),
-                       'x': x.cpu()*px_size[0],
-                       'y': y.cpu()*px_size[1],
-                       'z': z.cpu()*px_size[2],
+                       'x': x.cpu()*px_size_zyx[2],
+                       'y': y.cpu()*px_size_zyx[1],
+                       'z': z.cpu()*px_size_zyx[0],
                        'int': ints.cpu()})
 
     return df
@@ -32,14 +32,14 @@ def sample_to_df(locs, x_os, y_os, z_os, ints, px_size=[100,100,100]):
 # Cell
 class SIPostProcess(torch.nn.Module):
 
-    def __init__(self, m1_threshold:float = 0.03, m2_threshold:float = 0.3, samp_threshold=0.1, px_size=[100,100,100], diag=0):
+    def __init__(self, m1_threshold:float = 0.03, m2_threshold:float = 0.3, samp_threshold=0.1, px_size_zyx=[100,100,100], diag=0):
 
         super().__init__()
         self.m1_threshold = m1_threshold
         self.m2_threshold = m2_threshold
         self.samp_threshold = samp_threshold
         self.diag = diag
-        self.px_size = px_size
+        self.px_size_zyx = px_size_zyx
 
         if not diag:
             d1 = 0; d2 = 0
@@ -102,15 +102,15 @@ class SIPostProcess(torch.nn.Module):
 
             df = DF({'loc_idx': loc_idx,
                      'frame_idx': frame_idx,
-                     'x': x*self.px_size[0],
-                     'y': y*self.px_size[1],
-                     'z': z*self.px_size[2],
+                     'x': x*self.px_size_zyx[2],
+                     'y': y*self.px_size_zyx[1],
+                     'z': z*self.px_size_zyx[0],
                      'prob': res_dict['Probs_si'][locations],
                      'int': res_dict['xyzi_mu'][:,[3]][locations],
                      'int_sig': res_dict['xyzi_sigma'][:,[3]][locations],
-                     'x_sig': res_dict['xyzi_sigma'][:,[0]][locations]*self.px_size[0],
-                     'y_sig': res_dict['xyzi_sigma'][:,[1]][locations]*self.px_size[1],
-                     'z_sig': res_dict['xyzi_sigma'][:,[2]][locations]*self.px_size[2],
+                     'x_sig': res_dict['xyzi_sigma'][:,[0]][locations]*self.px_size_zyx[0],
+                     'y_sig': res_dict['xyzi_sigma'][:,[1]][locations]*self.px_size_zyx[1],
+                     'z_sig': res_dict['xyzi_sigma'][:,[2]][locations]*self.px_size_zyx[2],
                      'comb_sig': torch.sqrt(res_dict['xyzi_sigma'][:,[0]][locations]**2
                                            +res_dict['xyzi_sigma'][:,[1]][locations]**2
                                            +res_dict['xyzi_sigma'][:,[2]][locations])})
@@ -140,9 +140,9 @@ class SIPostProcess(torch.nn.Module):
 #export
 class ISIPostProcess(SIPostProcess):
 
-    def __init__(self, m1_threshold:float = 0.1, samp_threshold=0.1, px_size=[100,100,100], diag=False):
+    def __init__(self, m1_threshold:float = 0.1, samp_threshold=0.1, px_size_zyx=[100,100,100], diag=False):
 
-        super().__init__(m1_threshold = m1_threshold, samp_threshold=samp_threshold, px_size=px_size, diag=diag)
+        super().__init__(m1_threshold = m1_threshold, samp_threshold=samp_threshold, px_size_zyx=px_size_zyx, diag=diag)
         self.m2_threshold = None
 
     def spatial_integration(self, p):

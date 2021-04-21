@@ -27,7 +27,7 @@ def load_model_state(model, path, file_name ='model.pkl'):
     return model
 
 # Cell
-def simfish_to_df(sim_file, px_size=np.array([100.,100.,300.]), frame_idx=0):
+def simfish_to_df(sim_file, frame_idx=0):
 
     yxz = []
     with open(sim_file) as f:
@@ -39,14 +39,14 @@ def simfish_to_df(sim_file, px_size=np.array([100.,100.,300.]), frame_idx=0):
             if 'SPOTS_END' in line: break
             if read: yxz.append([float(s) for s in line.split()[:3]])
 
-    yxz = np.array(yxz)/px_size
+    yxz = np.array(yxz)#/px_size
     loc_idx = np.arange(len(yxz))
 
     df = pd.DataFrame({'loc_idx': loc_idx,
                        'frame_idx': frame_idx,
-                       'x': yxz[:,1]*px_size[0],
-                       'y': yxz[:,0]*px_size[1],
-                       'z': yxz[:,2]*px_size[2],
+                       'x': yxz[:,1],
+                       'y': yxz[:,0],
+                       'z': yxz[:,2],
                        'prob': np.ones_like(loc_idx),
                        'int': np.ones_like(loc_idx),
                        'int_sig': np.ones_like(loc_idx),

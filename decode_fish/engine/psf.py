@@ -50,10 +50,10 @@ class LinearInterpolatedPSF(nn.Module):
 
     def get_com(self):
 
-        x_grid, y_grid, z_grid = torch.meshgrid(torch.arange(self.psf_size[2]),torch.arange(self.psf_size[1]),torch.arange(self.psf_size[0]))
+        x_grid, y_grid, z_grid = torch.meshgrid(torch.arange(self.psf_size[0]),torch.arange(self.psf_size[1]),torch.arange(self.psf_size[2]))
         m_grid = torch.stack([x_grid, y_grid, z_grid], -1).to(self.device)
 
-        vol = self.psf_volume[0]**2
+        vol = (self.psf_volume[0]**2).to(self.device)
 
         zc = (m_grid[:,:,:,0] * vol).sum()/vol.sum()
         yc = (m_grid[:,:,:,1] * vol).sum()/vol.sum()

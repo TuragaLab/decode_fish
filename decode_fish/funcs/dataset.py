@@ -194,12 +194,12 @@ class RandomCrop3D(TransformBase):
 # Cell
 class AddFoci(TransformBase):
 
-    def __init__(self, n_foci_avg: float, rad_range: tuple, n_mol_range: tuple, px_size_xyz: tuple=(100,100,100), mode='gaussian'):
+    def __init__(self, n_foci_avg: float, rad_range: tuple, n_mol_range: tuple, px_size_zyx: tuple=(100,100,100), mode='gaussian'):
 
         self.n_foci_avg = n_foci_avg
         self.rad_range = rad_range
         self.n_mol_range = n_mol_range
-        self.px_size_xyz = px_size_xyz
+        self.px_size_zyx = px_size_zyx
         self.mode = mode
 
     def binary_sphere(self, shape, radius, position):
@@ -226,7 +226,7 @@ class AddFoci(TransformBase):
 
         for inds in torch.nonzero(locations, as_tuple=False):
             rad = torch.distributions.Uniform(*self.rad_range).sample().item()
-            rads = [rad/pxs for pxs in self.px_size_xyz[::-1]]
+            rads = [rad/pxs for pxs in self.px_size_zyx]
             n_mol = torch.distributions.Uniform(*self.n_mol_range).sample().item()
             center = inds[-3:].cpu().numpy()
             size = list(x.shape[-3:])

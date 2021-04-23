@@ -120,11 +120,11 @@ autoencoder:
     opt_psf:
      _target_: torch.optim.SGD
      lr: 5e-4
-     momentum: 0
+#      momentum: 0
     opt_micro:
      _target_: torch.optim.SGD
      lr: 5e-4
-     momentum: 0
+#      momentum: 0
 
 other:
     pp: 'isi'

@@ -9,6 +9,7 @@ from matplotlib import pyplot as plt
 from matplotlib import gridspec
 import seaborn as sns
 from .utils import *
+from .emitter_io import *
 
 # Cell
 def add_colorbar(im, aspect=20, pad_fraction=0.5, **kwargs):

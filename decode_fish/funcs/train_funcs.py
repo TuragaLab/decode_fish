@@ -116,14 +116,25 @@ def train(cfg,
 
         optim_net.zero_grad()
 
-        # Get supervised loss
+
         sim_vars = PointProcessUniform(local_rate, sim_iters=5).sample()  # sim_vars = locs_sl, x_os_sl, y_os_sl, z_os_sl, ints_sl, output_shape
-        xsim = microscope(*sim_vars)
+        output_shape = sim_vars[-1]
+        sim_vars = filt_sim_vars(*sim_vars[:5], microscope.int_mu, microscope.int_sig, microscope.min_fac)
+        xsim = microscope(*sim_vars,output_shape)
         xsim_noise = microscope.noise(xsim, background).sample()
 
         out_sim = model(xsim_noise)
 
-        gt_vars = filt_sim_vars(*sim_vars[:5], microscope.int_mu, microscope.int_sig, microscope.min_fac)
+        gt_vars = sim_vars #filt_sim_vars(*sim_vars[:5], microscope.int_mu, microscope.int_sig, microscope.min_fac)
+
+        # Get supervised loss
+#         sim_vars = PointProcessUniform(local_rate, sim_iters=5).sample()  # sim_vars = locs_sl, x_os_sl, y_os_sl, z_os_sl, ints_sl, output_shape
+#         xsim = microscope(*sim_vars)
+#         xsim_noise = microscope.noise(xsim, background).sample()
+
+#         out_sim = model(xsim_noise)
+#         gt_vars = filt_sim_vars(*sim_vars[:5], microscope.int_mu, microscope.int_sig, microscope.min_fac)
+
         count_prob, spatial_prob = PointProcessGaussian(**out_sim).log_prob(*gt_vars)
         gmm_loss = -(spatial_prob + cfg.supervised.cnt_loss_scale*count_prob).mean()
 

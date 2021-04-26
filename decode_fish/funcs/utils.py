@@ -67,7 +67,8 @@ def gaussian_sphere(shape, radius, position):
 
 def filt_sim_vars(locs_sl, x_os_sl, y_os_sl, z_os_sl, ints_sl, int_mu, int_sig, min_fac):
 
-    filt =  (ints_sl * int_sig + int_mu) > (int_mu * min_fac)
+#     filt =  (ints_sl * int_sig + int_mu) > (int_mu * min_fac)
+    filt = ints_sl > (int_mu * min_fac)
     locs_sl = tuple([l[filt] for l in locs_sl])
     return locs_sl, x_os_sl[filt], y_os_sl[filt], z_os_sl[filt], ints_sl[filt]
 

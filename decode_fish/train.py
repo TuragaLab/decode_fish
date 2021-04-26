@@ -70,7 +70,7 @@ def my_app(cfg):
     if cfg.data_path.model_init is not None:
     
         model = load_model_state(model, cfg.data_path.model_init).cuda()
-#         micro.load_state_dict(torch.load(Path(cfg.data_path.model_init)/'microscope.pkl'))
+        micro.load_state_dict(torch.load(Path(cfg.data_path.model_init)/'microscope.pkl'))
         opt_net.load_state_dict(torch.load(Path(cfg.data_path.model_init)/'opt_net.pkl'))
 #         opt_psf.load_state_dict(torch.load(Path(cfg.data_path.model_init)/'opt_psf.pkl'))
         psf.load_state_dict(torch.load(Path(cfg.data_path.model_init)/'psf.pkl'))

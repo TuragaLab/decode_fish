@@ -97,7 +97,7 @@ class Microscope(nn.Module):
             if self.psf_noise: psf = self.add_psf_noise(psf)
             #applying intenseties (N_Emitters, C, H, W, D)
 
-            tot_intensity = torch.clamp_min((i_val*self.int_sig) + self.int_mu, 0)
+            tot_intensity = torch.clamp_min(i_val, 0)
             psf = psf * tot_intensity[:,None,None,None,None]
             xsim = place_psf(locations, psf, output_shape)
             xsim = self.scale * xsim

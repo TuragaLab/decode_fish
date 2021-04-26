@@ -116,8 +116,7 @@ def train(cfg,
 
         optim_net.zero_grad()
 
-
-        sim_vars = PointProcessUniform(local_rate, sim_iters=5).sample()  # sim_vars = locs_sl, x_os_sl, y_os_sl, z_os_sl, ints_sl, output_shape
+        sim_vars = PointProcessUniform(local_rate, microscope.int_mu.detach(), microscope.int_sig.detach(), sim_iters=5).sample()  # sim_vars = locs_sl, x_os_sl, y_os_sl, z_os_sl, ints_sl, output_shape
         output_shape = sim_vars[-1]
         sim_vars = filt_sim_vars(*sim_vars[:5], microscope.int_mu, microscope.int_sig, microscope.min_fac)
         xsim = microscope(*sim_vars,output_shape)
@@ -126,7 +125,7 @@ def train(cfg,
         out_sim = model(xsim_noise)
 
         gt_vars = sim_vars #filt_sim_vars(*sim_vars[:5], microscope.int_mu, microscope.int_sig, microscope.min_fac)
-
+        int_sl = gt_vars[-1] - microscope.int_mu * microscope.min_fac
         # Get supervised loss
 #         sim_vars = PointProcessUniform(local_rate, sim_iters=5).sample()  # sim_vars = locs_sl, x_os_sl, y_os_sl, z_os_sl, ints_sl, output_shape
 #         xsim = microscope(*sim_vars)
@@ -135,7 +134,7 @@ def train(cfg,
 #         out_sim = model(xsim_noise)
 #         gt_vars = filt_sim_vars(*sim_vars[:5], microscope.int_mu, microscope.int_sig, microscope.min_fac)
 
-        count_prob, spatial_prob = PointProcessGaussian(**out_sim).log_prob(*gt_vars)
+        count_prob, spatial_prob = PointProcessGaussian(**out_sim).log_prob(*gt_vars[:-1], int_sl)
         gmm_loss = -(spatial_prob + cfg.supervised.cnt_loss_scale*count_prob).mean()
 
         background_loss = F.mse_loss(out_sim['background'], background) * cfg.supervised.bl_loss_scale
@@ -152,50 +151,88 @@ def train(cfg,
         if sched_net:
             sched_net.step()
 
-        if batch_idx > cfg.supervised.num_iter:
-            if batch_idx % cfg.autoencoder.freq_ae == 0:
+        if batch_idx > 1000:
+
+            optim_mic.zero_grad()
+            out_inp = model(x)
+            proc_out_inp = post_proc(out_inp, ret='micro') # locations, x_os_3d, y_os_3d, z_os_3d, ints_3d, output_shape, comb_sig
+            ae_loss = 0
+
+            if len(proc_out_inp[6]):
+                good_ints = proc_out_inp[4][proc_out_inp[6] < torch.quantile(proc_out_inp[6], 0.5)]
+                good_ints = good_ints + microscope.int_mu.detach() * microscope.min_fac
+                ae_loss -= torch.distributions.Normal(microscope.int_mu, microscope.int_sig).log_prob(good_ints).mean()
+
+            if batch_idx > cfg.supervised.num_iter:
 
                 optim_psf.zero_grad()
-                optim_mic.zero_grad()
-                # Get autoencoder loss
-                out_inp = model(x)
-                proc_out_inp = post_proc(out_inp, ret='micro') # locations, x_os_3d, y_os_3d, z_os_3d, ints_3d, output_shape, comb_sig
-                ae_img = microscope(*proc_out_inp[:6])
-                log_p_x_given_z = - microscope.noise(ae_img,out_inp['background']).log_prob(x).mean()
-                if cfg.autoencoder.norm_reg:
-                    log_p_x_given_z += cfg.autoencoder.norm_reg * (psf.sum_loss() + psf.com_loss())
-                    if len(proc_out_inp[6]):
-                        good_ints = proc_out_inp[4][proc_out_inp[6] < torch.quantile(proc_out_inp[6], 0.5)]
-                        log_p_x_given_z -= torch.distributions.Normal(microscope.int_mu, microscope.int_sig).log_prob((good_ints*microscope.int_sig.detach()) + microscope.int_mu.detach()).mean()
 
-#                 if cfg.autoencoder.l1_decay:
-#                     l1_norm = sum(p.abs().sum() for p in optim_psf.param_groups[0]['params'])
-#                     log_p_x_given_z += cfg.autoencoder.l1_decay * l1_norm
+                if batch_idx % cfg.autoencoder.freq_ae == 0:
 
-    #             Update PSF parameters
-                log_p_x_given_z.backward()
+                    # Get autoencoder loss
+                    ae_img = microscope(*proc_out_inp[:6])
+                    log_p_x_given_z = -microscope.noise(ae_img,out_inp['background']).log_prob(x).mean()
+                    ae_loss += log_p_x_given_z
+                    if cfg.autoencoder.norm_reg:
+                        ae_loss += cfg.autoencoder.norm_reg * (psf.sum_loss() + psf.com_loss())
+
+                    if sched_psf:
+                        sched_psf.step()
+
+
+            # Update PSF parameters
+            if ae_loss > 0:
+
+                ae_loss.backward()
 
                 if cfg.autoencoder.grad_clip:
                     torch.nn.utils.clip_grad_norm_(optim_psf.param_groups[0]['params'], max_norm=cfg.autoencoder.grad_clip, norm_type=2)
 
+
                 optim_psf.step()
                 optim_mic.step()
-                if sched_psf:
-                    sched_psf.step()
+
+#         if batch_idx > cfg.supervised.num_iter:
+#             if batch_idx % cfg.autoencoder.freq_ae == 0:
+
+#                 optim_psf.zero_grad()
+#                 optim_mic.zero_grad()
+#                 # Get autoencoder loss
+#                 out_inp = model(x)
+#                 proc_out_inp = post_proc(out_inp, ret='micro') # locations, x_os_3d, y_os_3d, z_os_3d, ints_3d, output_shape, comb_sig
+#                 ae_img = microscope(*proc_out_inp[:6])
+#                 log_p_x_given_z = - microscope.noise(ae_img,out_inp['background']).log_prob(x).mean()
+#                 if cfg.autoencoder.norm_reg:
+#                     log_p_x_given_z += cfg.autoencoder.norm_reg * (psf.sum_loss() + psf.com_loss())
+#                     if len(proc_out_inp[6]):
+#                         good_ints = proc_out_inp[4][proc_out_inp[6] < torch.quantile(proc_out_inp[6], 0.5)]
+#                         good_ints = good_ints + microscope.int_mu.detach() * microscope.min_fac
+#                         log_p_x_given_z -= torch.distributions.Normal(microscope.int_mu, microscope.int_sig).log_prob(good_ints).mean()
+
+#                 # Update PSF parameters
+#                 log_p_x_given_z.backward()
+
+#                 if cfg.autoencoder.grad_clip:
+#                     torch.nn.utils.clip_grad_norm_(optim_psf.param_groups[0]['params'], max_norm=cfg.autoencoder.grad_clip, norm_type=2)
+
+#                 optim_psf.step()
+#                 optim_mic.step()
+#                 if sched_psf:
+#                     sched_psf.step()
 
         # Logging
         if batch_idx % 10 == 0:
             wandb.log({'SL Losses/gmm_loss': gmm_loss.detach().cpu()}, step=batch_idx)
             wandb.log({'SL Losses/count_loss': (-count_prob.mean()).detach().cpu()}, step=batch_idx)
             wandb.log({'SL Losses/bg_loss': background_loss.detach().cpu()}, step=batch_idx)
+            wandb.log({'AE Losses/int_mu': microscope.int_mu.item()}, step=batch_idx)
+            wandb.log({'AE Losses/int_sig': microscope.int_sig.item()}, step=batch_idx)
             if batch_idx > cfg.supervised.num_iter:
                 if batch_idx % cfg.autoencoder.freq_ae == 0:
                     wandb.log({'AE Losses/p_x_given_z': log_p_x_given_z.detach().cpu()}, step=batch_idx)
                     wandb.log({'AE Losses/RMSE(rec)': torch.sqrt(((x-(ae_img+out_inp['background']))**2).mean()).detach().cpu()}, step=batch_idx)
                     wandb.log({'AE Losses/sum(psf)': psf.psf_volume[0].sum().detach().cpu()}, step=batch_idx)
 #                     wandb.log({'AE Losses/theta': microscope.theta.item()}, step=batch_idx)
-                    wandb.log({'AE Losses/int_mu': microscope.int_mu.item()}, step=batch_idx)
-                    wandb.log({'AE Losses/int_sig': microscope.int_sig.item()}, step=batch_idx)
 
         if batch_idx % cfg.output.log_interval == 0:
             print(batch_idx)

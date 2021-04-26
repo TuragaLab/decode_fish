@@ -6,6 +6,7 @@ __all__ = ['PointProcessUniform', 'list_to_locations']
 from ..imports import *
 from torch import distributions as D, Tensor
 from torch.distributions import Distribution
+from ..funcs.utils import *
 
 # Cell
 class PointProcessUniform(Distribution):
@@ -17,11 +18,13 @@ class PointProcessUniform(Distribution):
         bg(bool): if returns sampled backround
 
     """
-    def __init__(self, local_rate: torch.tensor, sim_iters: int = 5):
+    def __init__(self, local_rate: torch.tensor, int_mu=0., int_sig = 1., sim_iters: int = 5):
 
         self.local_rate = local_rate
         self.device = self._get_device(self.local_rate)
         self.sim_iters = sim_iters
+        self.int_mu = int_mu
+        self.int_sig = int_sig
 
     def sample(self):
 
@@ -43,7 +46,7 @@ class PointProcessUniform(Distribution):
         x_offset = D.Uniform(low=0 - zero_point_five, high=0 + zero_point_five).sample(sample_shape=[n_emitter])
         y_offset = D.Uniform(low=0 - zero_point_five, high=0 + zero_point_five).sample(sample_shape=[n_emitter])
         z_offset = D.Uniform(low=0 - zero_point_five, high=0 + zero_point_five).sample(sample_shape=[n_emitter])
-        intensities = D.Normal(0, 1).sample(sample_shape=[n_emitter]).to(self.device)
+        intensities = D.Normal(self.int_mu, self.int_sig).sample(sample_shape=[n_emitter]).to(self.device)
 
         output_shape = tuple(locations.shape)
         locations = locations.nonzero(as_tuple=False)

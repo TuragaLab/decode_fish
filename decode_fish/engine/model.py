@@ -482,7 +482,8 @@ class UnetDecodeNoBn(nn.Module):
         logit    = torch.clamp(out[:, 0] + self.p_offset, -15., 15)
         xyzi_sig = torch.sigmoid(out[:, 1:5]) + 0.01
         xyz_mu   = torch.tanh(out[:, 5:-2])
-        i_mu     = torch.nn.Identity()(out[:, -2])
+#         i_mu     = torch.nn.Identity()(out[:, -2])
+        i_mu     = F.softplus(out[:, -2])
         background = self.unet.inp_scale * F.softplus(out[:, -1])
         xyzi_mu = torch.cat((xyz_mu, i_mu.unsqueeze(1)), dim=1)
 

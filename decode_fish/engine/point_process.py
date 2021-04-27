@@ -18,13 +18,14 @@ class PointProcessUniform(Distribution):
         bg(bool): if returns sampled backround
 
     """
-    def __init__(self, local_rate: torch.tensor, int_mu=0., int_sig = 1., sim_iters: int = 5):
+    def __init__(self, local_rate: torch.tensor, int_mu=0., int_scale=1., int_loc=1., sim_iters: int = 5):
 
         self.local_rate = local_rate
         self.device = self._get_device(self.local_rate)
         self.sim_iters = sim_iters
         self.int_mu = int_mu
-        self.int_sig = int_sig
+        self.int_scale = int_scale
+        self.int_loc = int_loc
 
     def sample(self):
 
@@ -46,7 +47,8 @@ class PointProcessUniform(Distribution):
         x_offset = D.Uniform(low=0 - zero_point_five, high=0 + zero_point_five).sample(sample_shape=[n_emitter])
         y_offset = D.Uniform(low=0 - zero_point_five, high=0 + zero_point_five).sample(sample_shape=[n_emitter])
         z_offset = D.Uniform(low=0 - zero_point_five, high=0 + zero_point_five).sample(sample_shape=[n_emitter])
-        intensities = D.Normal(self.int_mu, self.int_sig).sample(sample_shape=[n_emitter]).to(self.device)
+#         intensities = D.Normal(self.int_mu, self.int_sig).sample(sample_shape=[n_emitter]).to(self.device)
+        intensities = (D.Gamma(self.int_mu*self.int_scale, self.int_scale).sample(sample_shape=[n_emitter]) + self.int_loc).to(self.device)
 
         output_shape = tuple(locations.shape)
         locations = locations.nonzero(as_tuple=False)

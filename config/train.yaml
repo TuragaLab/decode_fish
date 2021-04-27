@@ -23,6 +23,7 @@ data_path:
 evaluation:
     image_path: ${data_path.image_path}
     txt_path: 
+    psf_path: 
     crop_sl: s_[:,100:250,100:250,25:60]
     img_ind: 0
     px_size_zyx: [100,100,100]
@@ -55,14 +56,12 @@ noise:
     baseline:  0.09
     
 microscope:
+    _target_: decode_fish.engine.microscope.Microscope
     int_mu: 200
-    int_sig: 50
-    min_fac: 0.2
+    int_scale: 50
+    int_loc: 0
     psf_noise: 2e-5
     clamp_mode: 'cx'
-
-dataloader:
-    bs: 2
     
 foci:
     _target_: decode_fish.funcs.dataset.AddFoci
@@ -96,35 +95,42 @@ post_proc_si:
     px_size_zyx: ${evaluation.px_size_zyx}
     diag: False
     
-supervised:
-    num_iter: 10000
-    bl_loss_scale: 0.01
-    cnt_loss_scale: 1
-    grad_clip: 0.005
-    gamma: 0.5
-    step_size: 6000
-    opt:
-     _target_: torch.optim.AdamW
-     lr: 5e-4
-#      momentum: 0.
-#      weight_decay: 0.
-     
-  
-autoencoder:
-    num_iter: 8000
-    grad_clip: 0.1
-    gamma: 0.5
-    step_size: 2000
-    freq_ae: 1
-    norm_reg: 0.5
-    opt_psf:
-     _target_: torch.optim.SGD
-     lr: 5e-4
-#      momentum: 0
-    opt_micro:
-     _target_: torch.optim.SGD
-     lr: 5e-4
-#      momentum: 0
+training:
+    bs: 2
+    num_iters: 15000
+    start_micro: 1000
+    start_psf: 6000
+    net:
+        bl_loss_scale: 0.01
+        cnt_loss_scale: 1
+        grad_clip: 0.005
+        sched:   
+            _target_: torch.optim.lr_scheduler.StepLR
+            gamma: 0.5
+            step_size: 6000
+        opt:
+            _target_: torch.optim.AdamW
+            lr: 5e-4
+    psf:
+        grad_clip: 0.1
+        gamma: 0.5
+        step_size: 2000
+        norm_reg: 0.5
+        opt:
+            _target_: torch.optim.SGD
+            lr: 7e-3
+        sched:
+            _target_: torch.optim.lr_scheduler.StepLR
+            gamma: 0.5
+            step_size: 3000
+    micro:
+        opt:
+            _target_: torch.optim.SGD
+            lr: 1e-2
+        sched:
+            _target_: torch.optim.lr_scheduler.StepLR
+            gamma: 0.5
+            step_size: 3000
 
 other:
     pp: 'isi'

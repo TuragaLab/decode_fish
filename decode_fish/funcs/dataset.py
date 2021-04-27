@@ -280,8 +280,8 @@ def get_dataloader(cfg):
                        rate_tfms = rate_tfms,
                        bg_transform = estimate_backg,
                        device='cuda:0',
-                       num_iter=(cfg.supervised.num_iter + cfg.autoencoder.num_iter) * cfg.dataloader.bs)
+                       num_iter=(cfg.training.num_iters) * cfg.training.bs)
 
-    decode_dl = DataLoader(ds, batch_size=cfg.dataloader.bs, num_workers=0)
+    decode_dl = DataLoader(ds, batch_size=cfg.training.bs, num_workers=0)
 
     return imgs_3d, decode_dl

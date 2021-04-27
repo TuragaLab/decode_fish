@@ -158,13 +158,7 @@ def load_psf_noise_micro(cfg):
         psf = get_gaussian_psf(cfg.PSF.psf_extent_zyx, cfg.PSF.gauss_radii)
 
     noise = hydra.utils.instantiate(cfg.noise)
-    micro = Microscope(parametric_psf=[psf],
-                       noise=noise,
-                       int_mu=cfg.microscope.int_mu,
-                       int_sig=cfg.microscope.int_sig,
-                       min_fac=cfg.microscope.min_fac,
-                       psf_noise=cfg.microscope.psf_noise,
-                       clamp_mode=cfg.microscope.clamp_mode).cuda()
+    micro = hydra.utils.instantiate(cfg.microscope, parametric_psf=[psf], noise=noise).cuda()
 
     return psf, noise, micro
 

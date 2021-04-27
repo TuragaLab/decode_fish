@@ -48,8 +48,8 @@ class Microscope(nn.Module):
                  noise: Union[torch.nn.Module, None]=None,
                  scale: float = 10000.,
                  int_mu=100,
-                 int_sig=10,
-                 min_fac=0.3,
+                 int_scale=10,
+                 int_loc=0.3,
                  psf_noise=None, clamp_mode = 'cp'
                  ):
 
@@ -59,9 +59,11 @@ class Microscope(nn.Module):
 #         self.scale = torch.nn.Parameter(torch.tensor(scale))
         self.scale = scale
         self.noise = noise
+
         self.int_mu = torch.nn.Parameter(torch.tensor(float(int_mu)))
-        self.int_sig = torch.nn.Parameter(torch.tensor(float(int_sig)))
-        self.min_fac = min_fac
+        self.int_scale = torch.nn.Parameter(torch.tensor(float(int_scale)))
+        self.int_loc = torch.nn.Parameter(torch.tensor(float(int_loc)))
+
         self.theta = self.noise.theta
         self.psf_noise = psf_noise
         self.clamp_mode = clamp_mode

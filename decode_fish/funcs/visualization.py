@@ -38,7 +38,7 @@ def get_simulation_statistics(decode_dl, micro, int_threshold=1, samples = 1):
                 x, local_rate, background = next(iter(decode_dl))
                 xmax = x[0,0,z_ind].max()
 
-            sim_vars = PointProcessUniform(local_rate).sample()
+            sim_vars = PointProcessUniform(local_rate, micro.int_mu.detach(), micro.int_scale.detach(), micro.int_loc.detach(), sim_iters=5).sample()
             xsim = micro(*sim_vars)
             xsim = micro.noise(xsim, background).sample()
             sim_df = sample_to_df(*sim_vars[:-1])

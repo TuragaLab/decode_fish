@@ -59,13 +59,13 @@ def my_app(cfg):
                    name=cfg.run_name
               )
 
-    opt_net = hydra.utils.instantiate(cfg.supervised.opt, params=model.parameters())
-    scheduler_net = torch.optim.lr_scheduler.StepLR(opt_net, step_size=cfg.supervised.step_size, gamma=cfg.supervised.gamma)
-    
-    psf_param = list(psf.parameters()) # + list(model_net.parameters()) + list(micro.parameters())
-    opt_psf  = hydra.utils.instantiate(cfg.autoencoder.opt_psf, params=psf_param)
-    opt_mic = hydra.utils.instantiate(cfg.autoencoder.opt_micro,params=list(micro.parameters())[:2])
-    scheduler_psf = torch.optim.lr_scheduler.StepLR(opt_psf, step_size=cfg.autoencoder.step_size, gamma=cfg.autoencoder.gamma)
+    opt_net = hydra.utils.instantiate(cfg.training.net.opt, params=model.parameters())
+    opt_psf = hydra.utils.instantiate(cfg.training.psf.opt, params=list(psf.parameters()))
+    opt_mic = hydra.utils.instantiate(cfg.training.micro.opt, params=list(micro.parameters())[:3])
+
+    scheduler_net = hydra.utils.instantiate(cfg.training.net.sched, optimizer=opt_net)
+    scheduler_psf = hydra.utils.instantiate(cfg.training.psf.sched, optimizer=opt_psf)
+    scheduler_mic = hydra.utils.instantiate(cfg.training.psf.sched, optimizer=opt_mic)
     
     if cfg.data_path.model_init is not None:
     
@@ -83,6 +83,7 @@ def my_app(cfg):
          optim_mic=opt_mic,
          sched_net=scheduler_net, 
          sched_psf=scheduler_psf, 
+         sched_mic=scheduler_mic, 
          psf=psf,
          post_proc=post_proc,
          microscope=micro, 

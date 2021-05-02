@@ -36,9 +36,9 @@ def nm_to_px(df, px_size_zyx=[100.,100.,100.]):
 def px_to_nm(df, px_size_zyx=[100.,100.,100.]):
 
     df_corr = df.copy()
-    df_corr['x'] *= px_size_zyx[0]
+    df_corr['x'] *= px_size_zyx[2]
     df_corr['y'] *= px_size_zyx[1]
-    df_corr['z'] *= px_size_zyx[2]
+    df_corr['z'] *= px_size_zyx[0]
     return df_corr
 
 #export

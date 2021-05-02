@@ -38,7 +38,7 @@ def get_simulation_statistics(decode_dl, micro, int_threshold=1, samples = 1):
                 x, local_rate, background = next(iter(decode_dl))
                 xmax = x[0,0,z_ind].max()
 
-            sim_vars = PointProcessUniform(local_rate, micro.int_mu.detach(), micro.int_scale.detach(), micro.int_loc.detach(), sim_iters=5).sample()
+            sim_vars = PointProcessUniform(local_rate, micro.int_conc.detach(), micro.int_rate.detach(), micro.int_loc.detach(), sim_iters=5).sample()
             xsim = micro(*sim_vars)
             xsim = micro.noise(xsim, background).sample()
             sim_df = sample_to_df(*sim_vars[:-1])
@@ -97,7 +97,7 @@ def eval_random_crop(decode_dl, model, post_proc, micro, projection='mean', cuda
             while x.max() < int_threshold:
                 x, local_rate, background = next(iter(decode_dl))
             pred_df, rec, res_dict = get_prediction(model, post_proc, x[:1], micro=micro, cuda=True, return_rec=True)
-            pred_df = nm_to_px(pred_df, post_proc.px_size)
+            pred_df = nm_to_px(pred_df, post_proc.px_size_zyx)
 
             x = x[0,0].cpu().numpy()
             rec = rec[0,0].cpu().numpy()
@@ -125,11 +125,11 @@ def eval_random_sim(decode_dl, model, post_proc, micro, projection='mean', plot_
 
             x, local_rate, background = next(iter(decode_dl))
 
-            sim_vars = PointProcessUniform(local_rate).sample()
+            sim_vars = PointProcessUniform(local_rate, micro.int_conc.item(), micro.int_rate.item(), micro.int_loc.item()).sample()
             xsim = micro(*sim_vars)
             x = micro.noise(xsim, background).sample()
             pred_df, rec, res_dict = get_prediction(model, post_proc, x[:1], micro=micro, cuda=True, return_rec=True)
-            pred_df = nm_to_px(pred_df, post_proc.px_size)
+            pred_df = nm_to_px(pred_df, post_proc.px_size_zyx)
             sim_df = nm_to_px(sample_to_df(*sim_vars[:-1]))
             sim_df = sim_df[sim_df['frame_idx']==0]
 

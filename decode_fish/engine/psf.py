@@ -29,6 +29,7 @@ class LinearInterpolatedPSF(nn.Module):
         self.register_buffer('z', v[0])
         self.device=device
         self.psf_volume = nn.Parameter(0.01*torch.rand(1, *self.psf_size))
+        self.forward_nonlin = torch.nn.Identity()
 
     def forward(self, x_offset_val, y_offset_val, z_offset_val):
 
@@ -44,7 +45,7 @@ class LinearInterpolatedPSF(nn.Module):
         z_grid = z_grid - z_offset[:, None, None, None]
 
         m_grid = torch.stack([x_grid, y_grid, z_grid], -1)
-        psf_out = torch.nn.functional.grid_sample(self.psf_volume.expand(N_em, -1, -1, -1, -1).to(self.device), m_grid, align_corners = False)
+        psf_out = torch.nn.functional.grid_sample(self.forward_nonlin(self.psf_volume).expand(N_em, -1, -1, -1, -1).to(self.device), m_grid, align_corners = False)
 
         return psf_out.transpose(-3,-1)
 
@@ -53,7 +54,7 @@ class LinearInterpolatedPSF(nn.Module):
         x_grid, y_grid, z_grid = torch.meshgrid(torch.arange(self.psf_size[0]),torch.arange(self.psf_size[1]),torch.arange(self.psf_size[2]))
         m_grid = torch.stack([x_grid, y_grid, z_grid], -1).to(self.device)
 
-        vol = (self.psf_volume[0]**2).to(self.device)
+        vol = (self.forward_nonlin(self.psf_volume[0])**2).to(self.device)
 
         zc = (m_grid[:,:,:,0] * vol).sum()/vol.sum()
         yc = (m_grid[:,:,:,1] * vol).sum()/vol.sum()
@@ -72,7 +73,7 @@ class LinearInterpolatedPSF(nn.Module):
 
     def sum_loss(self, target=1):
 
-        return torch.norm(self.psf_volume.sum() - 1, 2)
+        return torch.norm(self.forward_nonlin(self.psf_volume).sum() - 1, 2)
 
 # Cell
 def crop_psf(psf, extent_zyx):

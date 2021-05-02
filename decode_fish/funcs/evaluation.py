@@ -44,7 +44,7 @@ def matching(target_df, pred_df, tolerance=500, print_res=True, eff_const=0.5):
     """
 
     perf_dict = None
-    match_df = pd.DataFrame(columns = ['loc_idx','frame_idx','x_tar','y_tar','z_tar','int_tar','x_pred','y_pred','z_pred','int_pred','x_sig','y_sig','z_sig','int_sig','prob'])
+    match_df = pd.DataFrame()
     TP = 0
     FP = 0.0001
     FN = 0.0001
@@ -54,7 +54,7 @@ def matching(target_df, pred_df, tolerance=500, print_res=True, eff_const=0.5):
 
         for i in range(0, pred_df['frame_idx'].iloc[-1] + 1):
 
-            match_sub_df = pd.DataFrame(columns = ['loc_idx','frame_idx','x_tar','y_tar','z_tar','int_tar','x_pred','y_pred','z_pred','int_pred','x_sig','y_sig','z_sig','int_sig','prob'])
+            match_sub_df = pd.DataFrame(columns = ['tar_idx','pred_idx','frame_idx','x_tar','y_tar','z_tar','int_tar','x_pred','y_pred','z_pred','int_pred','x_sig','y_sig','z_sig','int_sig','prob'])
             sub_tar = target_df[target_df['frame_idx']==i].reset_index()
             sub_pred = pred_df[pred_df['frame_idx']==i].reset_index()
             tar_xyz = sub_tar[['x','y','z']]
@@ -72,7 +72,7 @@ def matching(target_df, pred_df, tolerance=500, print_res=True, eff_const=0.5):
                     MSE_vol += dist_arr[r, c] ** 2
                     TP += 1
 
-                    match_sub_df = match_sub_df.append({'loc_idx':sub_tar.loc[r]['loc_idx'],'frame_idx':sub_tar.loc[r]['frame_idx'],
+                    match_sub_df = match_sub_df.append({'tar_idx':sub_tar.loc[r]['loc_idx'],'pred_idx':sub_pred.loc[c]['loc_idx'],'frame_idx':sub_tar.loc[r]['frame_idx'],
                                      'x_tar':sub_tar.loc[r]['x'],'y_tar':sub_tar.loc[r]['y'],'z_tar':sub_tar.loc[r]['z'],'int_tar':sub_tar.loc[r]['int'],
                                      'x_pred':sub_pred.loc[c]['x'],'y_pred':sub_pred.loc[c]['y'],'z_pred':sub_pred.loc[c]['z'],'int_pred':sub_pred.loc[c]['int'],
                                      'x_sig':sub_pred.loc[c]['x_sig'],'y_sig':sub_pred.loc[c]['y_sig'],'z_sig':sub_pred.loc[c]['z_sig'],'int_sig':sub_pred.loc[c]['int_sig'],

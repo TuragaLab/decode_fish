@@ -122,15 +122,14 @@ def train(cfg,
 
         optim_net.zero_grad()
 
-        sim_vars = PointProcessUniform(local_rate, microscope.int_mu.detach(), microscope.int_scale.detach(), microscope.int_loc.detach(), sim_iters=5).sample()
+        sim_vars = PointProcessUniform(local_rate, int_conc=microscope.int_conc.detach(), int_rate=microscope.int_rate.detach(), int_loc=microscope.int_loc.detach(), sim_iters=5).sample()
         # sim_vars = locs_sl, x_os_sl, y_os_sl, z_os_sl, ints_sl, output_shape
         xsim = microscope(*sim_vars)
         xsim_noise = microscope.noise(xsim, background).sample()
 
         out_sim = model(xsim_noise)
-        int_sl = sim_vars[4] - microscope.int_loc.detach()
 
-        count_prob, spatial_prob = PointProcessGaussian(**out_sim).log_prob(*sim_vars[:4], int_sl)
+        count_prob, spatial_prob = PointProcessGaussian(**out_sim).log_prob(*sim_vars[:5])
         gmm_loss = -(spatial_prob + cfg.training.net.cnt_loss_scale*count_prob).mean()
 
         background_loss = F.mse_loss(out_sim['background'], background) * cfg.training.net.bl_loss_scale
@@ -155,9 +154,9 @@ def train(cfg,
             ae_loss = 0
 
             if len(proc_out_inp[6]):
-                good_ints = proc_out_inp[4][proc_out_inp[6] < torch.quantile(proc_out_inp[6], 0.5)]
+                good_ints = proc_out_inp[4]#[proc_out_inp[6] < torch.quantile(proc_out_inp[6], 0.5)]
                 good_ints = good_ints + microscope.int_loc.detach()
-                gamma_int = D.Gamma(microscope.int_mu*microscope.int_scale, microscope.int_scale)
+                gamma_int = D.Gamma(microscope.int_conc, microscope.int_rate)
                 loc_trafo = [D.AffineTransform(loc=microscope.int_loc, scale=1)]
                 ae_loss -= D.TransformedDistribution(gamma_int, loc_trafo).log_prob(good_ints).mean()
 
@@ -173,7 +172,7 @@ def train(cfg,
                 log_p_x_given_z = -microscope.noise(ae_img,out_inp['background']).log_prob(x).mean()
                 ae_loss += log_p_x_given_z
                 if cfg.training.psf.norm_reg:
-                    ae_loss += cfg.training.psf.norm_reg * (psf.sum_loss() + psf.com_loss() + psf.clip_loss())
+                    ae_loss += cfg.training.psf.norm_reg * (psf.sum_loss()) # + psf.com_loss() + psf.clip_loss())
 
                 if sched_psf:
                     sched_psf.step()
@@ -196,14 +195,14 @@ def train(cfg,
             wandb.log({'SL Losses/gmm_loss': gmm_loss.detach().cpu()}, step=batch_idx)
             wandb.log({'SL Losses/count_loss': (-count_prob.mean()).detach().cpu()}, step=batch_idx)
             wandb.log({'SL Losses/bg_loss': background_loss.detach().cpu()}, step=batch_idx)
-            wandb.log({'AE Losses/int_mu': microscope.int_mu.item()}, step=batch_idx)
-            wandb.log({'AE Losses/int_scale': microscope.int_scale.item()}, step=batch_idx)
+            wandb.log({'AE Losses/int_mu': microscope.int_conc.item()/microscope.int_rate.item()}, step=batch_idx)
+            wandb.log({'AE Losses/int_rate': microscope.int_rate.item()}, step=batch_idx)
             wandb.log({'AE Losses/int_loc': microscope.int_loc.item()}, step=batch_idx)
 
             if batch_idx > cfg.training.start_psf:
                 wandb.log({'AE Losses/p_x_given_z': log_p_x_given_z.detach().cpu()}, step=batch_idx)
                 wandb.log({'AE Losses/RMSE(rec)': torch.sqrt(((x-(ae_img+out_inp['background']))**2).mean()).detach().cpu()}, step=batch_idx)
-                wandb.log({'AE Losses/sum(psf)': psf.psf_volume[0].sum().detach().cpu()}, step=batch_idx)
+                wandb.log({'AE Losses/sum(psf)': torch.exp(psf.psf_volume)[0].sum().detach().cpu()}, step=batch_idx)
 #                     wandb.log({'AE Losses/theta': microscope.theta.item()}, step=batch_idx)
 
         if batch_idx % cfg.output.log_interval == 0:
@@ -232,7 +231,7 @@ def train(cfg,
                         eval_logger(pred_eval_df, eval_df, batch_idx, data_str='Inp. ')
 
                     if eval_psf is not None:
-                        wandb.log({'AE Losses/RMSE(psf)': cpu(torch.sqrt(torch.mean((eval_psf-psf.psf_volume.detach().cpu())**2)))}, step=batch_idx)
+                        wandb.log({'AE Losses/RMSE(psf)': cpu(torch.sqrt(torch.mean((eval_psf-torch.exp(psf.psf_volume).detach().cpu())**2)))}, step=batch_idx)
 
                     if cfg.output.log_figs:
                         eval_fig = gt_plot(eval_img, nm_to_px(pred_eval_df, px_size), nm_to_px(eval_df, px_size), px_size,ae_img[0]+res_eval['background'][0], psf)

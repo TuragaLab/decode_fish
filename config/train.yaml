@@ -61,6 +61,7 @@ microscope:
     int_rate: 50
     int_loc: 0
     psf_noise: 2e-5
+    scale: 10000
     clamp_mode: 'cx'
     
 foci:
@@ -126,7 +127,7 @@ training:
     micro:
         opt:
             _target_: torch.optim.SGD
-            lr: 1e-2
+            lr: 5e-4
         sched:
             _target_: torch.optim.lr_scheduler.StepLR
             gamma: 0.5

@@ -93,7 +93,7 @@ class Microscope(nn.Module):
             if self.clamp_mode == 'cp':
                 torch.clamp_min_(psf,0)
             #normalizing psf
-            psf_sum = psf.sum(dim=[2, 3, 4], keepdim=True)
+            psf_sum = psf.amax(dim=[2, 3, 4], keepdim=True)
 #             psf_sum = torch.nn.ReLU().forward(psf).sum(dim=[2, 3, 4], keepdim=True)
             psf = psf.div(psf_sum)
             if self.psf_noise: psf = self.add_psf_noise(psf)

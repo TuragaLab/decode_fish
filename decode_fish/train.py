@@ -18,7 +18,6 @@ from decode_fish.engine.point_process import PointProcessUniform
 from decode_fish.engine.gmm_loss import PointProcessGaussian
 
 from decode_fish.funcs.train_funcs import *
-from madgrad import MADGRAD
 import wandb
 
 @hydra.main(config_path='/groups/turaga/home/speisera/Dropbox (mackelab)/Artur/WorkDB/deepstorm/decode_fish/config', config_name='train')

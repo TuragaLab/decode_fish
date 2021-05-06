@@ -50,11 +50,16 @@ def matching(target_df, pred_df, tolerance=500, print_res=True, eff_const=0.5):
     FN = 0.0001
     MSE_vol = 0
 
+    match_list = []
+
+    tar_cols = ['loc_idx', 'frame_idx', 'x', 'y', 'z', 'int']
+    pred_cols = ['loc_idx', 'prob', 'x', 'y', 'z', 'int','x_sig', 'y_sig', 'z_sig', 'int_sig']
+
     if len(pred_df):
 
         for i in range(0, pred_df['frame_idx'].iloc[-1] + 1):
 
-            match_sub_df = pd.DataFrame(columns = ['tar_idx','pred_idx','frame_idx','x_tar','y_tar','z_tar','int_tar','x_pred','y_pred','z_pred','int_pred','x_sig','y_sig','z_sig','int_sig','prob'])
+            FC = 0
             sub_tar = target_df[target_df['frame_idx']==i].reset_index()
             sub_pred = pred_df[pred_df['frame_idx']==i].reset_index()
             tar_xyz = sub_tar[['x','y','z']]
@@ -63,28 +68,27 @@ def matching(target_df, pred_df, tolerance=500, print_res=True, eff_const=0.5):
             dist_arr = cdist(tar_xyz,pred_xyz)
 
             if dist_arr.size > 0:
-                while dist_arr.min() < tolerance:
+                r, c = np.unravel_index(dist_arr.argmin(), dist_arr.shape)
 
-                    r, c = np.where(dist_arr == dist_arr.min())
-                    r = r[0]
-                    c = c[0]
+                while dist_arr[r,c] < tolerance:
 
                     MSE_vol += dist_arr[r, c] ** 2
                     TP += 1
+                    FC += 1
 
-                    match_sub_df = match_sub_df.append({'tar_idx':sub_tar.loc[r]['loc_idx'],'pred_idx':sub_pred.loc[c]['loc_idx'],'frame_idx':sub_tar.loc[r]['frame_idx'],
-                                     'x_tar':sub_tar.loc[r]['x'],'y_tar':sub_tar.loc[r]['y'],'z_tar':sub_tar.loc[r]['z'],'int_tar':sub_tar.loc[r]['int'],
-                                     'x_pred':sub_pred.loc[c]['x'],'y_pred':sub_pred.loc[c]['y'],'z_pred':sub_pred.loc[c]['z'],'int_pred':sub_pred.loc[c]['int'],
-                                     'x_sig':sub_pred.loc[c]['x_sig'],'y_sig':sub_pred.loc[c]['y_sig'],'z_sig':sub_pred.loc[c]['z_sig'],'int_sig':sub_pred.loc[c]['int_sig'],
-                                     'prob':sub_pred.loc[c]['prob']}, ignore_index=True)
+                    match_list.append(list(sub_tar.loc[r,tar_cols].values) + list(sub_pred.loc[c,pred_cols].values))
 
                     dist_arr[r, :] = np.inf
                     dist_arr[:, c] = np.inf
 
-            FP += len(pred_xyz) - len(match_sub_df)
-            FN += len(tar_xyz) - len(match_sub_df)
+                    r, c = np.unravel_index(dist_arr.argmin(), dist_arr.shape)
 
-            match_df = match_df.append(match_sub_df)
+            FP += len(pred_xyz) - FC
+            FN += len(tar_xyz) - FC
+
+    match_df = pd.DataFrame(match_list, columns = ['tar_idx', 'frame_idx', 'x_tar', 'y_tar', 'z_tar', 'int_tar',
+                                                   'pred_idx','prob_pred', 'x_pred','y_pred','z_pred','int_pred','x_sig_pred','y_sig_pred','z_sig_pred','int_sig_pred'])
+
 
     precision = TP / (TP + FP)
     recall = TP / (TP + FN)

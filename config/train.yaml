@@ -61,7 +61,7 @@ microscope:
     int_rate: 50
     int_loc: 0
     psf_noise: 2e-5
-    scale: 10000
+    scale: 100
     clamp_mode: 'cx'
     
 foci:
@@ -125,6 +125,7 @@ training:
             gamma: 0.5
             step_size: 3000
     micro:
+        int_quantile: 1.
         opt:
             _target_: torch.optim.SGD
             lr: 5e-4

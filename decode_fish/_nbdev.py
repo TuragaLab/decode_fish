@@ -89,7 +89,10 @@ index = {"init_func": "00_models.ipynb",
          "get_simulation_statistics": "16_visualization.ipynb",
          "get_prediction": "16_visualization.ipynb",
          "eval_random_crop": "16_visualization.ipynb",
-         "eval_random_sim": "16_visualization.ipynb"}
+         "eval_random_sim": "16_visualization.ipynb",
+         "get_df_from_hdf5": "17_eval_routines.ipynb",
+         "add_df_to_hdf5": "17_eval_routines.ipynb",
+         "load_all": "17_eval_routines.ipynb"}
 
 modules = ["engine/model.py",
            "engine/psf.py",

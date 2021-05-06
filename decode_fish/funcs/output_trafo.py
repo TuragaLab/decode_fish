@@ -21,11 +21,11 @@ def sample_to_df(locs, x_os, y_os, z_os, ints, px_size_zyx=[100,100,100]):
     loc_idx = torch.arange(n_locs)
 
     df = DF({'loc_idx': loc_idx.cpu(),
-                       'frame_idx': frame_idx.cpu(),
-                       'x': x.cpu()*px_size_zyx[2],
-                       'y': y.cpu()*px_size_zyx[1],
-                       'z': z.cpu()*px_size_zyx[0],
-                       'int': ints.cpu()})
+             'frame_idx': frame_idx.cpu(),
+             'x': x.cpu()*px_size_zyx[2],
+             'y': y.cpu()*px_size_zyx[1],
+             'z': z.cpu()*px_size_zyx[0],
+             'int': ints.cpu()})
 
     return df
 

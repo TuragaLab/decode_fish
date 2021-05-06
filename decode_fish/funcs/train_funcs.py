@@ -173,7 +173,7 @@ def train(cfg,
 
                 optim_mic.zero_grad()
 
-                good_ints = proc_out_inp[4]#[proc_out_inp[6] < torch.quantile(proc_out_inp[6], 0.5)]
+                good_ints = proc_out_inp[4][proc_out_inp[6] < torch.quantile(proc_out_inp[6], cfg.training.micro.int_quantile)]
                 good_ints = good_ints + microscope.int_loc.detach()
                 gamma_int = D.Gamma(microscope.int_conc, microscope.int_rate)
                 loc_trafo = [D.AffineTransform(loc=microscope.int_loc, scale=1)]
@@ -225,7 +225,8 @@ def train(cfg,
                         eval_logger(pred_eval_df, eval_df, batch_idx, data_str='Inp. ')
 
                     if eval_psf is not None:
-                        wandb.log({'AE Losses/RMSE(psf)': cpu(torch.sqrt(torch.mean(((eval_psf-psf.psf_volume.detach().cpu()))**2)))}, step=batch_idx)
+#                         wandb.log({'AE Losses/Corr(psf)': cpu(torch.sqrt(torch.mean(((eval_psf-psf.psf_volume.detach().cpu()))**2)))}, step=batch_idx)
+                        wandb.log({'AE Losses/Corr(psf)': np.corrcoef(cpu(eval_psf).reshape(-1), cpu(psf.psf_volume).reshape(-1))[0,1]}, step=batch_idx)
 
                     if cfg.output.log_figs:
                         eval_fig = gt_plot(eval_img, nm_to_px(pred_eval_df, px_size), nm_to_px(eval_df, px_size), px_size,ae_img[0]+res_eval['background'][0], psf)

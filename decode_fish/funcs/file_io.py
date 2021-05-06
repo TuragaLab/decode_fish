@@ -44,7 +44,8 @@ def simfish_to_df(sim_file, frame_idx=0):
     # Number calculated by taking into account their (or my?) normalization (by max and not by sum)
     if yxzi.shape[1] == 4:
         # PSF.max() | PSF.sum() | 3**3 (superres)  | PSF.max() | microscope scale
-        ints = yxzi[:,3] * 65535.0 * 156772560.0 / 27 / 65535.0 / 10000.0
+        # ints = yxzi[:,3] * 65535.0 * 156772560.0 / 27 / 65535.0 / 10000.0
+        ints = yxzi[:,3] * 65535.0 / 100.0
     else:
         ints = np.ones_like(loc_idx)
 
@@ -148,7 +149,7 @@ def swap_psf_vol(psf, vol):
 def get_gaussian_psf(size_zyx, radii):
     psf = LinearInterpolatedPSF(size_zyx, device='cuda')
     gauss_vol = gaussian_sphere(size_zyx, radii, [size_zyx[0]//2,size_zyx[1]//2,size_zyx[2]//2])
-    gauss_vol = gauss_vol/gauss_vol.sum()
+    gauss_vol = gauss_vol/gauss_vol.max()
 #     gauss_vol = np.log(gauss_vol+1e-6)
     psf = swap_psf_vol(psf, gauss_vol)
     return psf

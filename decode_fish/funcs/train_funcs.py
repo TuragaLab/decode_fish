@@ -122,7 +122,7 @@ def train(cfg,
 
         optim_net.zero_grad()
 
-        sim_vars = PointProcessUniform(local_rate, int_conc=microscope.int_conc.detach(), int_rate=microscope.int_rate.detach(), int_loc=microscope.int_loc.detach(), sim_iters=5).sample()
+        sim_vars = PointProcessUniform(local_rate, int_conc=model.int_dist.int_conc.detach(), int_rate=model.int_dist.int_rate.detach(), int_loc=model.int_dist.int_loc.detach(), sim_iters=5).sample()
         # sim_vars = locs_sl, x_os_sl, y_os_sl, z_os_sl, ints_sl, output_shape
         xsim = microscope(*sim_vars)
         xsim_noise = microscope.noise(xsim, background).sample()
@@ -139,7 +139,7 @@ def train(cfg,
         # Update network parameters
         loss.backward()
 
-        if cfg.training.net.grad_clip: torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=cfg.training.net.grad_clip, norm_type=2)
+        if cfg.training.net.grad_clip: torch.nn.utils.clip_grad_norm_(model.unet.parameters(), max_norm=cfg.training.net.grad_clip, norm_type=2)
 
         optim_net.step()
         if sched_net:
@@ -169,15 +169,19 @@ def train(cfg,
                 if sched_psf:
                     sched_psf.step()
 
-            if len(proc_out_inp[6]):
+            if len(proc_out_inp[4]):
 
                 optim_mic.zero_grad()
+                good_ints = proc_out_inp[4]#[proc_out_inp[7] == 1.]
+                #   good_ints = proc_out_inp[4][proc_out_inp[6] < torch.quantile(proc_out_inp[6], cfg.training.micro.int_quantile)]
 
-                good_ints = proc_out_inp[4][proc_out_inp[6] < torch.quantile(proc_out_inp[6], cfg.training.micro.int_quantile)]
-                good_ints = good_ints + microscope.int_loc.detach()
-                gamma_int = D.Gamma(microscope.int_conc, microscope.int_rate)
-                loc_trafo = [D.AffineTransform(loc=microscope.int_loc, scale=1)]
+                gamma_int = D.Gamma(model.int_dist.int_conc, model.int_dist.int_rate)
+                loc_trafo = [D.AffineTransform(loc=model.int_dist.int_loc, scale=1, event_dim=1)]
                 int_loss = -D.TransformedDistribution(gamma_int, loc_trafo).log_prob(good_ints.detach()).mean()
+
+#                 print('Pars:', model.int_dist.int_conc.detach(), model.int_dist.int_rate.detach(),model.int_dist.int_loc.detach())
+#                 print('Ints:', good_ints.detach())
+#                 print('Loss:', int_loss)
 
                 int_loss.backward()
                 optim_mic.step()
@@ -189,9 +193,9 @@ def train(cfg,
             wandb.log({'SL Losses/gmm_loss': gmm_loss.detach().cpu()}, step=batch_idx)
             wandb.log({'SL Losses/count_loss': (-count_prob.mean()).detach().cpu()}, step=batch_idx)
             wandb.log({'SL Losses/bg_loss': background_loss.detach().cpu()}, step=batch_idx)
-            wandb.log({'AE Losses/int_mu': microscope.int_conc.item()/microscope.int_rate.item() + microscope.int_loc.item()}, step=batch_idx)
-            wandb.log({'AE Losses/int_rate': microscope.int_rate.item()}, step=batch_idx)
-            wandb.log({'AE Losses/int_loc': microscope.int_loc.item()}, step=batch_idx)
+            wandb.log({'AE Losses/int_mu': model.int_dist.int_conc.item()/model.int_dist.int_rate.item() + model.int_dist.int_loc.item()}, step=batch_idx)
+            wandb.log({'AE Losses/int_rate': model.int_dist.int_rate.item()}, step=batch_idx)
+            wandb.log({'AE Losses/int_loc': model.int_dist.int_loc.item()}, step=batch_idx)
 
             if batch_idx > cfg.training.start_psf:
                 wandb.log({'AE Losses/p_x_given_z': log_p_x_given_z.detach().cpu()}, step=batch_idx)

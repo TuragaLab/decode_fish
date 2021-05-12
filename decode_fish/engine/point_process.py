@@ -40,16 +40,14 @@ class PointProcessUniform(Distribution):
 
     def _sample(self, local_rate):
 
-        local_rate = torch.clamp_max(local_rate, 1.)
+        local_rate = torch.clamp(local_rate,0.,1.)
         locations = D.Bernoulli(local_rate).sample()
         n_emitter = int(locations.sum().item())
         zero_point_five = torch.tensor(0.5, device=self.device)
         x_offset = D.Uniform(low=0 - zero_point_five, high=0 + zero_point_five).sample(sample_shape=[n_emitter])
         y_offset = D.Uniform(low=0 - zero_point_five, high=0 + zero_point_five).sample(sample_shape=[n_emitter])
         z_offset = D.Uniform(low=0 - zero_point_five, high=0 + zero_point_five).sample(sample_shape=[n_emitter])
-#         intensities = D.Normal(self.int_mu, self.int_sig).sample(sample_shape=[n_emitter]).to(self.device)
-#         intensities = (D.Gamma(self.int_mu*self.int_scale, self.int_scale).sample(sample_shape=[n_emitter]) + self.int_loc).to(self.device)
-        intensities = D.Gamma(self.int_conc, self.int_rate).sample(sample_shape=[n_emitter]).to(self.device)
+        intensities = D.Gamma(self.int_conc, self.int_rate).sample(sample_shape=[n_emitter]).to(self.device) + self.int_loc
 
         output_shape = tuple(locations.shape)
         locations = locations.nonzero(as_tuple=False)

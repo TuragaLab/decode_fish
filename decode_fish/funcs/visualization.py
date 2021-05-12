@@ -14,13 +14,14 @@ from .plotting import *
 from torch.utils.data import DataLoader
 from ..engine.microscope import Microscope
 from ..engine.point_process import PointProcessUniform
+# from decode_fish.funcs.routines import *
 
 import ipyvolume as ipv
 
 base_path =  '/groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/'
 
 # Cell
-def get_simulation_statistics(decode_dl, micro, int_threshold=1, samples = 1):
+def get_simulation_statistics(decode_dl, micro, int_conc, int_rate, int_loc, int_threshold=1, samples = 1):
 
     """
     Draws a sample from the dataloader, and plots a slice of the real volume, the extracted background and
@@ -38,7 +39,7 @@ def get_simulation_statistics(decode_dl, micro, int_threshold=1, samples = 1):
                 x, local_rate, background = next(iter(decode_dl))
                 xmax = x[0,0,z_ind].max()
 
-            sim_vars = PointProcessUniform(local_rate, micro.int_conc.detach(), micro.int_rate.detach(), micro.int_loc.detach(), sim_iters=5).sample()
+            sim_vars = PointProcessUniform(local_rate, int_conc, int_rate, int_loc, sim_iters=5).sample()
             xsim = micro(*sim_vars)
             xsim = micro.noise(xsim, background).sample()
             sim_df = sample_to_df(*sim_vars[:-1])
@@ -103,9 +104,7 @@ def eval_random_crop(decode_dl, model, post_proc, micro, projection='mean', cuda
             rec = rec[0,0].cpu().numpy()
 
             axes = plot_3d_projections(x, projection=projection)
-            axes[0].scatter(pred_df['x'],pred_df['y'], color='red', s=5.)
-            axes[1].scatter(pred_df['x'],pred_df['z'], color='red', s=5.)
-            axes[2].scatter(pred_df['y'],pred_df['z'], color='red', s=5.)
+            scat_3d_projections(axes, [pred_df])
 
             axes[1].set_title('Predictions', size=16)
 
@@ -125,7 +124,7 @@ def eval_random_sim(decode_dl, model, post_proc, micro, projection='mean', plot_
 
             x, local_rate, background = next(iter(decode_dl))
 
-            sim_vars = PointProcessUniform(local_rate, micro.int_conc.item(), micro.int_rate.item(), micro.int_loc.item()).sample()
+            sim_vars = PointProcessUniform(local_rate, model.int_dist.int_conc.item(), model.int_dist.int_rate.item(), model.int_dist.int_loc.item()).sample()
             xsim = micro(*sim_vars)
             x = micro.noise(xsim, background).sample()
             pred_df, rec, res_dict = get_prediction(model, post_proc, x[:1], micro=micro, cuda=True, return_rec=True)
@@ -137,15 +136,11 @@ def eval_random_sim(decode_dl, model, post_proc, micro, projection='mean', plot_
             rec = rec[0,0].cpu().numpy()
 
             axes = plot_3d_projections(x, projection=projection)
-
+            plot_dfs = [pred_df]
             if plot_gt:
-                axes[0].scatter(sim_df['x'],sim_df['y'], color='black', marker='x', s=25.)
-                axes[1].scatter(sim_df['x'],sim_df['z'], color='black', marker='x', s=25.)
-                axes[2].scatter(sim_df['y'],sim_df['z'], color='black', marker='x', s=25.)
+                plot_dfs.append(sim_df)
 
-            axes[0].scatter(pred_df['x'],pred_df['y'], color='red', s=5.)
-            axes[1].scatter(pred_df['x'],pred_df['z'], color='red', s=5.)
-            axes[2].scatter(pred_df['y'],pred_df['z'], color='red', s=5.)
+            scat_3d_projections(axes, plot_dfs)
 
             axes[1].set_title('Predictions', size=16)
 

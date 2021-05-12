@@ -116,6 +116,8 @@ def plot_3d_projections(volume, projection='mean', size=6, vmax=None):
             im = axes[i].imshow(plot_vol.mean(i),vmax=vmax)
         if 'max' in projection:
             im = axes[i].imshow(plot_vol.max(i),vmax=vmax)
+        if 'min' in projection:
+            im = axes[i].imshow(plot_vol.min(i),vmax=vmax)
         add_colorbar(im)
 
     axes[0].set_xlabel('x')
@@ -134,9 +136,10 @@ def scat_3d_projections(axes, dfs, px_size_zyx=[1.,1.,1], s_fac=1.):
         dfs = [dfs]
     for i,df in enumerate(dfs):
         df = nm_to_px(df, px_size_zyx)
-        axes[0].scatter(df['x'],df['y'], color=colors[i], marker=markers[i], s=20*s_fac)
+        axes[0].scatter(df['x'],df['y'], color=colors[i], marker=markers[i], s=20*s_fac, label=f'DF {i}')
         axes[1].scatter(df['x'],df['z'], color=colors[i], marker=markers[i], s=20*s_fac)
         axes[2].scatter(df['y'],df['z'], color=colors[i], marker=markers[i], s=20*s_fac)
+    axes[0].legend()
 
 def plot_prob_hist(res_dict):
     fig = plt.figure()

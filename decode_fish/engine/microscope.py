@@ -47,9 +47,6 @@ class Microscope(nn.Module):
                  empirical_psf : List[torch.nn.Module]=None ,
                  noise: Union[torch.nn.Module, None]=None,
                  scale: float = 10000.,
-                 int_conc=100,
-                 int_rate=10,
-                 int_loc=0.3,
                  psf_noise=None, clamp_mode = 'cp'
                  ):
 
@@ -59,10 +56,6 @@ class Microscope(nn.Module):
 #         self.scale = torch.nn.Parameter(torch.tensor(scale))
         self.scale = scale
         self.noise = noise
-
-        self.int_conc = torch.nn.Parameter(torch.tensor(float(int_conc)))
-        self.int_rate = torch.nn.Parameter(torch.tensor(float(int_rate)))
-        self.int_loc = torch.nn.Parameter(torch.tensor(float(int_loc)))
 
         self.theta = self.noise.theta
         self.psf_noise = psf_noise
@@ -99,7 +92,7 @@ class Microscope(nn.Module):
             if self.psf_noise: psf = self.add_psf_noise(psf)
             #applying intenseties (N_Emitters, C, H, W, D)
 
-            tot_intensity = torch.clamp_min(i_val, 0) + self.int_loc.detach()
+            tot_intensity = torch.clamp_min(i_val, 0)
             psf = psf * tot_intensity[:,None,None,None,None]
             xsim = place_psf(locations, psf, output_shape)
             xsim = self.scale * xsim

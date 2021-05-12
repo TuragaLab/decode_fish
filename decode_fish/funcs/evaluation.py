@@ -57,7 +57,7 @@ def matching(target_df, pred_df, tolerance=500, print_res=True, eff_const=0.5):
 
     if len(pred_df):
 
-        for i in range(0, pred_df['frame_idx'].iloc[-1] + 1):
+        for i in range(0, pred_df['frame_idx'].max() + 1):
 
             FC = 0
             sub_tar = target_df[target_df['frame_idx']==i].reset_index()

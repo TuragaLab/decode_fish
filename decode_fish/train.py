@@ -58,7 +58,7 @@ def my_app(cfg):
                    name=cfg.run_name
               )
 
-    opt_net = hydra.utils.instantiate(cfg.training.net.opt, params=model.unet.parameters())
+    opt_net = hydra.utils.instantiate(cfg.training.net.opt, params=model.parameters())
     opt_psf = hydra.utils.instantiate(cfg.training.psf.opt, params=list(psf.parameters()))
     opt_mic = hydra.utils.instantiate(cfg.training.micro.opt, params=list(model.int_dist.parameters())[:3])
 

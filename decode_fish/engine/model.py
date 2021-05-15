@@ -414,17 +414,17 @@ class Abstract3DUNet(nn.Module):
 
         # in the last layer a 1×1 convolution reduces the number of output
         # channels to the number of labels
-        self.final_conv = nn.Conv3d(f_maps[0], out_channels, 1)
+#         self.final_conv = nn.Conv3d(f_maps[0], out_channels, 1)
 
-        if is_segmentation:
-            # semantic segmentation problem
-            if final_sigmoid:
-                self.final_activation = nn.Sigmoid()
-            else:
-                self.final_activation = nn.ELU()
-        else:
-            # regression problem
-            self.final_activation = None
+#         if is_segmentation:
+#             # semantic segmentation problem
+#             if final_sigmoid:
+#                 self.final_activation = nn.Sigmoid()
+#             else:
+#                 self.final_activation = nn.ELU()
+#         else:
+#             # regression problem
+#             self.final_activation = None
 
     def forward(self, x):
         # encoder part
@@ -445,12 +445,12 @@ class Abstract3DUNet(nn.Module):
             # of the previous decoder
             x = decoder(encoder_features, x)
 
-        x = self.final_conv(x)
+#         x = self.final_conv(x)
 
-        # apply final_activation (i.e. Sigmoid or Softmax) only during prediction. During training the network outputs
-        # logits and it's up to the user to normalize it before visualising with tensorboard or computing validation metric
-        if self.testing and self.final_activation is not None:
-            x = self.final_activation(x)
+#         # apply final_activation (i.e. Sigmoid or Softmax) only during prediction. During training the network outputs
+#         # logits and it's up to the user to normalize it before visualising with tensorboard or computing validation metric
+#         if self.testing and self.final_activation is not None:
+#             x = self.final_activation(x)
 
         return x
 
@@ -482,20 +482,56 @@ class UnetDecodeNoBn(nn.Module):
     def __init__(self, ch_in: int =1, ch_out: int=10, final_sigmoid : bool =False, depth: int =3, inp_scale: float=1., inp_offset: float=0.,  order='bcr', f_maps=64, p_offset=-5.,
                 int_conc=5, int_rate=1, int_loc=1):
         super().__init__()
-        self.unet = UNet3D(ch_in, ch_out, final_sigmoid=final_sigmoid, num_levels=depth, layer_order = order, inp_scale=inp_scale, inp_offset=inp_offset, f_maps=f_maps)
+        self.unet = UNet3D(ch_in, ch_out, final_sigmoid=final_sigmoid, num_levels=depth,
+                           layer_order = order, inp_scale=inp_scale, inp_offset=inp_offset, f_maps=f_maps)
         self.p_offset = p_offset
         self.int_dist = IntensityDist(int_conc, int_rate, int_loc)
 
+        self.p_out1 = nn.Conv3d(f_maps, f_maps, kernel_size=3, padding=1)
+        self.p_out2 = nn.Conv3d(f_maps, 1, kernel_size=1, padding=0)
+        nn.init.constant_(self.p_out2.bias,p_offset)
+
+        self.xyzi_out1 = nn.Conv3d(f_maps, f_maps, kernel_size=3, padding=1)
+        self.xyzi_out2 = nn.Conv3d(f_maps, 4, kernel_size=1, padding=0)
+
+        self.xyzis_out1 = nn.Conv3d(f_maps, f_maps, kernel_size=3, padding=1)
+        self.xyzis_out2 = nn.Conv3d(f_maps, 4, kernel_size=1, padding=0)
+
+        self.bg_out1 = nn.Conv3d(f_maps, f_maps, kernel_size=3, padding=1)
+        self.bg_out2 = nn.Conv3d(f_maps, 1, kernel_size=1, padding=0)
+
+        nn.init.kaiming_normal_(self.p_out1.weight, mode='fan_in', nonlinearity='relu')
+        nn.init.kaiming_normal_(self.p_out2.weight, mode='fan_in', nonlinearity='linear')
+        nn.init.kaiming_normal_(self.xyzi_out1.weight, mode='fan_in', nonlinearity='relu')
+        nn.init.kaiming_normal_(self.xyzi_out2.weight, mode='fan_in', nonlinearity='linear')
+        nn.init.kaiming_normal_(self.xyzis_out1.weight, mode='fan_in', nonlinearity='relu')
+        nn.init.kaiming_normal_(self.xyzis_out2.weight, mode='fan_in', nonlinearity='linear')
+        nn.init.kaiming_normal_(self.bg_out1.weight, mode='fan_in', nonlinearity='relu')
+        nn.init.kaiming_normal_(self.bg_out2.weight, mode='fan_in', nonlinearity='linear')
+
     def forward(self, x):
         out =  self.unet(x)
-        logit    = torch.clamp(out[:, 0] + self.p_offset, -15., 15)
-        xyzi_sig = F.softplus(out[:, 1:5]) + 0.01
-        xyz_mu   = torch.tanh(out[:, 5:-2])
-        i_mu     = F.softplus(out[:, -2]) + self.int_dist.int_loc.detach() + 0.01
-        background = self.unet.inp_scale * F.softplus(out[:, -1])
-        xyzi_mu = torch.cat((xyz_mu, i_mu.unsqueeze(1)), dim=1)
 
-        return {'logits': logit.unsqueeze(1),
+        logit    = F.elu(self.p_out1(out))
+        logit    = self.p_out2(logit)
+        logit    = torch.clamp(logit, -15., 15)
+
+        xyzi = F.elu(self.xyzi_out1(out))
+        xyzi = self.xyzi_out2(xyzi)
+
+        xyz_mu   = torch.tanh(xyzi[:, :3])
+        i_mu     = F.softplus(xyzi[:, 3:]) + self.int_dist.int_loc.detach() + 0.01
+        xyzi_mu = torch.cat((xyz_mu, i_mu), dim=1)
+
+        xyzis = F.elu(self.xyzis_out1(out))
+        xyzis = self.xyzis_out2(xyzis)
+        xyzi_sig = F.softplus(xyzis) + 0.01
+
+        background = F.elu(self.bg_out1(out))
+        background = self.bg_out2(background)
+        background = self.unet.inp_scale * F.softplus(background)
+
+        return {'logits': logit,
                 'xyzi_mu': xyzi_mu,
                 'xyzi_sigma': xyzi_sig,
-                'background': background.unsqueeze(1)}
+                'background': background}

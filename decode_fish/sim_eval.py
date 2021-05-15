@@ -147,25 +147,22 @@ def my_app(cfg):
             print('Save microscope state')
 
             g = f.create_group('microscope_state')
-
             for m in model_names:
                 
                 gg = g.create_group(m)
-                
+                model = load_model_state(model, model_dir + m + '/sl_save/', 'model.pkl')
                 train_cfg = OmegaConf.load(model_dir + m + '/train.yaml')
-                noise = hydra.utils.instantiate(train_cfg.noise)
-                micro = hydra.utils.instantiate(train_cfg.microscope, noise=noise)
                 
-                gg.create_dataset('conc_pre', data=micro.int_conc.item())                
-                gg.create_dataset('rate_pre', data=micro.int_rate.item())                
-                gg.create_dataset('loc_pre', data=micro.int_loc.item())                
-                gg.create_dataset('scale', data=micro.scale) 
+                gg.create_dataset('conc_pre', data=model.int_dist.int_conc.item())                
+                gg.create_dataset('rate_pre', data=model.int_dist.int_rate.item())                
+                gg.create_dataset('loc_pre', data=model.int_dist.int_loc.item())                
+                gg.create_dataset('scale', data=train_cfg.microscope.scale) 
                 
-                micro.load_state_dict(torch.load(model_dir + m + '/microscope.pkl'))
+                model = load_model_state(model, model_dir + m, 'model.pkl')
 
-                gg.create_dataset('conc_post', data=micro.int_conc.item())                
-                gg.create_dataset('rate_post', data=micro.int_rate.item())                
-                gg.create_dataset('loc_post', data=micro.int_loc.item())  
+                gg.create_dataset('conc_post', data=model.int_dist.int_conc.item())                
+                gg.create_dataset('rate_post', data=model.int_dist.int_rate.item())                
+                gg.create_dataset('loc_post', data=model.int_dist.int_loc.item())  
                 
 if __name__ == "__main__":
     my_app()

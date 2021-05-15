@@ -120,7 +120,6 @@ training:
     psf:
         grad_clip: 0.1
         gamma: 0.5
-        step_size: 2000
         norm_reg: 0.5
         opt:
             _target_: torch.optim.AdamW

@@ -200,7 +200,7 @@ def train(cfg,
             if batch_idx > cfg.training.start_psf:
                 wandb.log({'AE Losses/p_x_given_z': log_p_x_given_z.detach().cpu()}, step=batch_idx)
                 wandb.log({'AE Losses/RMSE(rec)': torch.sqrt(((x-(ae_img+out_inp['background']))**2).mean()).detach().cpu()}, step=batch_idx)
-                wandb.log({'AE Losses/sum(psf)': F.relu(psf.psf_volume)[0].sum().detach().cpu()}, step=batch_idx)
+                wandb.log({'AE Losses/sum(psf)': F.relu(psf.psf_volume/psf.psf_volume.max())[0].sum().detach().cpu()}, step=batch_idx)
 #                     wandb.log({'AE Losses/theta': microscope.theta.item()}, step=batch_idx)
 
         if batch_idx % cfg.output.log_interval == 0:
@@ -231,6 +231,7 @@ def train(cfg,
                     if eval_psf is not None:
 #                         wandb.log({'AE Losses/Corr(psf)': cpu(torch.sqrt(torch.mean(((eval_psf-psf.psf_volume.detach().cpu()))**2)))}, step=batch_idx)
                         wandb.log({'AE Losses/Corr(psf)': np.corrcoef(cpu(eval_psf).reshape(-1), cpu(psf.psf_volume).reshape(-1))[0,1]}, step=batch_idx)
+                        wandb.log({'AE Losses/RMSE(psf)': np.sqrt(np.mean((cpu(eval_psf/eval_psf.max())-cpu(psf.psf_volume/psf.psf_volume.max()))**2))}, step=batch_idx)
 
                     if cfg.output.log_figs:
                         eval_fig = gt_plot(eval_img, nm_to_px(pred_eval_df, px_size), nm_to_px(eval_df, px_size), px_size,ae_img[0]+res_eval['background'][0], psf)

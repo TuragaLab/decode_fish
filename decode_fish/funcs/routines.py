@@ -41,14 +41,15 @@ def sim_data(decode_dl, batches, micro):
     xsim_col = []
 
     for _ in range(batches):
-        x, local_rate, background = next(iter(decode_dl))
-        sim_vars = PointProcessUniform(local_rate,micro.int_conc, micro.int_rate, micro.int_loc).sample()
-        xsim = micro(*sim_vars)
-        x = micro.noise(xsim, background).sample()
+        with torch.no_grad():
+            x, local_rate, background = next(iter(decode_dl))
+            sim_vars = PointProcessUniform(local_rate,model.int_dist.int_conc, model.int_dist.int_rate, model.int_dist.int_loc).sample()
+            xsim = micro(*sim_vars)
+            x = micro.noise(xsim, background).sample()
 
-        xsim_col.append(x)
-        gt_vars = sim_vars[:-1]
-        gt_dfs.append(sample_to_df(*gt_vars, px_size_zyx=[1.,1.,1.]))
+            xsim_col.append(x)
+            gt_vars = sim_vars[:-1]
+            gt_dfs.append(sample_to_df(*gt_vars, px_size_zyx=[1.,1.,1.]))
 
     return torch.cat(xsim_col), cat_emitter_dfs(gt_dfs, decode_dl.batch_size)
 
@@ -58,10 +59,10 @@ def get_sim_perf(x, gt_df, model, post_proc, micro, cuda=True, print_res=True):
     x_recs = []
 
     for i in range(len(x)):
-
-        pred_df, rec, res_dict = get_prediction(model, post_proc, x[i:i+1], micro=micro, cuda=True, return_rec=True, min_int=-100)
-        pred_dfs.append(pred_df)
-        x_recs.append(rec)
+        with torch.no_grad():
+            pred_df, rec, res_dict = get_prediction(model, post_proc, x[i:i+1], micro=micro, cuda=True, return_rec=True, min_int=-100)
+            pred_dfs.append(pred_df)
+            x_recs.append(rec)
 
     pred_df = cat_emitter_dfs(pred_dfs)
     xrec = torch.cat(x_recs)

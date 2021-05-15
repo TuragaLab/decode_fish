@@ -71,9 +71,9 @@ class LinearInterpolatedPSF(nn.Module):
 
         return torch.norm(torch.nn.ReLU().forward(-self.psf_volume).sum(), 2)
 
-    def sum_loss(self, target=1):
+    def sum_loss(self):
 
-        return torch.norm(self.forward_nonlin(self.psf_volume).sum() - 1, 2)
+        return torch.norm(self.forward_nonlin(self.psf_volume).sum(), 1)
 
 # Cell
 def crop_psf(psf, extent_zyx):

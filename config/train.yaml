@@ -34,8 +34,8 @@ prob_generator:
     
 bg_estimation:
     _target_: decode_fish.funcs.dataset.EstimateBackground
-    smoothing_filter_size: 6
-    div_factor: 1
+#     smoothing_filter_size: 6
+#     div_factor: 1
     
 random_crop: 
     crop_sz: 48
@@ -53,7 +53,7 @@ PSF:
 noise:
     _target_: decode_fish.engine.noise.sCMOS
     theta: 2. 
-    baseline:  0.09
+    baseline:  0
     
 microscope:
     _target_: decode_fish.engine.microscope.Microscope
@@ -70,9 +70,9 @@ foci:
     mode: 'gaussian'
     
 intensity_dist:
-    int_conc: 200
-    int_rate: 50
-    int_loc: 0
+    int_conc: 4.
+    int_rate: 1.
+    int_loc: 1.
     
 model:
     _target_: decode_fish.engine.model.UnetDecodeNoBn
@@ -103,9 +103,10 @@ post_proc_si:
     
 training:
     bs: 2
-    num_iters: 15000
-    start_micro: 1000
-    start_psf: 6000
+    num_iters: 20000
+    start_micro: 3000
+    start_psf: 3000
+    isi_filt: False
     net:
         bl_loss_scale: 0.01
         cnt_loss_scale: 1
@@ -122,8 +123,8 @@ training:
         gamma: 0.5
         norm_reg: 0.5
         opt:
-            _target_: torch.optim.AdamW
-            lr: 0.001
+            _target_: torch.optim.RMSprop
+            lr: 0.00025
         sched:
             _target_: torch.optim.lr_scheduler.StepLR
             gamma: 0.5

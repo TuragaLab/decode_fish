@@ -39,7 +39,6 @@ def my_app(cfg):
     model = hydra.utils.instantiate(cfg.model)
     model.cuda()
     
-    
     post_proc = hydra.utils.instantiate(cfg.post_proc_isi, samp_threshold=0.5)
     
     with h5py.File(out_file, 'w') as f:
@@ -163,6 +162,27 @@ def my_app(cfg):
                 gg.create_dataset('conc_post', data=model.int_dist.int_conc.item())                
                 gg.create_dataset('rate_post', data=model.int_dist.int_rate.item())                
                 gg.create_dataset('loc_post', data=model.int_dist.int_loc.item())  
+                
+        if cfg.eval_routines.psf:
+
+            """ PSF save """
+            print('Save PSF state')
+
+            g = f.create_group('psf_state')
+            
+            for i,m in enumerate(model_names):
+                
+                train_cfg = OmegaConf.load(model_dir + m + '/train.yaml')
+                if not i:
+                    g.create_dataset('gt_psf', data=cpu(load_tiff_image(train_cfg.evaluation.psf_path)[0]))
+                
+                gg = g.create_group(m)
+
+                psf_init = load_psf(train_cfg)
+                gg.create_dataset('init_psf', data=cpu(psf_init.psf_volume[0]))     
+                
+                psf_init.load_state_dict(torch.load(Path(train_cfg.output.save_dir)/'psf.pkl'))
+                gg.create_dataset('fit_psf', data=cpu(psf_init.psf_volume[0]))               
                 
 if __name__ == "__main__":
     my_app()

@@ -59,7 +59,7 @@ def my_app(cfg):
               )
 
     opt_net = hydra.utils.instantiate(cfg.training.net.opt, params=model.parameters())
-    opt_psf = hydra.utils.instantiate(cfg.training.psf.opt, params=list(psf.parameters()))
+    opt_psf = hydra.utils.instantiate(cfg.training.psf.opt, params=list(psf.parameters())+ list(micro.noise.parameters()))
     opt_mic = hydra.utils.instantiate(cfg.training.micro.opt, params=list(model.int_dist.parameters())[:3])
 
     scheduler_net = hydra.utils.instantiate(cfg.training.net.sched, optimizer=opt_net)

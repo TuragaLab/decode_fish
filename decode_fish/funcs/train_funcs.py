@@ -172,7 +172,10 @@ def train(cfg,
             if len(proc_out_inp[4]):
 
                 optim_mic.zero_grad()
-                good_ints = proc_out_inp[4]#[proc_out_inp[7] == 1.]
+                if cfg.training.isi_filt == True:
+                    good_ints = proc_out_inp[4][proc_out_inp[7] == 1.]
+                else:
+                    good_ints = proc_out_inp[4]
                 #   good_ints = proc_out_inp[4][proc_out_inp[6] < torch.quantile(proc_out_inp[6], cfg.training.micro.int_quantile)]
 
                 gamma_int = D.Gamma(model.int_dist.int_conc, model.int_dist.int_rate)
@@ -196,6 +199,7 @@ def train(cfg,
             wandb.log({'AE Losses/int_mu': model.int_dist.int_conc.item()/model.int_dist.int_rate.item() + model.int_dist.int_loc.item()}, step=batch_idx)
             wandb.log({'AE Losses/int_rate': model.int_dist.int_rate.item()}, step=batch_idx)
             wandb.log({'AE Losses/int_loc': model.int_dist.int_loc.item()}, step=batch_idx)
+            wandb.log({'AE Losses/theta': microscope.noise.theta.item()}, step=batch_idx)
 
             if batch_idx > cfg.training.start_psf:
                 wandb.log({'AE Losses/p_x_given_z': log_p_x_given_z.detach().cpu()}, step=batch_idx)

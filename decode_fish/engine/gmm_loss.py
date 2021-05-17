@@ -26,7 +26,7 @@ class PointProcessGaussian(Distribution):
         count_var = (P - P ** 2).sum(dim=[2, 3, 4]).squeeze(-1)
         count_dist = D.Normal(count_mean, torch.sqrt(count_var))
 
-        count_prob =  count_dist.log_prob(counts) * counts
+        count_prob =  count_dist.log_prob(counts) # * counts
 
         mixture_probs = P / P.sum(dim=[2, 3, 4], keepdim=True)
 

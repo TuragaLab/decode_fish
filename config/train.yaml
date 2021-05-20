@@ -57,7 +57,6 @@ noise:
     
 microscope:
     _target_: decode_fish.engine.microscope.Microscope
-    psf_noise: 0
     scale: 100
     clamp_mode: 'cp'
     
@@ -103,10 +102,9 @@ post_proc_si:
     
 training:
     bs: 2
-    num_iters: 20000
-    start_micro: 3000
+    num_iters: 30000
     start_psf: 3000
-    isi_filt: False
+    start_micro: ${training.start_psf}
     net:
         bl_loss_scale: 0.01
         cnt_loss_scale: 1
@@ -114,7 +112,7 @@ training:
         sched:   
             _target_: torch.optim.lr_scheduler.StepLR
             gamma: 0.5
-            step_size: 6000
+            step_size: 5000
         opt:
             _target_: torch.optim.AdamW
             lr: 5e-4
@@ -128,7 +126,7 @@ training:
         sched:
             _target_: torch.optim.lr_scheduler.StepLR
             gamma: 0.5
-            step_size: 3000
+            step_size: 5000
     micro:
         int_quantile: 1.
         opt:

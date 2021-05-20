@@ -214,6 +214,7 @@ def get_dataloader(cfg):
     return imgs_3d, decode_dl
 
 def load_all(cfg, sl=False):
+
     path = Path(cfg.output.save_dir)/'sl_save' if sl else Path(cfg.output.save_dir)
     model = hydra.utils.instantiate(cfg.model)
     model = load_model_state(model, path, 'model.pkl')

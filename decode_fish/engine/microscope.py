@@ -58,13 +58,7 @@ class Microscope(nn.Module):
         self.noise = noise
 
         self.theta = self.noise.theta
-        self.psf_noise = psf_noise
         self.clamp_mode = clamp_mode
-
-    def add_psf_noise(self, psf_stack):
-
-        noise = torch.distributions.Normal(loc=0, scale=self.psf_noise).sample(psf_stack.shape).to(psf_stack.device)
-        return psf_stack + noise
 
     def forward(self, locations, x_os_val, y_os_val, z_os_val, i_val,output_shape, bg=None, eval_=None, scale_x=None, scale_y=None, scale_z=None):
 
@@ -86,12 +80,11 @@ class Microscope(nn.Module):
             if self.clamp_mode == 'cp':
                 torch.clamp_min_(psf,0)
             #normalizing psf
-            psf_sum = psf.amax(dim=[2, 3, 4], keepdim=True)
+            psf_max = psf.amax(dim=[2, 3, 4], keepdim=True)
 #             psf_sum = torch.nn.ReLU().forward(psf).sum(dim=[2, 3, 4], keepdim=True)
-            psf = psf.div(psf_sum)
-            if self.psf_noise: psf = self.add_psf_noise(psf)
-            #applying intenseties (N_Emitters, C, H, W, D)
+            psf = psf.div(psf_max)
 
+            #applying intenseties (N_Emitters, C, H, W, D)
             tot_intensity = torch.clamp_min(i_val, 0)
             psf = psf * tot_intensity[:,None,None,None,None]
             xsim = place_psf(locations, psf, output_shape)

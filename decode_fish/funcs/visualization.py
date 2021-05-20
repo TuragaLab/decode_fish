@@ -77,11 +77,12 @@ def get_prediction(model, post_proc, img, micro=None, cuda=True, return_rec=Fals
         img = img[(None,)*(5-img.ndim)]
         model.eval().cuda() if cuda else model.eval().cpu()
         res_dict = model(img.cuda()) if cuda else model(img)
-        pred_df = post_proc(res_dict)
+        res_dict = model.tensor_to_dict(res_dict)
+        pred_df = post_proc.get_df(res_dict)
         pred_df = pred_df[pred_df['int'] > min_int]
 
         if return_rec:
-            locations, x_os_3d, y_os_3d, z_os_3d, ints_3d, output_shape = post_proc(res_dict, ret='micro')[:6]
+            locations, x_os_3d, y_os_3d, z_os_3d, ints_3d, output_shape = post_proc.get_micro_inp(res_dict)[:6]
             inds = torch.where(ints_3d > min_int)[0]
             ae_img_3d = micro([l[inds] for l in locations], x_os_3d[inds], y_os_3d[inds], z_os_3d[inds], ints_3d[inds], output_shape)
             return pred_df, ae_img_3d + res_dict['background'], res_dict

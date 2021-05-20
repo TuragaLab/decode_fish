@@ -127,7 +127,7 @@ def train(cfg,
         xsim = microscope(*sim_vars)
         xsim_noise = microscope.noise(xsim, background).sample()
 
-        out_sim = model(xsim_noise)
+        out_sim = model.tensor_to_dict(model(xsim_noise))
 
         count_prob, spatial_prob = PointProcessGaussian(**out_sim).log_prob(*sim_vars[:5])
         gmm_loss = -(spatial_prob + cfg.training.net.cnt_loss_scale*count_prob).mean()
@@ -147,8 +147,8 @@ def train(cfg,
 
         if batch_idx > cfg.training.start_micro:
 
-            out_inp = model(x)
-            proc_out_inp = post_proc(out_inp, ret='micro') # locations, x_os_3d, y_os_3d, z_os_3d, ints_3d, output_shape, comb_sig
+            out_inp = model.tensor_to_dict(model(x))
+            proc_out_inp = post_proc.get_micro_inp(out_inp) # locations, x_os_3d, y_os_3d, z_os_3d, ints_3d, output_shape, comb_sig
 
             if batch_idx > cfg.training.start_psf:
 
@@ -172,22 +172,15 @@ def train(cfg,
             if len(proc_out_inp[4]):
 
                 optim_mic.zero_grad()
-                if cfg.training.isi_filt == True:
-                    good_ints = proc_out_inp[4][proc_out_inp[7] == 1.]
-                else:
-                    good_ints = proc_out_inp[4]
-                #   good_ints = proc_out_inp[4][proc_out_inp[6] < torch.quantile(proc_out_inp[6], cfg.training.micro.int_quantile)]
+                ints = proc_out_inp[4]
 
                 gamma_int = D.Gamma(model.int_dist.int_conc, model.int_dist.int_rate)
                 loc_trafo = [D.AffineTransform(loc=model.int_dist.int_loc, scale=1, event_dim=1)]
-                int_loss = -D.TransformedDistribution(gamma_int, loc_trafo).log_prob(good_ints.detach()).mean()
-
-#                 print('Pars:', model.int_dist.int_conc.detach(), model.int_dist.int_rate.detach(),model.int_dist.int_loc.detach())
-#                 print('Ints:', good_ints.detach())
-#                 print('Loss:', int_loss)
+                int_loss = -D.TransformedDistribution(gamma_int, loc_trafo).log_prob(ints.detach()).mean()
 
                 int_loss.backward()
                 optim_mic.step()
+
                 if sched_mic:
                     sched_mic.step()
 
@@ -210,7 +203,7 @@ def train(cfg,
         if batch_idx % cfg.output.log_interval == 0:
             print(batch_idx)
             with torch.no_grad():
-                pred_df = post_proc(out_sim, ret='df')
+                pred_df = post_proc.get_df(out_sim)
                 px_size = cfg.evaluation.px_size_zyx
                 target_df = sample_to_df(*sim_vars[:5], px_size_zyx=px_size)
                 eval_logger(pred_df, target_df, batch_idx, data_str='Sim. ')
@@ -224,9 +217,9 @@ def train(cfg,
                     wandb.log({'SL summary': sl_fig}, step=batch_idx)
 
                 if eval_dict is not None:
-                    res_eval = model(eval_img[None].cuda())
-                    ae_img = microscope(*post_proc(res_eval, ret='micro')[:6])
-                    pred_eval_df = post_proc(res_eval, ret='df')
+                    res_eval = model.tensor_to_dict(model(eval_img[None].cuda()))
+                    ae_img = microscope(*post_proc.get_micro_inp(res_eval)[:6])
+                    pred_eval_df = post_proc.get_df(res_eval)
                     wandb.log({'AE Losses/N preds(eval)': len(pred_eval_df)}, step=batch_idx)
 
                     if eval_df is not None:

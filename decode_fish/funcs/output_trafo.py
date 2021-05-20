@@ -64,9 +64,10 @@ class SIPostProcess(torch.nn.Module):
                                        [[d1, 1,d1],[1, 1, 1],[d1, 1,d1]],
                                        [[d2,d1,d2],[d1,1,d1],[d2,d1,d2]]])[None,None]
 
-    def spatial_integration(self, p):
+    def forward(self, logits):
 
-        device = p.device
+        device = logits.device
+        p = torch.sigmoid(logits)
 
         with torch.no_grad():
 
@@ -93,62 +94,65 @@ class SIPostProcess(torch.nn.Module):
             # This is our final clustered probablity which we then threshold (normally > 0.7) to get our final discrete locations
             p_ps = p_ps1 + p_ps2
 
-            return p_ps, None
+            return p_ps
 
-    def forward(self, res_dict, ret='df'):
+    def get_si_resdict(self, res_dict, p_si=None):
 
-        probs =  torch.sigmoid(res_dict['logits'])
-        res_dict['Probs_si'], res_dict['Iters_si'] = self.spatial_integration(probs)
+        if p_si is None:
+            p_si = self.forward(res_dict['logits'])
+
+        res_dict['Probs_si'] = p_si
         res_dict['Samples_si'] = torch.where(res_dict['Probs_si'] > self.samp_threshold, torch.ones_like(res_dict['Probs_si']), torch.zeros_like(res_dict['Probs_si']))
 
-        if ret == 'df':
+        return res_dict
 
-            res_dict = {k:v.cpu() for (k,v) in res_dict.items()}
-            locations = res_dict['Samples_si'].nonzero(as_tuple=True)
+    def get_df(self, res_dict, p_si=None):
 
-            pos_x, pos_y, pos_z = locations[-1] ,locations[-2], locations[-3]
-            x = pos_x + res_dict['xyzi_mu'][:,[0]][locations] + 0.5
-            y = pos_y + res_dict['xyzi_mu'][:,[1]][locations] + 0.5
-            z = pos_z + res_dict['xyzi_mu'][:,[2]][locations] + 0.5
+        res_dict = self.get_si_resdict(res_dict, p_si)
 
-            loc_idx = torch.arange(len(x))
-            frame_idx = locations[0]
+        res_dict = {k:v.cpu() for (k,v) in res_dict.items()}
+        locations = res_dict['Samples_si'].nonzero(as_tuple=True)
 
-            df = DF({'loc_idx': loc_idx,
-                     'frame_idx': frame_idx,
-                     'x': x*self.px_size_zyx[2],
-                     'y': y*self.px_size_zyx[1],
-                     'z': z*self.px_size_zyx[0],
-                     'prob': res_dict['Probs_si'][locations],
-                     'int': res_dict['xyzi_mu'][:,[3]][locations],
-                     'int_sig': res_dict['xyzi_sigma'][:,[3]][locations],
-                     'x_sig': res_dict['xyzi_sigma'][:,[0]][locations]*self.px_size_zyx[0],
-                     'y_sig': res_dict['xyzi_sigma'][:,[1]][locations]*self.px_size_zyx[1],
-                     'z_sig': res_dict['xyzi_sigma'][:,[2]][locations]*self.px_size_zyx[2],
-                     'comb_sig': torch.sqrt(res_dict['xyzi_sigma'][:,[0]][locations]**2
-                                           +res_dict['xyzi_sigma'][:,[1]][locations]**2
-                                           +res_dict['xyzi_sigma'][:,[2]][locations])})
+        pos_x, pos_y, pos_z = locations[-1] ,locations[-2], locations[-3]
+        x = pos_x + res_dict['xyzi_mu'][:,[0]][locations] + 0.5
+        y = pos_y + res_dict['xyzi_mu'][:,[1]][locations] + 0.5
+        z = pos_z + res_dict['xyzi_mu'][:,[2]][locations] + 0.5
 
-            return df
+        loc_idx = torch.arange(len(x))
+        frame_idx = locations[0]
 
-        elif ret == 'micro':
+        df = DF({'loc_idx': loc_idx,
+                 'frame_idx': frame_idx,
+                 'x': x*self.px_size_zyx[2],
+                 'y': y*self.px_size_zyx[1],
+                 'z': z*self.px_size_zyx[0],
+                 'prob': res_dict['Probs_si'][locations],
+                 'int': res_dict['xyzi_mu'][:,[3]][locations],
+                 'int_sig': res_dict['xyzi_sigma'][:,[3]][locations],
+                 'x_sig': res_dict['xyzi_sigma'][:,[0]][locations]*self.px_size_zyx[0],
+                 'y_sig': res_dict['xyzi_sigma'][:,[1]][locations]*self.px_size_zyx[1],
+                 'z_sig': res_dict['xyzi_sigma'][:,[2]][locations]*self.px_size_zyx[2],
+                 'comb_sig': torch.sqrt(res_dict['xyzi_sigma'][:,[0]][locations]**2
+                                       +res_dict['xyzi_sigma'][:,[1]][locations]**2
+                                       +res_dict['xyzi_sigma'][:,[2]][locations])})
 
-            locations = res_dict['Samples_si'].nonzero(as_tuple=True)
-            x_os_3d = res_dict['xyzi_mu'][:,[0]][locations]
-            y_os_3d = res_dict['xyzi_mu'][:,[1]][locations]
-            z_os_3d = res_dict['xyzi_mu'][:,[2]][locations]
-            ints_3d = res_dict['xyzi_mu'][:,[3]][locations]
-            output_shape  = res_dict['Samples_si'].shape
-            comb_sig = torch.sqrt(res_dict['xyzi_sigma'][:,[0]][locations]**2
-                                 +res_dict['xyzi_sigma'][:,[1]][locations]**2
-                                 +res_dict['xyzi_sigma'][:,[2]][locations])
-            iters_si = res_dict['Iters_si'][locations]
+        return df
 
-            return locations, x_os_3d, y_os_3d, z_os_3d, ints_3d, output_shape, comb_sig, iters_si
+    def get_micro_inp(self, res_dict, p_si=None):
 
-        elif ret == 'dict':
+        res_dict = self.get_si_resdict(res_dict, p_si)
 
-            return res_dict
+        locations = res_dict['Samples_si'].nonzero(as_tuple=True)
+        x_os_3d = res_dict['xyzi_mu'][:,[0]][locations]
+        y_os_3d = res_dict['xyzi_mu'][:,[1]][locations]
+        z_os_3d = res_dict['xyzi_mu'][:,[2]][locations]
+        ints_3d = res_dict['xyzi_mu'][:,[3]][locations]
+        output_shape  = res_dict['Samples_si'].shape
+        comb_sig = torch.sqrt(res_dict['xyzi_sigma'][:,[0]][locations]**2
+                             +res_dict['xyzi_sigma'][:,[1]][locations]**2
+                             +res_dict['xyzi_sigma'][:,[2]][locations])
+
+        return locations, x_os_3d, y_os_3d, z_os_3d, ints_3d, output_shape, comb_sig
 
 # p_col = []
 
@@ -160,16 +164,17 @@ class ISIPostProcess(SIPostProcess):
         super().__init__(m1_threshold = m1_threshold, samp_threshold=samp_threshold, px_size_zyx=px_size_zyx, diag=diag)
         self.m2_threshold = None
 
-    def spatial_integration(self, p):
+    def forward(self, logits):
 
-        device = p.device
+        device = logits.device
         count = 0
+        p = torch.sigmoid(logits)
 
         with torch.no_grad():
 
             p_ret = 0
             tot_mask = torch.ones_like(p)
-            count_arr = torch.zeros_like(p)
+#             count_arr = torch.zeros_like(p)
 
             while True:
 
@@ -184,7 +189,7 @@ class ISIPostProcess(SIPostProcess):
                 max_mask1 = torch.eq(p, pool).float()
                 max_mask1[p==0] = 0
 
-                count_arr += max_mask1*count
+#                 count_arr += max_mask1*count
 
                 tot_mask *= (torch.ones_like(max_mask1) - max_mask1)
 
@@ -218,4 +223,4 @@ class ISIPostProcess(SIPostProcess):
                 if not max_mask1.sum():
                     break
 
-            return p_ret, count_arr
+            return p_ret #, count_arr

@@ -156,7 +156,7 @@ class SIPostProcess(torch.nn.Module):
 
 # p_col = []
 
-#export
+# Cell
 class ISIPostProcess(SIPostProcess):
 
     def __init__(self, m1_threshold:float = 0.1, samp_threshold=0.1, px_size_zyx=[100,100,100], diag=False):
@@ -179,7 +179,6 @@ class ISIPostProcess(SIPostProcess):
             while True:
 
                 count += 1
-                p_copy = p + 0
 
                 # probability values > threshold are regarded as possible locations
                 p_clip = torch.where(p>self.m1_threshold,p,torch.zeros_like(p))*tot_mask
@@ -204,6 +203,14 @@ class ISIPostProcess(SIPostProcess):
                 p_fac = torch.clamp_max(p_fac, 1)
                 p_proc = F.conv3d(p_fac, self.filt.to(device),padding=1)*p
 
+                p = p - p_proc
+                torch.clamp_min_(p, 0)
+
+                if not max_mask1.sum():
+                    break
+
+            return p_ret #, count_arr
+
 #                 plt.figure(figsize=(20,5))
 #                 plt.subplot(141)
 #                 plt.imshow(cpu(p[0,0][sl[1:]]).sum(0))
@@ -216,11 +223,3 @@ class ISIPostProcess(SIPostProcess):
 #                 plt.title(cpu(p_proc[0,0][sl[1:]]).sum())
 #                 plt.colorbar()
 #                 plt.show()
-
-                p = p - p_proc
-                torch.clamp_min_(p, 0)
-
-                if not max_mask1.sum():
-                    break
-
-            return p_ret #, count_arr

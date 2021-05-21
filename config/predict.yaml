@@ -1,0 +1,23 @@
+out_file:
+model_path:
+image_path: 
+         
+model:
+    _target_: decode_fish.engine.model.UnetDecodeNoBn
+    depth: 2
+    f_maps: 32
+    inp_scale: 
+    inp_offset: 
+    p_offset: -4.0
+    order: 'ce'
+    
+post_proc_isi:
+    _target_: decode_fish.funcs.output_trafo.ISIPostProcess
+    m1_threshold: 0.03
+    samp_threshold: 0.5
+    px_size_zyx: [100,100,100]
+    diag: True
+        
+predict:
+    window_size: [128,256,256]
+    device: cuda

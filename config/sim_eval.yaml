@@ -1,0 +1,50 @@
+sweep_name: fh2
+
+device:
+    gpu_device: cuda 
+    
+out_file: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/decode_fish/data/results/${sweep_name}_file.hdf5
+
+cfg_path: /groups/turaga/home/speisera/Dropbox (mackelab)/Artur/WorkDB/deepstorm/decode_fish/config/sim_eval.yaml
+  
+# model_dir: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/models/fishcod/Fig_sim_density/psf_opt_runs/
+model_dir: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/models/fishcod/Fig_sim_density/sweep_${sweep_name}/
+model_names: 
+# model_names: ['i_psf_max_norm_foci_3loc']
+              
+model:
+    _target_: decode_fish.engine.model.UnetDecodeNoBn
+    depth: 2
+    f_maps: 32
+    inp_scale: 
+    inp_offset: 
+    p_offset: -4.0
+    order: 'ce'
+    
+post_proc_isi:
+    _target_: decode_fish.funcs.output_trafo.ISIPostProcess
+    m1_threshold: 0.03
+    samp_threshold: 0.7
+    px_size_zyx: [300,100,100]
+    diag: True
+    
+post_proc_si:
+    _target_: decode_fish.funcs.output_trafo.SIPostProcess
+    m1_threshold: 0.03
+    m2_threshold: 0.5
+    samp_threshold: 0.1
+    px_size_zyx: [300,100,100]
+    diag: False
+    
+eval_routines:
+    densities: True
+    foci: True
+    microscope: True
+    psf: True
+    
+other:
+    pp: 'isi'
+  
+# hydra:
+#   run:
+#     dir: ${output.save_dir}/${now:%H-%M-%S}

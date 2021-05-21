@@ -14,6 +14,7 @@ from .plotting import *
 from torch.utils.data import DataLoader
 from ..engine.microscope import Microscope
 from ..engine.point_process import PointProcessUniform
+from matplotlib.backends.backend_agg import FigureCanvas
 # from decode_fish.funcs.routines import *
 
 import ipyvolume as ipv
@@ -26,8 +27,6 @@ def get_simulation_statistics(decode_dl, micro, int_conc, int_rate, int_loc, int
     """
     Draws a sample from the dataloader, and plots a slice of the real volume, the extracted background and
     a slice from a simulated volume.
-
-
     """
     z_ind = decode_dl.dataset.dataset_tfms[0].crop_sz[0]//2
     with torch.no_grad():
@@ -42,11 +41,11 @@ def get_simulation_statistics(decode_dl, micro, int_conc, int_rate, int_loc, int
             sim_vars = PointProcessUniform(local_rate, int_conc, int_rate, int_loc, sim_iters=5).sample()
             xsim = micro(*sim_vars)
             xsim = micro.noise(xsim, background).sample()
-            sim_df = sample_to_df(*sim_vars[:-1])
+            sim_df = sample_to_df(*sim_vars[:-1], px_size_zyx=[1.,1.,1.])
             sim_df = sim_df[sim_df['frame_idx'] == 0]
 
             fig, axes = plt.subplots(ncols=3, figsize=(15,5))
-            fig.suptitle('z slice')
+            fig.suptitle('z slice', fontsize=15, y=0.96)
 
             x = cpu(x[0,0])
             xsim = cpu(xsim[0,0])
@@ -62,12 +61,14 @@ def get_simulation_statistics(decode_dl, micro, int_conc, int_rate, int_loc, int
             im = axes[2].imshow(xsim[z_ind])
             add_colorbar(im)
             axes[2].set_title('Simulation')
+            plt.show()
 
-            axes = plot_3d_projections(x, 'max')
-            axes[1].set_title('Recording, max proj')
+            fig1, axes = plot_3d_projections(x, display=False)
+            fig2, axes = plot_3d_projections(xsim, display=False)
+            scat_3d_projections(axes, sim_df)
 
-            axes = plot_3d_projections(xsim, 'max')
-            axes[1].set_title('Simulation, max proj')
+            figure = combine_figures([fig1,fig2],['Data','Simulation'], nrows=1, ncols=2, figsize=(20,10))
+            figure.suptitle('Max projection', fontsize=15, y=0.9)
 
 # Cell
 def get_prediction(model, post_proc, img, micro=None, cuda=True, return_rec=False, min_int=-1000.):
@@ -89,7 +90,7 @@ def get_prediction(model, post_proc, img, micro=None, cuda=True, return_rec=Fals
 
         return pred_df
 
-def eval_random_crop(decode_dl, model, post_proc, micro, projection='mean', cuda=False, samples=1, int_threshold=1):
+def eval_random_crop(decode_dl, model, post_proc, micro, proj_func=np.max, cuda=False, samples=1, int_threshold=1):
 
     with torch.no_grad():
 
@@ -104,18 +105,14 @@ def eval_random_crop(decode_dl, model, post_proc, micro, projection='mean', cuda
             x = x[0,0].cpu().numpy()
             rec = rec[0,0].cpu().numpy()
 
-            axes = plot_3d_projections(x, projection=projection)
+            fig1, axes = plot_3d_projections(x, proj_func=proj_func, display=False)
             scat_3d_projections(axes, [pred_df])
 
-            axes[1].set_title('Predictions', size=16)
-
             diff = abs(x-rec)
-            axes = plot_3d_projections(diff, projection=projection)
+            fig2, axes = plot_3d_projections(diff, proj_func=proj_func, display=False)
             rmse = np.sqrt(((diff)**2).mean())
 
-            axes[1].set_title(f'Reconstruction {rmse:.2f}', size=16)
-
-            pred_df, rec,res_dict
+            combine_figures([fig1,fig2], ['Predictions', 'Residual'], figsize=(20,10))
 
 def eval_random_sim(decode_dl, model, post_proc, micro, projection='mean', plot_gt=True, cuda=True, samples=1):
 

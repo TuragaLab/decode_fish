@@ -1,22 +1,24 @@
-seed: 0
 
 device:
     gpu_device: cuda 
   
+base_dir: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/
 run_name: test/test_sub
 
-cfg_path: /groups/turaga/home/speisera/Dropbox (mackelab)/Artur/WorkDB/deepstorm/decode_fish/config/train.yaml
+cfg_path: ${base_dir}/decode_fish/config/train.yaml
+
+seed: 0
   
 output:
     project: test
     group: nb_run 
-    save_dir: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/models/fishcod/${output.project}/${output.group}/${run_name}
-    log_dir : /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/decode_fish/runs/
+    save_dir: ${base_dir}/models/fishcod/${output.project}/${output.group}/${run_name}
+    log_dir : ${base_dir}/decode_fish/runs/
     log_figs : True
     log_interval: 100
   
 data_path: 
-    image_path: /groups/turaga/home/speisera/share_TUM/FishSIM/sim_1/mRNAlevel_200/cell3D/strong/w1_HelaKyoto_Gapdh_2597_p01_cy3__Cell_CP_14__cell3D__1.tif
+    image_path: 
     psf_path: 
     model_init: 
     
@@ -24,7 +26,7 @@ evaluation:
     image_path: ${data_path.image_path}
     txt_path: 
     psf_path: 
-    crop_sl: s_[:,100:250,100:250,25:60]
+    crop_sl: s_[:,:,:,:]
     img_ind: 0
     px_size_zyx: [100,100,100]
     
@@ -34,26 +36,24 @@ prob_generator:
     
 bg_estimation:
     _target_: decode_fish.funcs.dataset.EstimateBackground
-#     smoothing_filter_size: 6
-#     div_factor: 1
+    smoothing_filter_size: 5
     
 random_crop: 
     crop_sz: 48
 
 roi_mask:
     pool_size: [10,10,10]
-    percentile: 50 # Percentage of volume that is removed
+    percentile: 50 # Percentage of volume that is not sampled from
                
 PSF:
     _target_: decode_fish.engine.psf.LinearInterpolatedPSF 
     device: ${device.gpu_device}
-    gauss_radii: [1,1,1]
+    gauss_radii: [1.,1.,1.]
     psf_extent_zyx : [21,21,21]
     
 noise:
     _target_: decode_fish.engine.noise.sCMOS
     theta: 2. 
-    baseline:  0
     
 microscope:
     _target_: decode_fish.engine.microscope.Microscope
@@ -91,14 +91,6 @@ post_proc_isi:
     samp_threshold: 0.7
     px_size_zyx: ${evaluation.px_size_zyx}
     diag: True
-    
-post_proc_si:
-    _target_: decode_fish.funcs.output_trafo.SIPostProcess
-    m1_threshold: 0.03
-    m2_threshold: 0.5
-    samp_threshold: 0.1
-    px_size_zyx: ${evaluation.px_size_zyx}
-    diag: False
     
 training:
     bs: 2
@@ -139,7 +131,3 @@ training:
 
 other:
     pp: 'isi'
-  
-# hydra:
-#   run:
-#     dir: ${output.save_dir}/${now:%H-%M-%S}

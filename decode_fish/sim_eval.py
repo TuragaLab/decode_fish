@@ -25,7 +25,7 @@ import wandb
 
 import h5py
 
-@hydra.main(config_path='/groups/turaga/home/speisera/Dropbox (mackelab)/Artur/WorkDB/deepstorm/decode_fish/config', config_name='sim_eval')
+@hydra.main(config_path='../config', config_name='sim_eval')
 def my_app(cfg):
 
     model_dir = cfg.model_dir
@@ -39,7 +39,7 @@ def my_app(cfg):
     model = hydra.utils.instantiate(cfg.model)
     model.cuda()
     
-    post_proc = hydra.utils.instantiate(cfg.post_proc_isi, samp_threshold=0.5)
+    post_proc = hydra.utils.instantiate(cfg.post_proc_isi)
     
     with h5py.File(out_file, 'w') as f:
         

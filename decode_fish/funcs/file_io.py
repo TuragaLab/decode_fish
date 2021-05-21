@@ -15,8 +15,8 @@ from .dataset import *
 from torch.utils.data import DataLoader
 
 # Cell
-def load_model_state(model, path, file_name ='model.pkl'):
-    model_dict = torch.load(Path(path)/file_name)
+def load_model_state(model, path):
+    model_dict = torch.load(path)
     model.load_state_dict(model_dict['state_dict'])
     model.unet.inp_scale = model_dict['scaling'][0]
     model.unet.inp_offset = model_dict['scaling'][1]
@@ -191,12 +191,15 @@ def get_dataloader(cfg):
 
     rand_crop      = RandomCrop3D(crop_zyx, roi_masks)
 
-    probmap_generator = ScaleTensor(low=cfg.prob_generator.low,
-                                    high=cfg.prob_generator.high)
-    rand_scale = RandScale(0.1,1.)
+#     probmap_generator = ScaleTensor(low=cfg.prob_generator.low,
+#                                     high=cfg.prob_generator.high)
+#     rand_scale = RandScale(0.1,1.)
+#     rate_tfms = [estimate_backg, probmap_generator, rand_scale]
+
+    probmap_generator = UniformValue(cfg.prob_generator.low, cfg.prob_generator.high)
+    rate_tfms = [probmap_generator]
 
     dataset_tfms = [rand_crop]
-    rate_tfms = [estimate_backg, probmap_generator, rand_scale]
 
     if cfg.foci is not None:
         if cfg.foci.n_foci_avg > 0:
@@ -217,7 +220,7 @@ def load_all(cfg, sl=False):
 
     path = Path(cfg.output.save_dir)/'sl_save' if sl else Path(cfg.output.save_dir)
     model = hydra.utils.instantiate(cfg.model)
-    model = load_model_state(model, path, 'model.pkl')
+    model = load_model_state(model, path/'model.pkl')
     post_proc = hydra.utils.instantiate(cfg.post_proc_isi, samp_threshold=0.5)
     psf, noise, micro = load_psf_noise_micro(cfg)
     psf.load_state_dict(torch.load(path/'psf.pkl'))

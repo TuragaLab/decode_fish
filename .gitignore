@@ -13,6 +13,7 @@ config/experiment
 runs/
 data/
 nbs/wandb
+outputs/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -1,0 +1,30 @@
+name: decode_fish_dev
+
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+  
+dependencies:
+
+  - python=3.9
+  - pip
+  - pytorch=1.7.1
+  - cudatoolkit=10.2
+  - torchvision
+  - h5py
+  - matplotlib
+  - pandas
+  - pyyaml
+  - scipy
+  - scikit-image
+  - seaborn=0.10
+  - tifffile>=2020.2
+  - tqdm
+  - hydra-core
+  - pip:
+      - nbdev
+      - monai
+
+  # add kernel to jupyter
+  - ipykernel

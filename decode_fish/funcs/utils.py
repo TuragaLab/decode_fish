@@ -4,7 +4,6 @@ __all__ = ['free_mem', 'center_crop', 'smooth', 'plot_tb_logs', 'gaussian_sphere
            'load_tiff_image', 'gpu', 'cpu', 'zip_longest_special', 'param_iter']
 
 # Cell
-from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
 from ..imports import *
 from itertools import product as iter_product
 from tifffile import imread

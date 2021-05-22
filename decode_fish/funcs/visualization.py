@@ -15,9 +15,6 @@ from torch.utils.data import DataLoader
 from ..engine.microscope import Microscope
 from ..engine.point_process import PointProcessUniform
 from matplotlib.backends.backend_agg import FigureCanvas
-# from decode_fish.funcs.routines import *
-
-import ipyvolume as ipv
 
 base_path =  '/groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/'
 

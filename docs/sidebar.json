@@ -14,9 +14,9 @@
     "Performance evaluation": "evaluation.html",
     "Functions for working with emitter DFs": "emitter_io.html",
     "Random assortment of helper functions": "utils.html",
-    "Training loop simulator learning": "train_sl.html",
-    "Training loop": "train_ae.html",
+    "Training loop simulator learning": "train.html",
     "Fitting a PSF": "fit_psf.html",
-    "Visualization tools ": "visualization.html"
+    "Visualization tools ": "eval_routines.html",
+    "Title": "predict_funcs.html"
   }
 }

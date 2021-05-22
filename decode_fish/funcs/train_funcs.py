@@ -22,7 +22,6 @@ import shutil
 from ..engine.point_process import PointProcessUniform
 from ..engine.gmm_loss import PointProcessGaussian
 import wandb
-from madgrad import MADGRAD
 # from decode_fish.funcs.visualization vimport get_simulation_statistics
 
 # Cell

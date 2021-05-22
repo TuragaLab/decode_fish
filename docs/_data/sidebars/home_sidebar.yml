@@ -50,16 +50,16 @@ entries:
       url: utils.html
     - output: web,pdf
       title: Training loop simulator learning
-      url: train_sl.html
-    - output: web,pdf
-      title: Training loop
-      url: train_ae.html
+      url: train.html
     - output: web,pdf
       title: Fitting a PSF
       url: fit_psf.html
     - output: web,pdf
       title: 'Visualization tools '
-      url: visualization.html
+      url: eval_routines.html
+    - output: web,pdf
+      title: Title
+      url: predict_funcs.html
     output: web
     title: decode_fish
   output: web

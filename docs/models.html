@@ -89,7 +89,7 @@ nb_path: "nbs/00_models.ipynb"
 
 
 <div class="output_markdown rendered_html output_subarea ">
-<h4 id="init_func" class="doc_header"><code>init_func</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/engine/model.py#L20" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>init_func</code>(<strong><code>m</code></strong>, <strong><code>func</code></strong>=<em><code>kaiming_normal_</code></em>)</p>
+<h4 id="init_func" class="doc_header"><code>init_func</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/engine/model.py#L21" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>init_func</code>(<strong><code>m</code></strong>, <strong><code>func</code></strong>=<em><code>kaiming_normal_</code></em>)</p>
 </blockquote>
 
 <pre><code>Initialize pytorch model `m` weights with `func`</code></pre>
@@ -122,7 +122,7 @@ nb_path: "nbs/00_models.ipynb"
 
 
 <div class="output_markdown rendered_html output_subarea ">
-<h4 id="layer_types" class="doc_header"><code>layer_types</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/engine/model.py#L26" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>layer_types</code>(<strong><code>m</code></strong>)</p>
+<h4 id="layer_types" class="doc_header"><code>layer_types</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/engine/model.py#L27" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>layer_types</code>(<strong><code>m</code></strong>)</p>
 </blockquote>
 
 <pre><code>returns list of pytorch models type</code></pre>
@@ -155,7 +155,7 @@ nb_path: "nbs/00_models.ipynb"
 
 
 <div class="output_markdown rendered_html output_subarea ">
-<h4 id="extract_layer" class="doc_header"><code>extract_layer</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/engine/model.py#L32" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>extract_layer</code>(<strong><code>m</code></strong>, <strong><code>name</code></strong>=<em><code>Conv3d</code></em>)</p>
+<h4 id="extract_layer" class="doc_header"><code>extract_layer</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/engine/model.py#L33" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>extract_layer</code>(<strong><code>m</code></strong>, <strong><code>name</code></strong>=<em><code>Conv3d</code></em>)</p>
 </blockquote>
 
 </div>
@@ -186,7 +186,7 @@ nb_path: "nbs/00_models.ipynb"
 
 
 <div class="output_markdown rendered_html output_subarea ">
-<h4 id="number_of_features_per_level" class="doc_header"><code>number_of_features_per_level</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/engine/model.py#L41" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>number_of_features_per_level</code>(<strong><code>init_channel_number</code></strong>, <strong><code>num_levels</code></strong>)</p>
+<h4 id="number_of_features_per_level" class="doc_header"><code>number_of_features_per_level</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/engine/model.py#L42" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>number_of_features_per_level</code>(<strong><code>init_channel_number</code></strong>, <strong><code>num_levels</code></strong>)</p>
 </blockquote>
 
 </div>
@@ -217,7 +217,7 @@ nb_path: "nbs/00_models.ipynb"
 
 
 <div class="output_markdown rendered_html output_subarea ">
-<h2 id="SingleConv" class="doc_header"><code>class</code> <code>SingleConv</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/engine/model.py#L45" class="source_link" style="float:right">[source]</a></h2><blockquote><p><code>SingleConv</code>(<strong><code>in_channels</code></strong>, <strong><code>out_channels</code></strong>, <strong><code>kernel_size</code></strong>=<em><code>3</code></em>, <strong><code>order</code></strong>=<em><code>'gcr'</code></em>, <strong><code>num_groups</code></strong>=<em><code>8</code></em>, <strong><code>padding</code></strong>=<em><code>1</code></em>) :: <code>Sequential</code></p>
+<h2 id="SingleConv" class="doc_header"><code>class</code> <code>SingleConv</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/engine/model.py#L46" class="source_link" style="float:right">[source]</a></h2><blockquote><p><code>SingleConv</code>(<strong><code>in_channels</code></strong>, <strong><code>out_channels</code></strong>, <strong><code>kernel_size</code></strong>=<em><code>3</code></em>, <strong><code>order</code></strong>=<em><code>'gcr'</code></em>, <strong><code>num_groups</code></strong>=<em><code>8</code></em>, <strong><code>padding</code></strong>=<em><code>1</code></em>) :: <code>Sequential</code></p>
 </blockquote>
 
 <pre><code>Basic convolutional module consisting of a Conv3d, non-linearity and optional batchnorm/groupnorm. The order
@@ -262,7 +262,7 @@ Args:
 
 
 <div class="output_markdown rendered_html output_subarea ">
-<h2 id="DoubleConv" class="doc_header"><code>class</code> <code>DoubleConv</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/engine/model.py#L69" class="source_link" style="float:right">[source]</a></h2><blockquote><p><code>DoubleConv</code>(<strong><code>in_channels</code></strong>, <strong><code>out_channels</code></strong>, <strong><code>encoder</code></strong>, <strong><code>kernel_size</code></strong>=<em><code>3</code></em>, <strong><code>order</code></strong>=<em><code>'gcr'</code></em>, <strong><code>num_groups</code></strong>=<em><code>8</code></em>, <strong><code>padding</code></strong>=<em><code>1</code></em>) :: <code>Sequential</code></p>
+<h2 id="DoubleConv" class="doc_header"><code>class</code> <code>DoubleConv</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/engine/model.py#L70" class="source_link" style="float:right">[source]</a></h2><blockquote><p><code>DoubleConv</code>(<strong><code>in_channels</code></strong>, <strong><code>out_channels</code></strong>, <strong><code>encoder</code></strong>, <strong><code>kernel_size</code></strong>=<em><code>3</code></em>, <strong><code>order</code></strong>=<em><code>'gcr'</code></em>, <strong><code>num_groups</code></strong>=<em><code>8</code></em>, <strong><code>padding</code></strong>=<em><code>1</code></em>) :: <code>Sequential</code></p>
 </blockquote>
 
 <pre><code>A module consisting of two consecutive convolution layers (e.g. BatchNorm3d+ReLU+Conv3d).
@@ -312,7 +312,7 @@ Args:
 
 
 <div class="output_markdown rendered_html output_subarea ">
-<h2 id="Upsampling" class="doc_header"><code>class</code> <code>Upsampling</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/engine/model.py#L115" class="source_link" style="float:right">[source]</a></h2><blockquote><p><code>Upsampling</code>(<strong><code>transposed_conv</code></strong>, <strong><code>in_channels</code></strong>=<em><code>None</code></em>, <strong><code>out_channels</code></strong>=<em><code>None</code></em>, <strong><code>kernel_size</code></strong>=<em><code>3</code></em>, <strong><code>scale_factor</code></strong>=<em><code>(2, 2, 2)</code></em>, <strong><code>mode</code></strong>=<em><code>'nearest'</code></em>) :: <code>Module</code></p>
+<h2 id="Upsampling" class="doc_header"><code>class</code> <code>Upsampling</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/engine/model.py#L116" class="source_link" style="float:right">[source]</a></h2><blockquote><p><code>Upsampling</code>(<strong><code>transposed_conv</code></strong>, <strong><code>in_channels</code></strong>=<em><code>None</code></em>, <strong><code>out_channels</code></strong>=<em><code>None</code></em>, <strong><code>kernel_size</code></strong>=<em><code>3</code></em>, <strong><code>scale_factor</code></strong>=<em><code>(2, 2, 2)</code></em>, <strong><code>mode</code></strong>=<em><code>'nearest'</code></em>) :: <code>Module</code></p>
 </blockquote>
 
 <pre><code>Upsamples a given multi-channel 3D data using either interpolation or learned transposed convolution.
@@ -358,7 +358,7 @@ Args:
 
 
 <div class="output_markdown rendered_html output_subarea ">
-<h2 id="Encoder" class="doc_header"><code>class</code> <code>Encoder</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/engine/model.py#L154" class="source_link" style="float:right">[source]</a></h2><blockquote><p><code>Encoder</code>(<strong><code>in_channels</code></strong>, <strong><code>out_channels</code></strong>, <strong><code>conv_kernel_size</code></strong>=<em><code>3</code></em>, <strong><code>apply_pooling</code></strong>=<em><code>True</code></em>, <strong><code>pool_kernel_size</code></strong>=<em><code>2</code></em>, <strong><code>pool_type</code></strong>=<em><code>'max'</code></em>, <strong><code>basic_module</code></strong>=<em><code>DoubleConv</code></em>, <strong><code>conv_layer_order</code></strong>=<em><code>'gcr'</code></em>, <strong><code>num_groups</code></strong>=<em><code>8</code></em>, <strong><code>padding</code></strong>=<em><code>1</code></em>) :: <code>Module</code></p>
+<h2 id="Encoder" class="doc_header"><code>class</code> <code>Encoder</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/engine/model.py#L155" class="source_link" style="float:right">[source]</a></h2><blockquote><p><code>Encoder</code>(<strong><code>in_channels</code></strong>, <strong><code>out_channels</code></strong>, <strong><code>conv_kernel_size</code></strong>=<em><code>3</code></em>, <strong><code>apply_pooling</code></strong>=<em><code>True</code></em>, <strong><code>pool_kernel_size</code></strong>=<em><code>2</code></em>, <strong><code>pool_type</code></strong>=<em><code>'max'</code></em>, <strong><code>basic_module</code></strong>=<em><code>DoubleConv</code></em>, <strong><code>conv_layer_order</code></strong>=<em><code>'gcr'</code></em>, <strong><code>num_groups</code></strong>=<em><code>8</code></em>, <strong><code>padding</code></strong>=<em><code>1</code></em>) :: <code>Module</code></p>
 </blockquote>
 
 <pre><code>A single module from the encoder path consisting of the optional max
@@ -407,7 +407,7 @@ Args:
 
 
 <div class="output_markdown rendered_html output_subarea ">
-<h2 id="Decoder" class="doc_header"><code>class</code> <code>Decoder</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/engine/model.py#L202" class="source_link" style="float:right">[source]</a></h2><blockquote><p><code>Decoder</code>(<strong><code>in_channels</code></strong>, <strong><code>out_channels</code></strong>, <strong><code>conv_kernel_size</code></strong>=<em><code>3</code></em>, <strong><code>scale_factor</code></strong>=<em><code>(2, 2, 2)</code></em>, <strong><code>basic_module</code></strong>=<em><code>DoubleConv</code></em>, <strong><code>conv_layer_order</code></strong>=<em><code>'gcr'</code></em>, <strong><code>num_groups</code></strong>=<em><code>8</code></em>, <strong><code>mode</code></strong>=<em><code>'nearest'</code></em>, <strong><code>padding</code></strong>=<em><code>1</code></em>) :: <code>Module</code></p>
+<h2 id="Decoder" class="doc_header"><code>class</code> <code>Decoder</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/engine/model.py#L203" class="source_link" style="float:right">[source]</a></h2><blockquote><p><code>Decoder</code>(<strong><code>in_channels</code></strong>, <strong><code>out_channels</code></strong>, <strong><code>conv_kernel_size</code></strong>=<em><code>3</code></em>, <strong><code>scale_factor</code></strong>=<em><code>(2, 2, 2)</code></em>, <strong><code>basic_module</code></strong>=<em><code>DoubleConv</code></em>, <strong><code>conv_layer_order</code></strong>=<em><code>'gcr'</code></em>, <strong><code>num_groups</code></strong>=<em><code>8</code></em>, <strong><code>mode</code></strong>=<em><code>'nearest'</code></em>, <strong><code>padding</code></strong>=<em><code>1</code></em>) :: <code>Module</code></p>
 </blockquote>
 
 <pre><code>A single module for decoder path consisting of the upsampling layer
@@ -453,7 +453,7 @@ Args:
 
 
 <div class="output_markdown rendered_html output_subarea ">
-<h4 id="conv3d" class="doc_header"><code>conv3d</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/engine/model.py#L259" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>conv3d</code>(<strong><code>in_channels</code></strong>, <strong><code>out_channels</code></strong>, <strong><code>kernel_size</code></strong>, <strong><code>bias</code></strong>, <strong><code>padding</code></strong>)</p>
+<h4 id="conv3d" class="doc_header"><code>conv3d</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/engine/model.py#L260" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>conv3d</code>(<strong><code>in_channels</code></strong>, <strong><code>out_channels</code></strong>, <strong><code>kernel_size</code></strong>, <strong><code>bias</code></strong>, <strong><code>padding</code></strong>)</p>
 </blockquote>
 
 </div>
@@ -477,7 +477,7 @@ Args:
 
 
 <div class="output_markdown rendered_html output_subarea ">
-<h4 id="create_conv" class="doc_header"><code>create_conv</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/engine/model.py#L262" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>create_conv</code>(<strong><code>in_channels</code></strong>, <strong><code>out_channels</code></strong>, <strong><code>kernel_size</code></strong>, <strong><code>order</code></strong>, <strong><code>num_groups</code></strong>, <strong><code>padding</code></strong>)</p>
+<h4 id="create_conv" class="doc_header"><code>create_conv</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/engine/model.py#L263" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>create_conv</code>(<strong><code>in_channels</code></strong>, <strong><code>out_channels</code></strong>, <strong><code>kernel_size</code></strong>, <strong><code>order</code></strong>, <strong><code>num_groups</code></strong>, <strong><code>padding</code></strong>)</p>
 </blockquote>
 
 <pre><code>Create a list of modules with together constitute a single conv layer with non-linearity
@@ -525,7 +525,7 @@ Return:
 
 
 <div class="output_markdown rendered_html output_subarea ">
-<h2 id="Abstract3DUNet" class="doc_header"><code>class</code> <code>Abstract3DUNet</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/engine/model.py#L321" class="source_link" style="float:right">[source]</a></h2><blockquote><p><code>Abstract3DUNet</code>(<strong><code>in_channels</code></strong>, <strong><code>out_channels</code></strong>, <strong><code>final_sigmoid</code></strong>, <strong><code>basic_module</code></strong>, <strong><code>f_maps</code></strong>=<em><code>64</code></em>, <strong><code>layer_order</code></strong>=<em><code>'gcr'</code></em>, <strong><code>num_groups</code></strong>=<em><code>8</code></em>, <strong><code>num_levels</code></strong>=<em><code>4</code></em>, <strong><code>is_segmentation</code></strong>=<em><code>True</code></em>, <strong><code>testing</code></strong>=<em><code>False</code></em>, <strong><code>conv_kernel_size</code></strong>=<em><code>3</code></em>, <strong><code>pool_kernel_size</code></strong>=<em><code>2</code></em>, <strong><code>conv_padding</code></strong>=<em><code>1</code></em>, <strong><code>inp_scale</code></strong>=<em><code>1</code></em>, <strong><code>inp_offset</code></strong>=<em><code>0</code></em>, <strong>**<code>kwargs</code></strong>) :: <code>Module</code></p>
+<h2 id="Abstract3DUNet" class="doc_header"><code>class</code> <code>Abstract3DUNet</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/engine/model.py#L322" class="source_link" style="float:right">[source]</a></h2><blockquote><p><code>Abstract3DUNet</code>(<strong><code>in_channels</code></strong>, <strong><code>out_channels</code></strong>, <strong><code>final_sigmoid</code></strong>, <strong><code>basic_module</code></strong>, <strong><code>f_maps</code></strong>=<em><code>64</code></em>, <strong><code>layer_order</code></strong>=<em><code>'gcr'</code></em>, <strong><code>num_groups</code></strong>=<em><code>8</code></em>, <strong><code>num_levels</code></strong>=<em><code>4</code></em>, <strong><code>is_segmentation</code></strong>=<em><code>True</code></em>, <strong><code>testing</code></strong>=<em><code>False</code></em>, <strong><code>conv_kernel_size</code></strong>=<em><code>3</code></em>, <strong><code>pool_kernel_size</code></strong>=<em><code>2</code></em>, <strong><code>conv_padding</code></strong>=<em><code>1</code></em>, <strong><code>inp_scale</code></strong>=<em><code>1</code></em>, <strong><code>inp_offset</code></strong>=<em><code>0</code></em>, <strong>**<code>kwargs</code></strong>) :: <code>Module</code></p>
 </blockquote>
 
 <pre><code>Base class for standard and residual UNet.
@@ -587,7 +587,7 @@ Args:
 
 
 <div class="output_markdown rendered_html output_subarea ">
-<h2 id="UNet3D" class="doc_header"><code>class</code> <code>UNet3D</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/engine/model.py#L457" class="source_link" style="float:right">[source]</a></h2><blockquote><p><code>UNet3D</code>(<strong><code>in_channels</code></strong>, <strong><code>out_channels</code></strong>, <strong><code>final_sigmoid</code></strong>=<em><code>True</code></em>, <strong><code>f_maps</code></strong>=<em><code>64</code></em>, <strong><code>layer_order</code></strong>=<em><code>'gcr'</code></em>, <strong><code>num_groups</code></strong>=<em><code>8</code></em>, <strong><code>num_levels</code></strong>=<em><code>4</code></em>, <strong><code>is_segmentation</code></strong>=<em><code>True</code></em>, <strong><code>conv_padding</code></strong>=<em><code>1</code></em>, <strong><code>inp_scale</code></strong>=<em><code>1</code></em>, <strong><code>inp_offset</code></strong>=<em><code>0</code></em>, <strong>**<code>kwargs</code></strong>) :: <a href="/decode_fish/models.html#Abstract3DUNet"><code>Abstract3DUNet</code></a></p>
+<h2 id="UNet3D" class="doc_header"><code>class</code> <code>UNet3D</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/engine/model.py#L458" class="source_link" style="float:right">[source]</a></h2><blockquote><p><code>UNet3D</code>(<strong><code>in_channels</code></strong>, <strong><code>out_channels</code></strong>, <strong><code>final_sigmoid</code></strong>=<em><code>True</code></em>, <strong><code>f_maps</code></strong>=<em><code>64</code></em>, <strong><code>layer_order</code></strong>=<em><code>'gcr'</code></em>, <strong><code>num_groups</code></strong>=<em><code>8</code></em>, <strong><code>num_levels</code></strong>=<em><code>4</code></em>, <strong><code>is_segmentation</code></strong>=<em><code>True</code></em>, <strong><code>conv_padding</code></strong>=<em><code>1</code></em>, <strong><code>inp_scale</code></strong>=<em><code>1</code></em>, <strong><code>inp_offset</code></strong>=<em><code>0</code></em>, <strong>**<code>kwargs</code></strong>) :: <a href="/decode_fish/models.html#Abstract3DUNet"><code>Abstract3DUNet</code></a></p>
 </blockquote>
 
 <pre><code>3DUnet model from
@@ -623,7 +623,58 @@ Uses `DoubleConv` as a basic_module and nearest neighbor upsampling in the decod
 
 
 <div class="output_markdown rendered_html output_subarea ">
-<h2 id="UnetDecodeNoBn" class="doc_header"><code>class</code> <code>UnetDecodeNoBn</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/engine/model.py#L473" class="source_link" style="float:right">[source]</a></h2><blockquote><p><code>UnetDecodeNoBn</code>(<strong><code>ch_in</code></strong>:<code>int</code>=<em><code>1</code></em>, <strong><code>ch_out</code></strong>:<code>int</code>=<em><code>10</code></em>, <strong><code>final_sigmoid</code></strong>:<code>bool</code>=<em><code>False</code></em>, <strong><code>depth</code></strong>:<code>int</code>=<em><code>3</code></em>, <strong><code>inp_scale</code></strong>:<code>float</code>=<em><code>1.0</code></em>, <strong><code>inp_offset</code></strong>:<code>float</code>=<em><code>0.0</code></em>, <strong><code>order</code></strong>=<em><code>'bcr'</code></em>, <strong><code>f_maps</code></strong>=<em><code>64</code></em>, <strong><code>p_offset</code></strong>=<em><code>-5.0</code></em>) :: <code>Module</code></p>
+<h2 id="IntensityDist" class="doc_header"><code>class</code> <code>IntensityDist</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/engine/model.py#L474" class="source_link" style="float:right">[source]</a></h2><blockquote><p><code>IntensityDist</code>(<strong><code>int_conc</code></strong>, <strong><code>int_rate</code></strong>, <strong><code>int_loc</code></strong>) :: <code>Module</code></p>
+</blockquote>
+
+<pre><code>Base class for all neural network modules.
+
+Your models should also subclass this class.
+
+Modules can also contain other Modules, allowing to nest them in
+a tree structure. You can assign the submodules as regular attributes::
+
+    import torch.nn as nn
+    import torch.nn.functional as F
+
+    class Model(nn.Module):
+        def __init__(self):
+            super(Model, self).__init__()
+            self.conv1 = nn.Conv2d(1, 20, 5)
+            self.conv2 = nn.Conv2d(20, 20, 5)
+
+        def forward(self, x):
+            x = F.relu(self.conv1(x))
+            return F.relu(self.conv2(x))
+
+Submodules assigned in this way will be registered, and will have their
+parameters converted too when you call :meth:`to`, etc.
+
+:ivar training: Boolean represents whether this module is in training or
+                evaluation mode.
+:vartype training: bool</code></pre>
+
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+    {% endraw %}
+
+    {% raw %}
+    
+<div class="cell border-box-sizing code_cell rendered">
+
+<div class="output_wrapper">
+<div class="output">
+
+<div class="output_area">
+
+
+<div class="output_markdown rendered_html output_subarea ">
+<h2 id="UnetDecodeNoBn" class="doc_header"><code>class</code> <code>UnetDecodeNoBn</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/engine/model.py#L481" class="source_link" style="float:right">[source]</a></h2><blockquote><p><code>UnetDecodeNoBn</code>(<strong><code>ch_in</code></strong>:<code>int</code>=<em><code>1</code></em>, <strong><code>ch_out</code></strong>:<code>int</code>=<em><code>10</code></em>, <strong><code>final_sigmoid</code></strong>:<code>bool</code>=<em><code>False</code></em>, <strong><code>depth</code></strong>:<code>int</code>=<em><code>3</code></em>, <strong><code>inp_scale</code></strong>:<code>float</code>=<em><code>1.0</code></em>, <strong><code>inp_offset</code></strong>:<code>float</code>=<em><code>0.0</code></em>, <strong><code>order</code></strong>=<em><code>'bcr'</code></em>, <strong><code>f_maps</code></strong>=<em><code>64</code></em>, <strong><code>p_offset</code></strong>=<em><code>-5.0</code></em>, <strong><code>int_conc</code></strong>=<em><code>5</code></em>, <strong><code>int_rate</code></strong>=<em><code>1</code></em>, <strong><code>int_loc</code></strong>=<em><code>1</code></em>) :: <code>Module</code></p>
 </blockquote>
 
 <pre><code>Base class for all neural network modules.
@@ -677,7 +728,196 @@ parameters converted too when you call :meth:`to`, etc.
 
 <div class="inner_cell">
     <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="n">model</span> <span class="o">=</span> <span class="n">UnetDecodeNoBn</span><span class="p">(</span><span class="n">order</span><span class="o">=</span> <span class="s1">&#39;ce&#39;</span><span class="p">)</span>
+<div class=" highlight hl-ipython3"><pre><span></span><span class="c1"># class InferenceNetwork(nn.Module):</span>
+<span class="c1">#     def __init__(self, ch_in: int =1, ch_out: int=10, final_sigmoid : bool =False, depth: int =3, inp_scale: float=1., inp_offset: float=0.,  order=&#39;bcr&#39;, f_maps=64, p_offset=-5.,</span>
+<span class="c1">#                 int_conc=5, int_rate=1, int_loc=1):</span>
+<span class="c1">#         super().__init__()</span>
+<span class="c1">#         self.unet = UNet3D(ch_in, ch_out, final_sigmoid=final_sigmoid, num_levels=depth, </span>
+<span class="c1">#                            layer_order = order, inp_scale=inp_scale, inp_offset=inp_offset, f_maps=f_maps)</span>
+<span class="c1">#         self.p_offset = p_offset</span>
+<span class="c1">#         self.int_dist = IntensityDist(int_conc, int_rate, int_loc)</span>
+        
+<span class="c1">#         self.p_out1 = nn.Conv3d(f_maps, f_maps, kernel_size=3, padding=1)</span>
+<span class="c1">#         self.p_out2 = nn.Conv3d(f_maps, 1, kernel_size=1, padding=0)</span>
+<span class="c1">#         nn.init.constant_(self.p_out2.bias,p_offset)</span>
+        
+<span class="c1">#         self.xyzi_out1 = nn.Conv3d(f_maps, f_maps, kernel_size=3, padding=1)</span>
+<span class="c1">#         self.xyzi_out2 = nn.Conv3d(f_maps, 4, kernel_size=1, padding=0)</span>
+        
+<span class="c1">#         self.xyzis_out1 = nn.Conv3d(f_maps, f_maps, kernel_size=3, padding=1)</span>
+<span class="c1">#         self.xyzis_out2 = nn.Conv3d(f_maps, 4, kernel_size=1, padding=0)</span>
+        
+<span class="c1">#         self.bg_out1 = nn.Conv3d(f_maps, f_maps, kernel_size=3, padding=1)</span>
+<span class="c1">#         self.bg_out2 = nn.Conv3d(f_maps, 1, kernel_size=1, padding=0)</span>
+        
+<span class="c1">#         nn.init.kaiming_normal_(self.p_out1.weight, mode=&#39;fan_in&#39;, nonlinearity=&#39;relu&#39;)</span>
+<span class="c1">#         nn.init.kaiming_normal_(self.p_out2.weight, mode=&#39;fan_in&#39;, nonlinearity=&#39;linear&#39;)</span>
+<span class="c1">#         nn.init.kaiming_normal_(self.xyzi_out1.weight, mode=&#39;fan_in&#39;, nonlinearity=&#39;relu&#39;)</span>
+<span class="c1">#         nn.init.kaiming_normal_(self.xyzi_out2.weight, mode=&#39;fan_in&#39;, nonlinearity=&#39;linear&#39;)</span>
+<span class="c1">#         nn.init.kaiming_normal_(self.xyzis_out1.weight, mode=&#39;fan_in&#39;, nonlinearity=&#39;relu&#39;)</span>
+<span class="c1">#         nn.init.kaiming_normal_(self.xyzis_out2.weight, mode=&#39;fan_in&#39;, nonlinearity=&#39;linear&#39;)</span>
+<span class="c1">#         nn.init.kaiming_normal_(self.bg_out1.weight, mode=&#39;fan_in&#39;, nonlinearity=&#39;relu&#39;)</span>
+<span class="c1">#         nn.init.kaiming_normal_(self.bg_out2.weight, mode=&#39;fan_in&#39;, nonlinearity=&#39;linear&#39;)</span>
+            
+<span class="c1">#     def forward(self, x):</span>
+<span class="c1">#         out =  self.unet(x)</span>
+        
+<span class="c1">#         logit    = F.elu(self.p_out1(out))</span>
+<span class="c1">#         logit    = self.p_out2(logit)</span>
+<span class="c1">#         logit    = torch.clamp(logit, -15., 15)</span>
+        
+<span class="c1">#         xyzi = F.elu(self.xyzi_out1(out))</span>
+<span class="c1">#         xyzi = self.xyzi_out2(xyzi)</span>
+        
+<span class="c1">#         xyz_mu   = torch.tanh(xyzi[:, :3])</span>
+<span class="c1">#         i_mu     = F.softplus(xyzi[:, 3:]) + self.int_dist.int_loc.detach() + 0.01</span>
+<span class="c1">#         xyzi_mu = torch.cat((xyz_mu, i_mu), dim=1)</span>
+        
+<span class="c1">#         xyzis = F.elu(self.xyzis_out1(out))</span>
+<span class="c1">#         xyzis = self.xyzis_out2(xyzis)</span>
+<span class="c1">#         xyzi_sig = F.softplus(xyzis) + 0.01</span>
+        
+<span class="c1">#         background = F.elu(self.bg_out1(out))</span>
+<span class="c1">#         background = self.bg_out2(background)</span>
+<span class="c1">#         background = self.unet.inp_scale * F.softplus(background)</span>
+        
+<span class="c1">#         return torch.cat([logit,xyzi_mu,xyzi_sig,background],1)</span>
+    
+<span class="c1">#     def tensor_to_dict(self, x):</span>
+    
+<span class="c1">#         return {&#39;logits&#39;: x[:,0:1], </span>
+<span class="c1">#                 &#39;xyzi_mu&#39;: x[:,1:5], </span>
+<span class="c1">#                 &#39;xyzi_sigma&#39;: x[:,5:9], </span>
+<span class="c1">#                 &#39;background&#39;: x[:,9:10]}</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+</div>
+    {% endraw %}
+
+    {% raw %}
+    
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="c1"># output = model.tensor_to_dict(model(torch.randn([10,1,20,20,20])))</span>
+<span class="c1"># for k in output.keys():</span>
+<span class="c1">#     print(k, output[k].shape)</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+<div class="output_area">
+
+<div class="output_subarea output_text output_error">
+<pre>
+<span class="ansi-red-fg">---------------------------------------------------------------------------</span>
+<span class="ansi-red-fg">NameError</span>                                 Traceback (most recent call last)
+<span class="ansi-green-fg">&lt;ipython-input-19-0e57e8f4dfb8&gt;</span> in <span class="ansi-cyan-fg">&lt;module&gt;</span>
+<span class="ansi-green-fg">----&gt; 1</span><span class="ansi-red-fg"> </span>model <span class="ansi-blue-fg">=</span> InferenceNetwork<span class="ansi-blue-fg">(</span>order<span class="ansi-blue-fg">=</span> <span class="ansi-blue-fg">&#39;ce&#39;</span><span class="ansi-blue-fg">)</span>
+<span class="ansi-green-intense-fg ansi-bold">      2</span> output <span class="ansi-blue-fg">=</span> model<span class="ansi-blue-fg">.</span>tensor_to_dict<span class="ansi-blue-fg">(</span>model<span class="ansi-blue-fg">(</span>torch<span class="ansi-blue-fg">.</span>randn<span class="ansi-blue-fg">(</span><span class="ansi-blue-fg">[</span><span class="ansi-cyan-fg">10</span><span class="ansi-blue-fg">,</span><span class="ansi-cyan-fg">1</span><span class="ansi-blue-fg">,</span><span class="ansi-cyan-fg">20</span><span class="ansi-blue-fg">,</span><span class="ansi-cyan-fg">20</span><span class="ansi-blue-fg">,</span><span class="ansi-cyan-fg">20</span><span class="ansi-blue-fg">]</span><span class="ansi-blue-fg">)</span><span class="ansi-blue-fg">)</span><span class="ansi-blue-fg">)</span>
+<span class="ansi-green-intense-fg ansi-bold">      3</span> <span class="ansi-green-fg">for</span> k <span class="ansi-green-fg">in</span> output<span class="ansi-blue-fg">.</span>keys<span class="ansi-blue-fg">(</span><span class="ansi-blue-fg">)</span><span class="ansi-blue-fg">:</span>
+<span class="ansi-green-intense-fg ansi-bold">      4</span>     print<span class="ansi-blue-fg">(</span>k<span class="ansi-blue-fg">,</span> output<span class="ansi-blue-fg">[</span>k<span class="ansi-blue-fg">]</span><span class="ansi-blue-fg">.</span>shape<span class="ansi-blue-fg">)</span>
+
+<span class="ansi-red-fg">NameError</span>: name &#39;InferenceNetwork&#39; is not defined</pre>
+</div>
+</div>
+
+</div>
+</div>
+
+</div>
+    {% endraw %}
+
+    {% raw %}
+    
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="n">model</span> <span class="o">=</span> <span class="n">UnetDecodeNoBn</span><span class="p">(</span><span class="n">order</span><span class="o">=</span> <span class="s1">&#39;ce&#39;</span><span class="p">,</span> <span class="n">f_maps</span><span class="o">=</span><span class="mi">32</span><span class="p">)</span>
+<span class="n">output</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">tensor_to_dict</span><span class="p">(</span><span class="n">model</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">([</span><span class="mi">2</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">37</span><span class="p">,</span><span class="mi">48</span><span class="p">,</span><span class="mi">48</span><span class="p">])))</span>
+<span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">output</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">output</span><span class="p">[</span><span class="n">k</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+<div class="output_area">
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre>logits torch.Size([2, 1, 37, 48, 48])
+xyzi_mu torch.Size([2, 4, 37, 48, 48])
+xyzi_sigma torch.Size([2, 4, 37, 48, 48])
+background torch.Size([2, 1, 37, 48, 48])
+</pre>
+</div>
+</div>
+
+</div>
+</div>
+
+</div>
+    {% endraw %}
+
+    {% raw %}
+    
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="nb">sum</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">())</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+<div class="output_area">
+
+
+
+<div class="output_text output_subarea output_execute_result">
+<pre>1093517</pre>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+    {% endraw %}
+
+    {% raw %}
+    
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="n">cfg</span> <span class="o">=</span> <span class="n">OmegaConf</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">default_conf</span><span class="p">)</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">hydra</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">instantiate</span><span class="p">(</span><span class="n">cfg</span><span class="o">.</span><span class="n">model</span><span class="p">,</span> <span class="n">int_loc</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">inp_scale</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">inp_offset</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
 <span class="n">model</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">([</span><span class="mi">10</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">20</span><span class="p">,</span><span class="mi">20</span><span class="p">,</span><span class="mi">20</span><span class="p">]))</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
 </pre></div>
 
@@ -711,6 +951,40 @@ parameters converted too when you call :meth:`to`, etc.
 
 <div class="inner_cell">
     <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="n">pytorch_total_params</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">())</span>
+<span class="n">pytorch_total_params</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+<div class="output_area">
+
+
+
+<div class="output_text output_subarea output_execute_result">
+<pre>319053</pre>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+    {% endraw %}
+
+    {% raw %}
+    
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+
+<div class="inner_cell">
+    <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="o">!</span>nbdev_build_lib
 </pre></div>
 
@@ -725,6 +999,22 @@ parameters converted too when you call :meth:`to`, etc.
 
 <div class="output_subarea output_stream output_stdout output_text">
 <pre>Converted 00_models.ipynb.
+Converted 01_psf.ipynb.
+Converted 02_microscope.ipynb.
+Converted 03_noise.ipynb.
+Converted 04_pointsource.ipynb.
+Converted 05_gmm_loss.ipynb.
+Converted 06_plotting.ipynb.
+Converted 07_file_io.ipynb.
+Converted 08_dataset.ipynb.
+Converted 09_output_trafo.ipynb.
+Converted 10_evaluation.ipynb.
+Converted 11_emitter_io.ipynb.
+Converted 12_utils.ipynb.
+Converted 13_train.ipynb.
+Converted 15_fit_psf.ipynb.
+Converted 16_visualization.ipynb.
+Converted 17_eval_routines.ipynb.
 Converted index.ipynb.
 </pre>
 </div>

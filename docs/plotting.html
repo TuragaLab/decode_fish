@@ -65,7 +65,7 @@ nb_path: "nbs/06_plotting.ipynb"
 
 
 <div class="output_markdown rendered_html output_subarea ">
-<h4 id="add_colorbar" class="doc_header"><code>add_colorbar</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/funcs/plotting.py#L13" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>add_colorbar</code>(<strong><code>im</code></strong>, <strong><code>aspect</code></strong>=<em><code>20</code></em>, <strong><code>pad_fraction</code></strong>=<em><code>0.5</code></em>, <strong>**<code>kwargs</code></strong>)</p>
+<h4 id="add_colorbar" class="doc_header"><code>add_colorbar</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/funcs/plotting.py#L17" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>add_colorbar</code>(<strong><code>im</code></strong>, <strong><code>aspect</code></strong>=<em><code>20</code></em>, <strong><code>pad_fraction</code></strong>=<em><code>0.5</code></em>, <strong>**<code>kwargs</code></strong>)</p>
 </blockquote>
 
 <pre><code>Add a vertical color bar to an image plot</code></pre>
@@ -144,7 +144,7 @@ nb_path: "nbs/06_plotting.ipynb"
 
 
 <div class="output_markdown rendered_html output_subarea ">
-<h4 id="sl_plot" class="doc_header"><code>sl_plot</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/funcs/plotting.py#L25" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>sl_plot</code>(<strong><code>x</code></strong>, <strong><code>xsim</code></strong>, <strong><code>background</code></strong>, <strong><code>res</code></strong>)</p>
+<h4 id="sl_plot" class="doc_header"><code>sl_plot</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/funcs/plotting.py#L29" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>sl_plot</code>(<strong><code>x</code></strong>, <strong><code>xsim</code></strong>, <strong><code>pred_df</code></strong>, <strong><code>target_df</code></strong>, <strong><code>background</code></strong>, <strong><code>res</code></strong>)</p>
 </blockquote>
 
 </div>
@@ -168,7 +168,7 @@ nb_path: "nbs/06_plotting.ipynb"
 
 
 <div class="output_markdown rendered_html output_subarea ">
-<h4 id="gt_plot" class="doc_header"><code>gt_plot</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/funcs/plotting.py#L61" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>gt_plot</code>(<strong><code>x</code></strong>, <strong><code>pred_df</code></strong>, <strong><code>gt_df</code></strong>, <strong><code>px_size</code></strong>, <strong><code>gt_rec</code></strong>=<em><code>None</code></em>)</p>
+<h4 id="gt_plot" class="doc_header"><code>gt_plot</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/funcs/plotting.py#L69" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>gt_plot</code>(<strong><code>x</code></strong>, <strong><code>pred_df</code></strong>, <strong><code>gt_df</code></strong>, <strong><code>px_size</code></strong>, <strong><code>gt_rec</code></strong>=<em><code>None</code></em>, <strong><code>psf</code></strong>=<em><code>None</code></em>, <strong><code>fig_size</code></strong>=<em><code>(24, 6)</code></em>)</p>
 </blockquote>
 
 </div>
@@ -192,7 +192,109 @@ nb_path: "nbs/06_plotting.ipynb"
 
 
 <div class="output_markdown rendered_html output_subarea ">
-<h4 id="plot_3d_projections" class="doc_header"><code>plot_3d_projections</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/funcs/plotting.py#L95" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>plot_3d_projections</code>(<strong><code>volume</code></strong>, <strong><code>projection</code></strong>=<em><code>'mean'</code></em>, <strong><code>size</code></strong>=<em><code>6</code></em>, <strong><code>vmax</code></strong>=<em><code>None</code></em>)</p>
+<h4 id="plot_3d_projections" class="doc_header"><code>plot_3d_projections</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/funcs/plotting.py#L108" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>plot_3d_projections</code>(<strong><code>volume</code></strong>, <strong><code>proj_func</code></strong>=<em><code>amax</code></em>, <strong><code>size</code></strong>=<em><code>6</code></em>, <strong><code>vmax</code></strong>=<em><code>None</code></em>, <strong><code>display</code></strong>=<em><code>True</code></em>)</p>
+</blockquote>
+
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+    {% endraw %}
+
+    {% raw %}
+    
+<div class="cell border-box-sizing code_cell rendered">
+
+<div class="output_wrapper">
+<div class="output">
+
+<div class="output_area">
+
+
+<div class="output_markdown rendered_html output_subarea ">
+<h4 id="scat_3d_projections" class="doc_header"><code>scat_3d_projections</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/funcs/plotting.py#L150" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>scat_3d_projections</code>(<strong><code>axes</code></strong>, <strong><code>dfs</code></strong>, <strong><code>px_size_zyx</code></strong>=<em><code>[1.0, 1.0, 1]</code></em>, <strong><code>s_fac</code></strong>=<em><code>1.0</code></em>)</p>
+</blockquote>
+
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+    {% endraw %}
+
+    {% raw %}
+    
+<div class="cell border-box-sizing code_cell rendered">
+
+<div class="output_wrapper">
+<div class="output">
+
+<div class="output_area">
+
+
+<div class="output_markdown rendered_html output_subarea ">
+<h4 id="plot_prob_hist" class="doc_header"><code>plot_prob_hist</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/funcs/plotting.py#L163" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>plot_prob_hist</code>(<strong><code>res_dict</code></strong>)</p>
+</blockquote>
+
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+    {% endraw %}
+
+    {% raw %}
+    
+<div class="cell border-box-sizing code_cell rendered">
+
+<div class="output_wrapper">
+<div class="output">
+
+<div class="output_area">
+
+<div class="output_subarea output_text output_error">
+<pre>
+<span class="ansi-red-fg">---------------------------------------------------------------------------</span>
+<span class="ansi-red-fg">NameError</span>                                 Traceback (most recent call last)
+<span class="ansi-green-fg">&lt;ipython-input-3-0a8df1503633&gt;</span> in <span class="ansi-cyan-fg">&lt;module&gt;</span>
+<span class="ansi-green-intense-fg ansi-bold">    105</span> <span class="ansi-red-fg">#     return axes</span>
+<span class="ansi-green-intense-fg ansi-bold">    106</span> 
+<span class="ansi-green-fg">--&gt; 107</span><span class="ansi-red-fg"> </span><span class="ansi-green-fg">def</span> plot_3d_projections<span class="ansi-blue-fg">(</span>volume<span class="ansi-blue-fg">,</span> proj_func<span class="ansi-blue-fg">=</span>np<span class="ansi-blue-fg">.</span>max<span class="ansi-blue-fg">,</span> size<span class="ansi-blue-fg">=</span><span class="ansi-cyan-fg">6</span><span class="ansi-blue-fg">,</span> vmax<span class="ansi-blue-fg">=</span><span class="ansi-green-fg">None</span><span class="ansi-blue-fg">)</span><span class="ansi-blue-fg">:</span>
+<span class="ansi-green-intense-fg ansi-bold">    108</span> 
+<span class="ansi-green-intense-fg ansi-bold">    109</span>     <span class="ansi-green-fg">if</span> torch<span class="ansi-blue-fg">.</span>is_tensor<span class="ansi-blue-fg">(</span>volume<span class="ansi-blue-fg">)</span><span class="ansi-blue-fg">:</span>
+
+<span class="ansi-red-fg">NameError</span>: name &#39;np&#39; is not defined</pre>
+</div>
+</div>
+
+</div>
+</div>
+
+</div>
+    {% endraw %}
+
+    {% raw %}
+    
+<div class="cell border-box-sizing code_cell rendered">
+
+<div class="output_wrapper">
+<div class="output">
+
+<div class="output_area">
+
+
+<div class="output_markdown rendered_html output_subarea ">
+<h4 id="combine_figures" class="doc_header"><code>combine_figures</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/funcs/plotting.py#L169" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>combine_figures</code>(<strong><code>figures</code></strong>, <strong><code>titles</code></strong>, <strong><code>nrows</code></strong>=<em><code>1</code></em>, <strong><code>ncols</code></strong>=<em><code>2</code></em>, <strong><code>figsize</code></strong>=<em><code>(10, 5)</code></em>)</p>
 </blockquote>
 
 </div>
@@ -223,37 +325,6 @@ nb_path: "nbs/06_plotting.ipynb"
 </pre></div>
 
     </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-<div class="output_area">
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre>Converted 00_models.ipynb.
-Converted 01_psf.ipynb.
-Converted 02_microscope.ipynb.
-Converted 03_noise.ipynb.
-Converted 04_pointsource.ipynb.
-Converted 05_gmm_loss.ipynb.
-Converted 06_plotting.ipynb.
-Converted 07_file_io.ipynb.
-Converted 08_dataset.ipynb.
-Converted 09_output_trafo.ipynb.
-Converted 10_evaluation.ipynb.
-Converted 11_emitter_io.ipynb.
-Converted 12_utils.ipynb.
-Converted 13_train_sl.ipynb.
-Converted 14_train_ae.ipynb.
-Converted 15_fit_psf.ipynb.
-Converted 16_visualization.ipynb.
-Converted index.ipynb.
-</pre>
-</div>
-</div>
-
 </div>
 </div>
 

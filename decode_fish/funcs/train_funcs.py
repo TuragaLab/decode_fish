@@ -19,7 +19,6 @@ from torch.utils.data import DataLoader
 from ..engine.microscope import Microscope
 from ..engine.model import UnetDecodeNoBn
 import shutil
-from torch.utils.tensorboard import SummaryWriter
 from ..engine.point_process import PointProcessUniform
 from ..engine.gmm_loss import PointProcessGaussian
 import wandb

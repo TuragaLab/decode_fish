@@ -25,6 +25,7 @@ dependencies:
   - pip:
       - nbdev
       - monai
+      - wandb
 
   # add kernel to jupyter
   - ipykernel

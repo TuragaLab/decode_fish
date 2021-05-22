@@ -6,24 +6,30 @@ __all__ = ['LinearInterpolatedPSF', 'crop_psf']
 from ..imports import *
 import torch.nn as nn
 from torch.jit import script
-from typing import Union, List
 import torch.nn.functional as F
 from ..funcs.utils import *
 from ..funcs.plotting import *
 
 # Cell
 class LinearInterpolatedPSF(nn.Module):
-    """
-    Linearly interpolates psf volume with offsets
-    """
 
-    def __init__(self, size_zyx, device='cuda'):
+    def __init__(self, size_zyx=[21,21,21], device='cuda'):
+        """ Stores a PSF volume parameter and enables linear subpixel interpolation
+
+        Args:
+            size_zyx: size of the psf volume in pixels
+            device: 'cuda' or 'cpu'
+
+        ToDo:
+            Eventually remove unneeded losses.
+        """
         super().__init__()
 
         self.psf_size = list(np.array(size_zyx).astype('int'))
         # +- /sz so that the values correspond to the pixel centers
         v = [torch.linspace(-1+1/sz, 1-1/sz, int(sz)) for sz in self.psf_size]
 
+        # Buffers are not optimized
         self.register_buffer('x', v[2])
         self.register_buffer('y', v[1])
         self.register_buffer('z', v[0])
@@ -32,6 +38,14 @@ class LinearInterpolatedPSF(nn.Module):
         self.forward_nonlin = torch.nn.Identity()
 
     def forward(self, x_offset_val, y_offset_val, z_offset_val):
+        """ Returns the PSF volume for a number of given subpixel shift.
+
+        Args:
+            x_offset_val, y_offset_val, z_offset_val: Vector of shifts in x,y,z
+
+        Returns:
+            PSF volumes shifted by x,y,z
+        """
 
         N_em = x_offset_val.shape[0]
         # Scale offsets by size. Factor of two because range [-1,1]
@@ -50,6 +64,7 @@ class LinearInterpolatedPSF(nn.Module):
         return psf_out.transpose(-3,-1)
 
     def get_com(self):
+        """ Returns the center of mass of the squared volume."""
 
         x_grid, y_grid, z_grid = torch.meshgrid(torch.arange(self.psf_size[0]),torch.arange(self.psf_size[1]),torch.arange(self.psf_size[2]))
         m_grid = torch.stack([x_grid, y_grid, z_grid], -1).to(self.device)
@@ -61,25 +76,27 @@ class LinearInterpolatedPSF(nn.Module):
         xc = (m_grid[:,:,:,2] * vol).sum()/vol.sum()
 
         return zc, yc, xc
-#         return torch.stack((zc, yc, xc)).to(self.device)
 
     def com_loss(self):
+        """ Returns the difference between the current CoM and the center of the volume.
+
+        Used as a loss term during AE training to avoid drift of the PSF.
+        """
 
         return torch.norm(torch.stack(self.get_com()) - torch.tensor(self.psf_size).to(self.device)//2, 2)
 
     def clip_loss(self):
-
+        """ Returns the 2 norm of negative values of the PSF volume. """
         return torch.norm(torch.nn.ReLU().forward(-self.psf_volume).sum(), 2)
 
     def sum_loss(self):
-
+        """ Returns the 1 norm of the PSF volume. """
         return torch.norm(self.forward_nonlin(self.psf_volume).sum(), 1)
 
 # Cell
 def crop_psf(psf, extent_zyx):
-
+    """Returns a cropped version of a PSF"""
     cropped_vol = center_crop(psf.psf_volume, extent_zyx)
     cropped_psf = LinearInterpolatedPSF(extent_zyx)
-    cropped_psf.psf_volume.data = cropped_vol
-
+    cropped_psf.load_state_dict({'psf_volume':cropped_vol}, strict=False)
     return cropped_psf

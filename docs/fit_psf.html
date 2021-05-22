@@ -891,6 +891,24 @@ peaks: array
 
 <div class="inner_cell">
     <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="n">device</span><span class="o">=</span><span class="s1">&#39;cuda&#39;</span>
+<span class="n">PSF</span> <span class="o">=</span> <span class="n">LinearInterpolatedPSF</span><span class="p">([</span><span class="mi">21</span><span class="p">,</span><span class="mi">21</span><span class="p">,</span><span class="mi">21</span><span class="p">],</span><span class="mi">1</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+</div>
+    {% endraw %}
+
+    {% raw %}
+    
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+
+<div class="inner_cell">
+    <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="n">PSF</span><span class="o">.</span><span class="n">psf_volume</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">gauss_3d</span><span class="p">[</span><span class="kc">None</span><span class="p">])</span>
 <span class="n">torch</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">PSF</span><span class="o">.</span><span class="n">state_dict</span><span class="p">(),</span> <span class="s1">&#39;../data/gaussian_psf.pkl&#39;</span><span class="p">)</span>
 </pre></div>
@@ -935,9 +953,9 @@ Converted 09_output_trafo.ipynb.
 Converted 10_evaluation.ipynb.
 Converted 11_emitter_io.ipynb.
 Converted 12_utils.ipynb.
-Converted 13_train_sl.ipynb.
-Converted 14_train_ae.ipynb.
+Converted 13_train.ipynb.
 Converted 15_fit_psf.ipynb.
+Converted 16_visualization.ipynb.
 Converted index.ipynb.
 </pre>
 </div>

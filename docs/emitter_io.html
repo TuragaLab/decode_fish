@@ -65,7 +65,7 @@ nb_path: "nbs/11_emitter_io.ipynb"
 
 
 <div class="output_markdown rendered_html output_subarea ">
-<h4 id="shift_df" class="doc_header"><code>shift_df</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/funcs/emitter_io.py#L9" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>shift_df</code>(<strong><code>df</code></strong>, <strong><code>shift</code></strong>=<em><code>[0.0, 0.0, 0.0]</code></em>)</p>
+<h4 id="shift_df" class="doc_header"><code>shift_df</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/funcs/emitter_io.py#L10" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>shift_df</code>(<strong><code>df</code></strong>, <strong><code>shift</code></strong>=<em><code>[0.0, 0.0, 0.0]</code></em>)</p>
 </blockquote>
 
 </div>
@@ -89,7 +89,7 @@ nb_path: "nbs/11_emitter_io.ipynb"
 
 
 <div class="output_markdown rendered_html output_subarea ">
-<h4 id="nm_to_px" class="doc_header"><code>nm_to_px</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/funcs/emitter_io.py#L18" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>nm_to_px</code>(<strong><code>df</code></strong>, <strong><code>px_size</code></strong>=<em><code>[100.0, 100.0, 100.0]</code></em>)</p>
+<h4 id="sig_filt" class="doc_header"><code>sig_filt</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/funcs/emitter_io.py#L18" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>sig_filt</code>(<strong><code>df</code></strong>, <strong><code>perc</code></strong>=<em><code>90</code></em>, <strong><code>return_low</code></strong>=<em><code>True</code></em>)</p>
 </blockquote>
 
 </div>
@@ -113,7 +113,7 @@ nb_path: "nbs/11_emitter_io.ipynb"
 
 
 <div class="output_markdown rendered_html output_subarea ">
-<h4 id="px_to_nm" class="doc_header"><code>px_to_nm</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/funcs/emitter_io.py#L27" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>px_to_nm</code>(<strong><code>df</code></strong>, <strong><code>px_size</code></strong>=<em><code>[100.0, 100.0, 100.0]</code></em>)</p>
+<h4 id="nm_to_px" class="doc_header"><code>nm_to_px</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/funcs/emitter_io.py#L28" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>nm_to_px</code>(<strong><code>df</code></strong>, <strong><code>px_size_zyx</code></strong>=<em><code>[100.0, 100.0, 100.0]</code></em>)</p>
 </blockquote>
 
 </div>
@@ -137,7 +137,7 @@ nb_path: "nbs/11_emitter_io.ipynb"
 
 
 <div class="output_markdown rendered_html output_subarea ">
-<h4 id="cat_emitter_dfs" class="doc_header"><code>cat_emitter_dfs</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/funcs/emitter_io.py#L36" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>cat_emitter_dfs</code>(<strong><code>df_list</code></strong>)</p>
+<h4 id="px_to_nm" class="doc_header"><code>px_to_nm</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/funcs/emitter_io.py#L38" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>px_to_nm</code>(<strong><code>df</code></strong>, <strong><code>px_size_zyx</code></strong>=<em><code>[100.0, 100.0, 100.0]</code></em>)</p>
 </blockquote>
 
 </div>
@@ -161,7 +161,79 @@ nb_path: "nbs/11_emitter_io.ipynb"
 
 
 <div class="output_markdown rendered_html output_subarea ">
-<h4 id="crop_df" class="doc_header"><code>crop_df</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/funcs/emitter_io.py#L47" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>crop_df</code>(<strong><code>df</code></strong>, <strong><code>fxyz_sl</code></strong>=<em><code>(slice(None, None, None), slice(None, None, None), slice(None, None, None), slice(None, None, None))</code></em>, <strong><code>shift</code></strong>=<em><code>True</code></em>, <strong><code>px_size</code></strong>=<em><code>[1.0, 1.0, 1.0]</code></em>)</p>
+<h4 id="cat_emitter_dfs" class="doc_header"><code>cat_emitter_dfs</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/funcs/emitter_io.py#L47" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>cat_emitter_dfs</code>(<strong><code>df_list</code></strong>, <strong><code>n_frames</code></strong>=<em><code>1</code></em>)</p>
+</blockquote>
+
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+    {% endraw %}
+
+    {% raw %}
+    
+<div class="cell border-box-sizing code_cell rendered">
+
+<div class="output_wrapper">
+<div class="output">
+
+<div class="output_area">
+
+
+<div class="output_markdown rendered_html output_subarea ">
+<h4 id="append_emitter_df" class="doc_header"><code>append_emitter_df</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/funcs/emitter_io.py#L61" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>append_emitter_df</code>(<strong><code>df1</code></strong>, <strong><code>df2</code></strong>)</p>
+</blockquote>
+
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+    {% endraw %}
+
+    {% raw %}
+    
+<div class="cell border-box-sizing code_cell rendered">
+
+<div class="output_wrapper">
+<div class="output">
+
+<div class="output_area">
+
+
+<div class="output_markdown rendered_html output_subarea ">
+<h4 id="crop_df" class="doc_header"><code>crop_df</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/funcs/emitter_io.py#L73" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>crop_df</code>(<strong><code>df</code></strong>, <strong><code>fzyx_sl</code></strong>=<em><code>(slice(None, None, None), slice(None, None, None), slice(None, None, None), slice(None, None, None))</code></em>, <strong><code>shift</code></strong>=<em><code>True</code></em>, <strong><code>px_size_zyx</code></strong>=<em><code>[1.0, 1.0, 1.0]</code></em>)</p>
+</blockquote>
+
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+    {% endraw %}
+
+    {% raw %}
+    
+<div class="cell border-box-sizing code_cell rendered">
+
+<div class="output_wrapper">
+<div class="output">
+
+<div class="output_area">
+
+
+<div class="output_markdown rendered_html output_subarea ">
+<h4 id="get_n_locs" class="doc_header"><code>get_n_locs</code><a href="https://github.com/TuragaLab/decode_fish/tree/master/decode_fish/funcs/emitter_io.py#L86" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>get_n_locs</code>(<strong><code>df</code></strong>)</p>
 </blockquote>
 
 </div>
@@ -214,10 +286,10 @@ Converted 09_output_trafo.ipynb.
 Converted 10_evaluation.ipynb.
 Converted 11_emitter_io.ipynb.
 Converted 12_utils.ipynb.
-Converted 13_train_sl.ipynb.
-Converted 14_train_ae.ipynb.
+Converted 13_train.ipynb.
 Converted 15_fit_psf.ipynb.
 Converted 16_visualization.ipynb.
+Converted 17_eval_routines.ipynb.
 Converted index.ipynb.
 </pre>
 </div>

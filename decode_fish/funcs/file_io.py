@@ -167,7 +167,7 @@ def load_psf_noise_micro(cfg):
 
     psf = load_psf(cfg)
     noise = hydra.utils.instantiate(cfg.noise)
-    micro = hydra.utils.instantiate(cfg.microscope, parametric_psf=[psf], noise=noise).cuda()
+    micro = hydra.utils.instantiate(cfg.microscope, psf=psf, noise=noise).cuda()
 
     return psf, noise, micro
 
@@ -216,15 +216,14 @@ def get_dataloader(cfg):
 
     return imgs_3d, decode_dl
 
-def load_all(cfg, sl=False):
+def load_all(cfg):
 
-    path = Path(cfg.output.save_dir)/'sl_save' if sl else Path(cfg.output.save_dir)
+    path = Path(cfg.output.save_dir)
     model = hydra.utils.instantiate(cfg.model)
     model = load_model_state(model, path/'model.pkl')
     post_proc = hydra.utils.instantiate(cfg.post_proc_isi, samp_threshold=0.5)
     psf, noise, micro = load_psf_noise_micro(cfg)
     psf.load_state_dict(torch.load(path/'psf.pkl'))
-    micro.load_state_dict(torch.load(path/'microscope.pkl'))
     psf.cuda()
     img_3d, decode_dl = get_dataloader(cfg)
 

@@ -58,7 +58,6 @@ noise:
 microscope:
     _target_: decode_fish.engine.microscope.Microscope
     scale: 100
-    clamp_mode: 'cp'
     
 foci:
     _target_: decode_fish.funcs.dataset.AddFoci
@@ -95,8 +94,8 @@ post_proc_isi:
 training:
     bs: 2
     num_iters: 30000
-    start_psf: 3000
-    start_micro: ${training.start_psf}
+    start_micro: 3000
+    start_int: 3000
     net:
         bl_loss_scale: 0.01
         cnt_loss_scale: 1
@@ -108,9 +107,8 @@ training:
         opt:
             _target_: torch.optim.AdamW
             lr: 5e-4
-    psf:
+    mic:
         grad_clip: 0.1
-        gamma: 0.5
         norm_reg: 0.5
         opt:
             _target_: torch.optim.RMSprop
@@ -119,8 +117,7 @@ training:
             _target_: torch.optim.lr_scheduler.StepLR
             gamma: 0.5
             step_size: 5000
-    micro:
-        int_quantile: 1.
+    int:
         opt:
             _target_: torch.optim.AdamW
             lr: 0.001
@@ -131,3 +128,4 @@ training:
 
 other:
     pp: 'isi'
+    wandb_mode: online # offline , disabled

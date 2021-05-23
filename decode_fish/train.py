@@ -8,7 +8,6 @@ from decode_fish.funcs.evaluation import *
 from decode_fish.funcs.plotting import *
 import torch.nn.functional as F
 from torch.optim import AdamW
-from torch.optim.lr_scheduler import MultiStepLR
 from torch.utils.data import DataLoader
 from decode_fish.engine.microscope import Microscope
 from decode_fish.engine.model import UnetDecodeNoBn
@@ -32,6 +31,7 @@ def my_app(cfg):
         inp_offset, inp_scale = get_forward_scaling(img_3d[0])
     else:
         inp_offset, inp_scale = cfg.model.inp_scale, cfg.model.inp_offset
+        
     model = hydra.utils.instantiate(cfg.model, inp_scale=float(inp_scale), inp_offset=float(inp_offset))
     post_proc = load_post_proc(cfg)
     
@@ -55,34 +55,40 @@ def my_app(cfg):
                    config=OmegaConf.to_container(cfg, resolve=True),
                    dir=cfg.output.log_dir,
                    group=cfg.output.group,
-                   name=cfg.run_name
+                   name=cfg.run_name,
+                   mode=cfg.other.wandb_mode
               )
 
-    opt_net = hydra.utils.instantiate(cfg.training.net.opt, params=model.parameters())
-    opt_psf = hydra.utils.instantiate(cfg.training.psf.opt, params=list(psf.parameters())+ list(micro.noise.parameters()))
-    opt_mic = hydra.utils.instantiate(cfg.training.micro.opt, params=list(model.int_dist.parameters())[:3])
+    optim_net = hydra.utils.instantiate(cfg.training.net.opt, params=model.unet.parameters())
+    optim_mic = hydra.utils.instantiate(cfg.training.mic.opt, params=micro.parameters())
+    optim_int = hydra.utils.instantiate(cfg.training.int.opt, params=model.int_dist.parameters())
 
-    scheduler_net = hydra.utils.instantiate(cfg.training.net.sched, optimizer=opt_net)
-    scheduler_psf = hydra.utils.instantiate(cfg.training.psf.sched, optimizer=opt_psf)
-    scheduler_mic = hydra.utils.instantiate(cfg.training.psf.sched, optimizer=opt_mic)
+    sched_net = hydra.utils.instantiate(cfg.training.net.sched, optimizer=optim_net)
+    sched_mic = hydra.utils.instantiate(cfg.training.mic.sched, optimizer=optim_mic)
+    sched_int = hydra.utils.instantiate(cfg.training.int.sched, optimizer=optim_int)
     
     if cfg.data_path.model_init is not None:
-    
+        print('loading')
         model = load_model_state(model, cfg.data_path.model_init).cuda()
         micro.load_state_dict(torch.load(Path(cfg.data_path.model_init)/'microscope.pkl'))
-        opt_net.load_state_dict(torch.load(Path(cfg.data_path.model_init)/'opt_net.pkl'))
-#         opt_psf.load_state_dict(torch.load(Path(cfg.data_path.model_init)/'opt_psf.pkl'))
-#         psf.load_state_dict(torch.load(Path(cfg.data_path.model_init)/'psf.pkl'))
+
+        train_state_dict = torch.load(Path(cfg.data_path.model_init)/'training_state.pkl')
+        optim_net.load_state_dict(train_state_dict['optim_net'])
+        optim_mic.load_state_dict(train_state_dict['optim_mic'])
+        optim_int.load_state_dict(train_state_dict['optim_int'])
+        sched_net.load_state_dict(train_state_dict['sched_net'])
+        sched_mic.load_state_dict(train_state_dict['sched_mic'])
+        sched_int.load_state_dict(train_state_dict['sched_int'])                                 
         
     train(cfg=cfg,
          model=model, 
          dl=decode_dl, 
-         optim_net=opt_net, 
-         optim_psf=opt_psf, 
-         optim_mic=opt_mic,
-         sched_net=scheduler_net, 
-         sched_psf=scheduler_psf, 
-         sched_mic=scheduler_mic, 
+         optim_net=optim_net, 
+         optim_mic=optim_mic, 
+         optim_int=optim_int, 
+         sched_net=sched_net, 
+         sched_mic=sched_mic, 
+         sched_int=sched_int,
          psf=psf,
          post_proc=post_proc,
          microscope=micro, 

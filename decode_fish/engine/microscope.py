@@ -25,7 +25,7 @@ class Microscope(nn.Module):
 
 
     Args:
-        parametric_psf (torch.nn.Module): List of Paramateric PSF
+        psf (torch.nn.Module): List of Paramateric PSF
         empirical_psf (torch.nn.Module): List of Emperical PSF
         noise (torch.nn.Module): Camera noise model
         scale(float): Paramter for scaling point spread functions
@@ -43,22 +43,17 @@ class Microscope(nn.Module):
 
 
     def __init__(self,
-                 parametric_psf: List[torch.nn.Module]=None,
-                 empirical_psf : List[torch.nn.Module]=None ,
+                 psf: torch.nn.Module=None,
                  noise: Union[torch.nn.Module, None]=None,
                  scale: float = 10000.,
-                 psf_noise=None, clamp_mode = 'cp'
                  ):
 
         super().__init__()
-        self.parametric_psf = parametric_psf if parametric_psf else None
-        self.empirical_psf  = empirical_psf if empirical_psf else None
-#         self.scale = torch.nn.Parameter(torch.tensor(scale))
+        self.psf = psf
         self.scale = scale
         self.noise = noise
 
         self.theta = self.noise.theta
-        self.clamp_mode = clamp_mode
 
     def forward(self, locations, x_os_val, y_os_val, z_os_val, i_val,output_shape, bg=None, eval_=None, scale_x=None, scale_y=None, scale_z=None):
 
@@ -68,17 +63,9 @@ class Microscope(nn.Module):
             if scale_y: y_os_val = y_os_val*scale_y
             if scale_z: z_os_val = z_os_val*scale_z
 
-            psf = 0
-            if self.parametric_psf:
-                for param_psf_ in self.parametric_psf:
-                    psf += param_psf_(x_os_val, y_os_val, z_os_val)
+            psf = self.psf(x_os_val, y_os_val, z_os_val)
 
-            if self.empirical_psf:
-                for emper_psf in self.empirical_psf:
-                    psf += emper_psf(x_os_val, y_os_val, z_os_val)
-
-            if self.clamp_mode == 'cp':
-                torch.clamp_min_(psf,0)
+            torch.clamp_min_(psf,0)
             #normalizing psf
             psf_max = psf.amax(dim=[2, 3, 4], keepdim=True)
 #             psf_sum = torch.nn.ReLU().forward(psf).sum(dim=[2, 3, 4], keepdim=True)
@@ -89,8 +76,6 @@ class Microscope(nn.Module):
             psf = psf * tot_intensity[:,None,None,None,None]
             xsim = place_psf(locations, psf, output_shape)
             xsim = self.scale * xsim
-            if self.clamp_mode == 'cx':
-                torch.clamp_min_(xsim,0)
             if eval_:
                 return xsim, psf
             return xsim

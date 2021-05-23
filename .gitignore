@@ -14,6 +14,7 @@ runs/
 data/
 nbs/wandb
 outputs/
+run_slurm.sh
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

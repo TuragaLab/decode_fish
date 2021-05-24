@@ -115,7 +115,7 @@ def plot_3d_projections(volume, proj_func=np.max, size=6, vmax=None, display=Tru
     for _ in range(plot_vol.ndim - 3):
         plot_vol = plot_vol.squeeze(0)
 
-    x,y,z = plot_vol.shape[::-1]
+    z,y,x = plot_vol.shape
 
     size_y = size * ((y+z)/y)
     size_x = size * ((1.1*x+z)/x)
@@ -124,9 +124,10 @@ def plot_3d_projections(volume, proj_func=np.max, size=6, vmax=None, display=Tru
                                                  gridspec_kw={'height_ratios': [y, z], 'width_ratios':[x, z, x/20]})
     plt.subplots_adjust(hspace=0.0,wspace=0.05)
 
-    im = ax_yx.imshow(proj_func(plot_vol, 0),vmax=vmax)
-    ax_yz.imshow(proj_func(plot_vol, 2).T,vmax=vmax)
-    ax_zx.imshow(proj_func(plot_vol, 1),vmax=vmax)
+    # usually imshow starts at -0.5 so we have to manually change that
+    im = ax_yx.imshow(proj_func(plot_vol, 0),vmax=vmax, extent=(0,x,y,0))
+    ax_yz.imshow(proj_func(plot_vol, 2).T,vmax=vmax, extent=(0,z,y,0))
+    ax_zx.imshow(proj_func(plot_vol, 1),vmax=vmax, extent=(0,x,z,0))
 
     ax_t1.axis('off')
     ax_t2.axis('off')
@@ -144,6 +145,8 @@ def plot_3d_projections(volume, proj_func=np.max, size=6, vmax=None, display=Tru
     plt.tight_layout()
 
     if not display: plt.close(fig)
+
+    return fig, [ax_yx,ax_zx,ax_yz]
 
     return fig, [ax_yx,ax_zx,ax_yz]
 

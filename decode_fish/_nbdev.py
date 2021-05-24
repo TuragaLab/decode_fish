@@ -2,8 +2,7 @@
 
 __all__ = ["index", "modules", "custom_doc_links", "git_url"]
 
-index = {"init_func": "00_models.ipynb",
-         "number_of_features_per_level": "00_models.ipynb",
+index = {"number_of_features_per_level": "00_models.ipynb",
          "create_conv": "00_models.ipynb",
          "SingleConv": "00_models.ipynb",
          "DoubleConv": "00_models.ipynb",
@@ -19,7 +18,6 @@ index = {"init_func": "00_models.ipynb",
          "crop_psf": "01_psf.ipynb",
          "Microscope": "02_microscope.ipynb",
          "place_psf": "02_microscope.ipynb",
-         "extractvalues": "02_microscope.ipynb",
          "sCMOS": "03_noise.ipynb",
          "estimate_noise_scale": "03_noise.ipynb",
          "PointProcessUniform": "04_pointsource.ipynb",

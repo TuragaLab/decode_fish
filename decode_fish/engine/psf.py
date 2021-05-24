@@ -12,17 +12,17 @@ from ..funcs.plotting import *
 
 # Cell
 class LinearInterpolatedPSF(nn.Module):
+    """ Stores a PSF volume parameter and enables linear subpixel interpolation
+
+    Args:
+        size_zyx: size of the psf volume in pixels
+        device: 'cuda' or 'cpu'
+
+    ToDo:
+        Eventually remove unneeded losses.
+    """
 
     def __init__(self, size_zyx=[21,21,21], device='cuda'):
-        """ Stores a PSF volume parameter and enables linear subpixel interpolation
-
-        Args:
-            size_zyx: size of the psf volume in pixels
-            device: 'cuda' or 'cpu'
-
-        ToDo:
-            Eventually remove unneeded losses.
-        """
         super().__init__()
 
         self.psf_size = list(np.array(size_zyx).astype('int'))

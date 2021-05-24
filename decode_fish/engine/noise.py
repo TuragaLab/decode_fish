@@ -7,6 +7,7 @@ from ..imports import *
 from torch import nn
 from torch import distributions as D
 from ..funcs.utils import *
+from ..funcs.plotting import *
 import scipy.stats as stats
 
 # Cell
@@ -37,11 +38,12 @@ class sCMOS(nn.Module):
     def forward(self, x_sim, background):
 
         x_sim_background = x_sim + background
-        x_sim_background.clamp_(1.0)
+#         x_sim_background.clamp_(1.0)
 
         conc = (x_sim_background - self.baseline) / self.theta
         xsim_dist = D.Gamma(concentration=conc, rate=1 / self.theta)
-        loc_trafo = [D.AffineTransform(loc=self.baseline, scale=1, event_dim=1)]
+
+        loc_trafo = [D.AffineTransform(loc=self.baseline, scale=1)]
         xsim_dist = D.TransformedDistribution(xsim_dist, loc_trafo)
         return xsim_dist
 

@@ -16,6 +16,7 @@ output:
     log_dir : ${base_dir}/decode_fish/runs/
     log_figs : True
     log_interval: 100
+    wandb_mode: online # offline , disabled
   
 data_path: 
     image_path: 
@@ -54,6 +55,7 @@ PSF:
 noise:
     _target_: decode_fish.engine.noise.sCMOS
     theta: 2. 
+    baseline: 0.
     
 microscope:
     _target_: decode_fish.engine.microscope.Microscope
@@ -125,7 +127,3 @@ training:
             _target_: torch.optim.lr_scheduler.StepLR
             gamma: 0.5
             step_size: 1e6
-
-other:
-    pp: 'isi'
-    wandb_mode: online # offline , disabled

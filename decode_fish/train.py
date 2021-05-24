@@ -33,7 +33,7 @@ def my_app(cfg):
         inp_offset, inp_scale = cfg.model.inp_scale, cfg.model.inp_offset
         
     model = hydra.utils.instantiate(cfg.model, inp_scale=float(inp_scale), inp_offset=float(inp_offset))
-    post_proc = load_post_proc(cfg)
+    post_proc = hydra.utils.instantiate(cfg.post_proc_isi)
     
     psf  .to(cfg.device.gpu_device)
     model.to(cfg.device.gpu_device)
@@ -56,42 +56,33 @@ def my_app(cfg):
                    dir=cfg.output.log_dir,
                    group=cfg.output.group,
                    name=cfg.run_name,
-                   mode=cfg.other.wandb_mode
+                   mode=cfg.output.wandb_mode
               )
 
-    optim_net = hydra.utils.instantiate(cfg.training.net.opt, params=model.unet.parameters())
-    optim_mic = hydra.utils.instantiate(cfg.training.mic.opt, params=micro.parameters())
-    optim_int = hydra.utils.instantiate(cfg.training.int.opt, params=model.int_dist.parameters())
+    optim_dict = {}
+    optim_dict['optim_net'] = hydra.utils.instantiate(cfg.training.net.opt, params=model.network.parameters())
+    optim_dict['optim_mic'] = hydra.utils.instantiate(cfg.training.mic.opt, params=micro.parameters())
+    optim_dict['optim_int'] = hydra.utils.instantiate(cfg.training.int.opt, params=model.int_dist.parameters())
 
-    sched_net = hydra.utils.instantiate(cfg.training.net.sched, optimizer=optim_net)
-    sched_mic = hydra.utils.instantiate(cfg.training.mic.sched, optimizer=optim_mic)
-    sched_int = hydra.utils.instantiate(cfg.training.int.sched, optimizer=optim_int)
-    
+    optim_dict['sched_net'] = hydra.utils.instantiate(cfg.training.net.sched, optimizer=optim_dict['optim_net'])
+    optim_dict['sched_mic'] = hydra.utils.instantiate(cfg.training.mic.sched, optimizer=optim_dict['optim_mic'])
+    optim_dict['sched_int'] = hydra.utils.instantiate(cfg.training.int.sched, optimizer=optim_dict['optim_int'])
+
     if cfg.data_path.model_init is not None:
         print('loading')
         model = load_model_state(model, cfg.data_path.model_init).cuda()
         micro.load_state_dict(torch.load(Path(cfg.data_path.model_init)/'microscope.pkl'))
 
         train_state_dict = torch.load(Path(cfg.data_path.model_init)/'training_state.pkl')
-        optim_net.load_state_dict(train_state_dict['optim_net'])
-        optim_mic.load_state_dict(train_state_dict['optim_mic'])
-        optim_int.load_state_dict(train_state_dict['optim_int'])
-        sched_net.load_state_dict(train_state_dict['sched_net'])
-        sched_mic.load_state_dict(train_state_dict['sched_mic'])
-        sched_int.load_state_dict(train_state_dict['sched_int'])                                 
+        for k in optim_dict:
+            optim_dict[k].load_state_dict(train_state_dict[k])                           
         
     train(cfg=cfg,
          model=model, 
-         dl=decode_dl, 
-         optim_net=optim_net, 
-         optim_mic=optim_mic, 
-         optim_int=optim_int, 
-         sched_net=sched_net, 
-         sched_mic=sched_mic, 
-         sched_int=sched_int,
-         psf=psf,
-         post_proc=post_proc,
          microscope=micro, 
+         post_proc=post_proc,
+         dl=decode_dl, 
+         optim_dict=optim_dict, 
          eval_dict=eval_dict)
 
 if __name__ == "__main__":

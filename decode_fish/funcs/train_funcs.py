@@ -121,7 +121,7 @@ def train(cfg,
         # Update network parameters
         loss.backward()
 
-        if cfg.training.net.grad_clip: torch.nn.utils.clip_grad_norm_(model.unet.parameters(), max_norm=cfg.training.net.grad_clip, norm_type=2)
+        if cfg.training.net.grad_clip: torch.nn.utils.clip_grad_norm_(model.network.parameters(), max_norm=cfg.training.net.grad_clip, norm_type=2)
 
         optim_dict['optim_net'].step()
         optim_dict['sched_net'].step()
@@ -154,7 +154,7 @@ def train(cfg,
                 ints = proc_out_inp[4]
 
                 gamma_int = D.Gamma(model.int_dist.int_conc, model.int_dist.int_rate)
-                loc_trafo = [D.AffineTransform(loc=model.int_dist.int_loc, scale=1, event_dim=1)]
+                loc_trafo = [D.AffineTransform(loc=model.int_dist.int_loc, scale=1)]
                 int_loss = -D.TransformedDistribution(gamma_int, loc_trafo).log_prob(ints.detach()).mean()
 
                 int_loss.backward()

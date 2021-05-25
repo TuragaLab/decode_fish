@@ -31,6 +31,6 @@ Also create a directory where you wan't to save your trained models and change t
 
 Please refer to the experiment.ipynb notebook to see the complete workflow of setting dataset specific training parameters, 
 running the training, performing predictions and inspecting the results on an example dataset. 
-We recommed making a copy of this notebook for your own experiments.
+We recommed copying and editing this notebook for your own experiments.
 
 

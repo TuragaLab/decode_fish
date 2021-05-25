@@ -33,4 +33,10 @@ Please refer to the experiment.ipynb notebook to see the complete workflow of se
 running the training, performing predictions and inspecting the results on an example dataset. 
 We recommed copying and editing this notebook for your own experiments.
 
+## Wandb
+
+We use [Weights & Biases](https://wandb.ai/site) to track training progress. Many performance metrics and intermediary results are continuously logged and 
+uploaded. However, you'll have to create a (free) account. 
+Do disable wandb logging set 'output.wandb_mode' = disabled
+
 

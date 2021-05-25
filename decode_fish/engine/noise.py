@@ -13,32 +13,32 @@ import scipy.stats as stats
 # Cell
 class sCMOS(nn.Module):
     """
-    Generates sCMOS noise distribution.
     Generates sCMOS noise distribution which can be used for sampling and
     calculating log probabilites.
 
+    Theta can be learned (but no the baseline)
+
     Args:
-        theta (float): Paramter for gamma distribution
-        background (float): background value
-        baseline (float): basline
+        theta (float): 1/theta gives the rate for torch.distributions.gamma
+        baseline (float): baseline
 
-    Shape:
-        -Input: x_sim: (BS, C, H, W, D)
-
-        -Output: Gamma(concentration: (BS, C, H, W, D), rate:
-        (BS, C, H, W, D))
     """
     def __init__(self,
                  theta: float = 3.,
-                 baseline: float = 0.01):
+                 baseline: float = 0.):
         super().__init__()
         self.theta = torch.nn.Parameter(torch.tensor(theta))
         self.register_buffer('baseline', torch.tensor(baseline))
 
     def forward(self, x_sim, background):
+        """ Calculates the concentration (mean / theta) of a Gamma distribution given
+        the signal x_sim and background tensors.
+
+        Also applies a shift and returns resulting the Gamma distribution
+        """
 
         x_sim_background = x_sim + background
-#         x_sim_background.clamp_(1.0)
+        x_sim_background.clamp_(1.0)
 
         conc = (x_sim_background - self.baseline) / self.theta
         xsim_dist = D.Gamma(concentration=conc, rate=1 / self.theta)
@@ -49,18 +49,29 @@ class sCMOS(nn.Module):
 
 # Cell
 def estimate_noise_scale(img, bg_est, percentile=99, plot=True):
+    """ Returns an estimate of theta given a volume and a background estimate
+
+    Args:
+        img: recorded volume for which we want to estimate the noise
+        bg_est: estimated background for img
+        percentile: we wan't to exclude the signal for our fit. therefore we only use the lower percentile of all voxels
+        plot: whether to plot the data and the final fit
+
+    Returns:
+        fit_theta: theta estimate
+    """
 
     img = cpu(img)
     bg_est = cpu(bg_est)
     residual = np.clip(img - bg_est + bg_est.mean(), img.min(), 1e10)
     fit_vals = residual[residual < np.percentile(residual, percentile)]
-    fit_alpha, fit_loc, fit_beta=stats.gamma.fit(fit_vals, floc=0)
+    fit_alpha, fit_loc, fit_theta=stats.gamma.fit(fit_vals, floc=0)
 
     if plot:
         _ = plt.hist(fit_vals,bins=np.linspace(fit_vals.min(),fit_vals.max(), 51),  histtype ='step',label='data', density=True)
         x = np.linspace(fit_vals.min(),fit_vals.max(),101)
-        y = stats.gamma.pdf(x, fit_alpha, fit_loc, fit_beta)
+        y = stats.gamma.pdf(x, fit_alpha, fit_loc, fit_theta)
         plt.plot(x, y, label='Fit')
         plt.legend()
 
-    return fit_beta
+    return fit_theta

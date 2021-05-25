@@ -95,6 +95,7 @@ post_proc_isi:
     
 training:
     bs: 2
+    start_iter: 0
     num_iters: 30000
     start_micro: 3000
     start_int: 3000

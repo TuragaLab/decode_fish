@@ -56,8 +56,7 @@ def my_app(cfg):
                    dir=cfg.output.log_dir,
                    group=cfg.output.group,
                    name=cfg.run_name,
-                   mode=cfg.output.wandb_mode
-              )
+                   mode=cfg.output.wandb_mode)
 
     optim_dict = {}
     optim_dict['optim_net'] = hydra.utils.instantiate(cfg.training.net.opt, params=model.network.parameters())
@@ -75,7 +74,9 @@ def my_app(cfg):
 
         train_state_dict = torch.load(Path(cfg.data_path.model_init)/'training_state.pkl')
         for k in optim_dict:
-            optim_dict[k].load_state_dict(train_state_dict[k])                           
+            optim_dict[k].load_state_dict(train_state_dict[k])    
+            
+        cfg.training.start_iter = train_state_dict['train_iter']
         
     train(cfg=cfg,
          model=model, 

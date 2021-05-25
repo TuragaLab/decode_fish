@@ -324,12 +324,10 @@ class Abstract3DUNet(nn.Module):
 
     def __init__(self, in_channels, out_channels, final_sigmoid, basic_module, f_maps=64, layer_order='gcr',
                  num_groups=8, num_levels=4, is_segmentation=True, testing=False,
-                 conv_kernel_size=3, pool_kernel_size=2, conv_padding=1, inp_scale=1, inp_offset=0, **kwargs):
+                 conv_kernel_size=3, pool_kernel_size=2, conv_padding=1, **kwargs):
         super(Abstract3DUNet, self).__init__()
 
         self.testing = testing
-        self.inp_scale = inp_scale
-        self.inp_offset = inp_offset
 
         if isinstance(f_maps, int):
             f_maps = number_of_features_per_level(f_maps, num_levels=num_levels)
@@ -397,7 +395,6 @@ class Abstract3DUNet(nn.Module):
 
     def forward(self, x):
         # encoder part
-        x = (x-self.inp_offset) / self.inp_scale
         encoders_features = []
         for encoder in self.encoders:
             x = encoder(x)
@@ -433,11 +430,11 @@ class UNet3D(Abstract3DUNet):
     """
 
     def __init__(self, in_channels, out_channels, final_sigmoid=True, f_maps=64, layer_order='gcr',
-                 num_groups=8, num_levels=4, is_segmentation=True, conv_padding=1, inp_scale=1, inp_offset=0, **kwargs):
+                 num_groups=8, num_levels=4, is_segmentation=True, conv_padding=1,  **kwargs):
         super(UNet3D, self).__init__(in_channels=in_channels, out_channels=out_channels, final_sigmoid=final_sigmoid,
                                      basic_module=DoubleConv, f_maps=f_maps, layer_order=layer_order,
                                      num_groups=num_groups, num_levels=num_levels, is_segmentation=is_segmentation,
-                                     conv_padding=conv_padding, inp_scale=inp_scale, inp_offset=inp_offset, **kwargs)
+                                     conv_padding=conv_padding, **kwargs)
 
 # Cell
 class IntensityDist(nn.Module):
@@ -521,11 +518,11 @@ class UnetDecodeNoBn(nn.Module):
 
     Args:
         ch_in (int): number of input channels
-            Multiple input channels are currently not support
+            Multiple input channels are currently not supported
         ch_out (int): number of output channels
             Currently 10: probability (1), xyzi_mu (4), xyzi_sig (4), background (1)
         depth (int): number of levels in the encoder/decoder path (applied only if f_maps is an int)
-        inp_offset, inp_scale (float):
+        inp_offset, inp_scale (float): Values used for normalizing the input.
         order (string): determines the order of layers
             in `SingleConv` module. e.g. 'ce' stands for Conv3d+ELU.
             See `SingleConv` for more info
@@ -546,14 +543,19 @@ class UnetDecodeNoBn(nn.Module):
                 int_conc=4., int_rate=1., int_loc=1.):
         super().__init__()
 
+        self.inp_scale = inp_scale
+        self.inp_offset = inp_offset
+
         self.unet = UNet3D(ch_in, ch_out, final_sigmoid=False, num_levels=depth,
-                           layer_order = order, inp_scale=inp_scale, inp_offset=inp_offset, f_maps=f_maps)
+                           layer_order = order, f_maps=f_maps)
         self.outnet = OutputNet(f_maps=f_maps, p_offset=p_offset)
 
         self.network = nn.ModuleList([self.unet, self.outnet])
         self.int_dist = IntensityDist(int_conc, int_rate, int_loc)
 
     def forward(self, x):
+
+        x = (x-self.inp_offset) / self.inp_scale
 
         for net in self.network:
             x = net(x)
@@ -564,7 +566,7 @@ class UnetDecodeNoBn(nn.Module):
 
         # Limit intensity
         x[:,4] = x[:,4] + self.int_dist.int_loc.detach() + 0.01
-        x[:,9] = x[:,9] * self.unet.inp_scale
+        x[:,9] = x[:,9] * self.inp_scale
 
         return {'logits': x[:,0:1],
                 'xyzi_mu': x[:,1:5],

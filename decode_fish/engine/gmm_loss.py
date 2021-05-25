@@ -10,18 +10,41 @@ from torch.distributions import Distribution
 # Cell
 class PointProcessGaussian(Distribution):
     def __init__(self, logits: torch.tensor, xyzi_mu: torch.tensor, xyzi_sigma: torch.tensor, **kwargs):
-        "logits: BS, C, H, W, D"
+        """ Defines our loss function. Given logits, xyzi_mu and xyzi_sigma
+
+        The count loss first constructs a Gaussian approximation to the predicted number of emitters by summing the mean and the variance of the Bernoulli detection probability map,
+        and then maximizes the probability of the true number of emitters under this distribution.
+        The localization loss models the distribution of sub-pixel localizations with a coordinate-wise independent Gaussian probability distribution  with a 3D standard deviation.
+        For imprecise localizations, this probability is maximized for large sigmas, for precise localizations for small sigmas.
+        The distribution of all localizations over the entire image is approximated as a weighted average of individual localization distributions, where the weights correspond to the probability of detection.
+
+        Args:
+            logits: shape (B,1,D,H,W)
+            xyzi_mu: shape (B,4,D,H,W)
+            xyzi_sigma: shape (B,4,D,H,W)
+        """
         self.logits = logits
         self.xyzi_mu = xyzi_mu
         self.xyzi_sigma = xyzi_sigma
 
-    def log_prob(self, locations_3d, x_offset_3d, y_offset_3d, z_offset_3d, intensities_3d):
+    def log_prob(self, locations, x_offset, y_offset, z_offset, intensities):
+        """ Creates the distributions for the count and localization loss and evaluates the log probability for the given set of localizations under those distriubtions.
+
+            Args:
+                locations: tuple with voxel locations of inferred emitters
+                x_offset, y_offset,z_offset: continuous within pixel offsets. Has lenght of number of emitters in the whole batch.
+                intensties: brightness of emitters. Has lenght of number of emitters in the whole batch.
+
+            Returns:
+                count_prob: count loss. Has langth of batch_size
+                spatial_prob: localizations loss. Has langth of batch_size
+        """
 
         batch_size = self.logits.shape[0]
-        xyzi, s_mask = get_true_labels(batch_size, locations_3d, x_offset_3d, y_offset_3d, z_offset_3d, intensities_3d)
+        xyzi, s_mask = get_true_labels(batch_size, locations, x_offset, y_offset, z_offset, intensities)
         counts = s_mask.sum(-1)
 
-        P = torch.sigmoid(self.logits) # + 0.00001
+        P = torch.sigmoid(self.logits)
         count_mean = P.sum(dim=[2, 3, 4]).squeeze(-1)
         count_var = (P - P ** 2).sum(dim=[2, 3, 4]).squeeze(-1)
         count_dist = D.Normal(count_mean, torch.sqrt(count_var))

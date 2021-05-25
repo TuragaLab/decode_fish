@@ -11,15 +11,21 @@ from ..funcs.utils import *
 # Cell
 class PointProcessUniform(Distribution):
     """
-    This class is part of the generative model and uses probability local_rate to generate locations `locations`  `x`, `y`, `z` offsets and `intensities` intensity of emitters. local_rate  should be `torch.tensor` scaled from 0.001 to 1), which is used by `_sample_bin` to generate `0` and `1` . `0` means that we don't have an emitter at a given pixel, and 1 means emitters is present. This map is used to generate offset in `x`, `y`, `z`, and intensities, which tells how bright is emitter or, in some cases, how many emitters are bound to given molecules.
+    This class is part of the generative model and uses the probability local_rate to generate sample locations on the voxel grid.
+    For each emitter we then sample x-,y- and z-offsets uniformly in the range [-0.5,0.5] to get continuous locations.
+    Intensities are sampled from a gamma distribution torch.distirubtions.gamma(int_conc, int_rate) which is shifted by int_loc.
+    Together with the microscope.scale and the PSF this results in the overall brightness of an emitter.
+
     Args:
-        local_rate (BS, C, H, W, D): Local rate
-        min_int (int): minimum intensity of emitters
-        bg(bool): if returns sampled backround
+        local_rate torch.tensor . shape(BS, C, H, W, D): Local rate
+        int_conc=0., int_rate=1., int_loc (float): parameters of the intensity gamma distribution
+        sim_iters (int): instead of sampling once from local_rate, we sample sim_iters times from local_rate/sim_iters.
+            This results in the same average number of sampled emitters but allows us to sample multiple emitters within one voxel.
 
     """
     def __init__(self, local_rate: torch.tensor, int_conc=0., int_rate=1., int_loc=1., sim_iters: int = 5):
 
+        assert sim_iters > 1
         self.local_rate = local_rate
         self.device = self._get_device(self.local_rate)
         self.sim_iters = sim_iters

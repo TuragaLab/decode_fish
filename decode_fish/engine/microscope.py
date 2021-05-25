@@ -86,13 +86,6 @@ def place_psf(locations, psf_volume, output_shape):
     Returns:
         placed_psf: torch.Tensor with shape (BS, C, H, W, D)
     """
-#     filter_size = psf_volume.shape[-3:]
-#     filter_sizes = torch.cat([torch.tensor((sz // 2, sz // 2 + 1)) for sz in filter_size]).reshape(3, 2).cuda()
-#     padding_sz = torch.tensor(max(filter_size) // 2 + 2).cuda()
-#     batch, ch, z, y, x = locations
-#     placed_psf = _place_psf(psf_volume, padding_sz, filter_sizes, batch, ch, z, y, x, torch.tensor(output_shape))
-#     assert placed_psf.shape == output_shape
-#     return placed_psf
 
     batch, ch, z, y, x = locations
     placed_psf = _place_psf(psf_volume, batch, ch, z, y, x, torch.tensor(output_shape))

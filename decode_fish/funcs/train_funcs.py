@@ -58,10 +58,12 @@ def load_from_eval_dict(eval_dict):
 
     return eval_img, eval_df, eval_psf
 
-def save_train_state(save_dir, model, microscope, optim_dict):
+def save_train_state(save_dir, model, microscope, optim_dict, train_iter):
 
         torch.save({'state_dict':model.state_dict(), 'scaling':[model.unet.inp_scale, model.unet.inp_offset]}, save_dir/'model.pkl')
         torch.save(microscope.state_dict(), save_dir/'microscope.pkl')
+
+
 
         torch.save({k:v.state_dict() for (k,v) in optim_dict.items()}, save_dir/'training_state.pkl')
 

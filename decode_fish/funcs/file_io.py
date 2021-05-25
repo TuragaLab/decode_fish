@@ -16,10 +16,13 @@ from torch.utils.data import DataLoader
 
 # Cell
 def load_model_state(model, path):
+    """
+    Loads the network parameters, the intensity parameters and the scaling into model given a path.
+    """
     model_dict = torch.load(path)
     model.load_state_dict(model_dict['state_dict'])
-    model.unet.inp_scale = model_dict['scaling'][0]
-    model.unet.inp_offset = model_dict['scaling'][1]
+    model.inp_scale = model_dict['scaling'][0]
+    model.inp_offset = model_dict['scaling'][1]
     return model
 
 # Cell

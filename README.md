@@ -25,7 +25,11 @@ python decode_fish/predict.py out_file='results.csv' model_path='your_experiment
 ```
 
 Training is parametrized by a .yaml config file. 
-Please refer to the experiment.ipynb notebook to see the complete workflow of setting training parameters, 
+Default parameters are stored in the config/train.yaml. 
+Before starting set the 'base_dir' to the path where you cloned this repository.
+Also create a directory where you wan't to save your trained models and change the 'out_put.save_dir'
+
+Please refer to the experiment.ipynb notebook to see the complete workflow of setting dataset specific training parameters, 
 running the training, performing predictions and inspecting the results on an example dataset. 
 We recommed making a copy of this notebook for your own experiments.
 

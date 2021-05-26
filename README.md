@@ -38,6 +38,6 @@ We recommed copying and editing this notebook for your own experiments.
 
 We use [Weights & Biases](https://wandb.ai/site) to track training progress. Many performance metrics and intermediary results are continuously logged and 
 uploaded. However, you'll have to create a (free) account. 
-Do disable wandb logging set 'output.wandb_mode' = disabled
+To disable wandb logging set 'output.wandb_mode' = disabled
 
 

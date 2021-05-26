@@ -12,6 +12,7 @@ git clone https://github.com/TuragaLab/decode_fish.git
 cd decode_fish
 conda env create -f requirements.yaml
 conda activate decode_fish_dev
+python setup.py develop
 ```
 
 ## Getting started

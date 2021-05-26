@@ -13,14 +13,12 @@ from .output_trafo import *
 from .plotting import *
 import torch.nn.functional as F
 from torch import distributions as D
-from torch.optim import AdamW
-from torch.optim.lr_scheduler import MultiStepLR
 from torch.utils.data import DataLoader
 from ..engine.microscope import Microscope
 from ..engine.model import UnetDecodeNoBn
-import shutil
 from ..engine.point_process import PointProcessUniform
 from ..engine.gmm_loss import PointProcessGaussian
+import shutil
 import wandb
 # from decode_fish.funcs.visualization vimport get_simulation_statistics
 
@@ -60,12 +58,13 @@ def load_from_eval_dict(eval_dict):
 
 def save_train_state(save_dir, model, microscope, optim_dict, train_iter):
 
-        torch.save({'state_dict':model.state_dict(), 'scaling':[model.unet.inp_scale, model.unet.inp_offset]}, save_dir/'model.pkl')
+        torch.save({'state_dict':model.state_dict(), 'scaling':[model.inp_scale, model.inp_offset]}, save_dir/'model.pkl')
         torch.save(microscope.state_dict(), save_dir/'microscope.pkl')
 
+        save_dict = {k:v.state_dict() for (k,v) in optim_dict.items()}
+        save_dict['train_iter'] = train_iter
 
-
-        torch.save({k:v.state_dict() for (k,v) in optim_dict.items()}, save_dir/'training_state.pkl')
+        torch.save(save_dict, save_dir/'training_state.pkl')
 
 # Cell
 def train(cfg,
@@ -100,7 +99,7 @@ def train(cfg,
     model.cuda().train()
     torch.save(microscope.psf.state_dict(), str(save_dir) + '/psf_init.pkl' )
 
-    for batch_idx in range(cfg.training.num_iters):
+    for batch_idx in range(cfg.training.start_iter, cfg.training.num_iters):
 
         x, local_rate, background = next(iter(dl))
 
@@ -145,7 +144,7 @@ def train(cfg,
 
                 log_p_x_given_z.backward()
                 if cfg.training.mic.grad_clip:
-                    torch.nn.utils.clip_grad_norm_(microscope.psf.parameters(), max_norm=cfg.training.mic.grad_clip, norm_type=2)
+                    torch.nn.utils.clip_grad_norm_(microscope.parameters(), max_norm=cfg.training.mic.grad_clip, norm_type=2)
 
                 optim_dict['optim_mic'].step()
                 optim_dict['sched_mic'].step()
@@ -158,6 +157,9 @@ def train(cfg,
                 gamma_int = D.Gamma(model.int_dist.int_conc, model.int_dist.int_rate)
                 loc_trafo = [D.AffineTransform(loc=model.int_dist.int_loc, scale=1)]
                 int_loss = -D.TransformedDistribution(gamma_int, loc_trafo).log_prob(ints.detach()).mean()
+
+                if cfg.training.int.grad_clip:
+                    torch.nn.utils.clip_grad_norm_(model.int_dist.parameters(), max_norm=cfg.training.mic.grad_clip, norm_type=2)
 
                 int_loss.backward()
                 optim_dict['optim_int'].step()
@@ -215,6 +217,6 @@ def train(cfg,
                         wandb.log({'GT': eval_fig}, step=batch_idx)
 
             # storing
-            save_train_state(save_dir, model, microscope, optim_dict)
+            save_train_state(save_dir, model, microscope, optim_dict, batch_idx)
 
     wandb.finish()

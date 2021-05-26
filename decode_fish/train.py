@@ -12,7 +12,6 @@ from torch.utils.data import DataLoader
 from decode_fish.engine.microscope import Microscope
 from decode_fish.engine.model import UnetDecodeNoBn
 import shutil
-from torch.utils.tensorboard import SummaryWriter
 from decode_fish.engine.point_process import PointProcessUniform
 from decode_fish.engine.gmm_loss import PointProcessGaussian
 

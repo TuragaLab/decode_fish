@@ -184,7 +184,7 @@ def combine_figures(figures, titles, nrows=1, ncols=2, figsize=(10,5)):
     for i in range(len(imgs)):
         axes[i].imshow(imgs[i])
         axes[i].axis('off')
-        if len(titles) >= i-1:
+        if len(titles) >= len(imgs)-1:
             axes[i].set_title(titles[i])
 
     return figure

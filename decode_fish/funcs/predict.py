@@ -20,7 +20,9 @@ def predict(model, post_proc, image_paths, window_size=[128,256,256], device='cu
             z,y,x = img.shape[-3:]
             img = img.reshape(-1,z,y,x)
             for i in range(len(img)):
+                print(img[i][None,None].shape)
                 output = sliding_window_inference(img[i][None,None], window_size, 1, model.to(device), overlap=0.2, sw_device=device, device='cpu', mode='gaussian')
+                # output = model.cpu()(img[i][None,None])
                 output = model.tensor_to_dict(output)
                 p_si = sliding_window_inference(output['logits'], window_size, 1, post_proc, overlap=0.2, sw_device=device, device='cpu', mode='gaussian')
                 i_df = post_proc.get_df(output, p_si)

@@ -192,7 +192,7 @@ def get_dataloader(cfg):
         crop_zyx = tuple(np.stack([min_shape, crop_zyx]).min(0))
         print('Crop size larger than volume in at least one dimension. Crop size changed to', crop_zyx)
 
-    rand_crop      = RandomCrop3D(crop_zyx, roi_masks)
+    rand_crop = RandomCrop3D(crop_zyx, roi_masks)
 
 #     probmap_generator = ScaleTensor(low=cfg.prob_generator.low,
 #                                     high=cfg.prob_generator.high)
@@ -225,9 +225,8 @@ def load_all(cfg):
     model = hydra.utils.instantiate(cfg.model)
     model = load_model_state(model, path/'model.pkl')
     post_proc = hydra.utils.instantiate(cfg.post_proc_isi, samp_threshold=0.5)
-    psf, noise, micro = load_psf_noise_micro(cfg)
-    psf.load_state_dict(torch.load(path/'psf.pkl'))
-    psf.cuda()
+    _, noise, micro = load_psf_noise_micro(cfg)
+    micro.load_state_dict(torch.load(path/'microscope.pkl'))
     img_3d, decode_dl = get_dataloader(cfg)
 
-    return model, post_proc, psf, micro, img_3d, decode_dl
+    return model, post_proc, micro, img_3d, decode_dl

@@ -121,6 +121,7 @@ training:
             gamma: 0.5
             step_size: 5000
     int:
+        grad_clip: 0.1
         opt:
             _target_: torch.optim.AdamW
             lr: 0.001

@@ -99,7 +99,7 @@ training:
     num_iters: 30000
 #     start_micro: 3000
 #     start_int: 3000
-    start_ae: 3000
+    start_ae: 0
     net:
         bl_loss_scale: 0.01
         cnt_loss_scale: 1
@@ -122,7 +122,7 @@ training:
             gamma: 0.5
             step_size: 5000
     int:
-        grad_clip: 0.1
+        grad_clip: 
         opt:
             _target_: torch.optim.AdamW
             lr: 0.001

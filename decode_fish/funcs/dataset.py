@@ -50,7 +50,7 @@ class DecodeDataset:
     def __getitem__(self, _):
         i = random.randint(0,len(self.volumes)-1)
         x = self.volumes[i]
-        x = self._compose(x, self.dataset_tfms)
+        x = self._compose(x, self.dataset_tfms, ind = i)
         local_rate = self._compose(x, self.rate_tfms, ind = i)
         background = self.bg_transform(x)
         return x.to(self.device), local_rate.to(self.device), background.to(self.device)

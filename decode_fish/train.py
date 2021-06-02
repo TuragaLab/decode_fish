@@ -22,6 +22,7 @@ import wandb
 def my_app(cfg):
 
     """ General setup """
+    seed_everything(cfg.seed)
     
     img_3d, decode_dl = get_dataloader(cfg)
     psf, noise, micro = load_psf_noise_micro(cfg)

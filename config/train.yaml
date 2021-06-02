@@ -97,8 +97,9 @@ training:
     bs: 2
     start_iter: 0
     num_iters: 30000
-    start_micro: 3000
-    start_int: 3000
+#     start_micro: 3000
+#     start_int: 3000
+    start_ae: 3000
     net:
         bl_loss_scale: 0.01
         cnt_loss_scale: 1

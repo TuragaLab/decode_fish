@@ -33,7 +33,6 @@ class sCMOS(nn.Module):
     def forward(self, x_sim, background):
         """ Calculates the concentration (mean / theta) of a Gamma distribution given
         the signal x_sim and background tensors.
-
         Also applies a shift and returns resulting the Gamma distribution
         """
 

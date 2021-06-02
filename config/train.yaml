@@ -128,4 +128,4 @@ training:
         sched:
             _target_: torch.optim.lr_scheduler.StepLR
             gamma: 0.5
-            step_size: 1e6
+            step_size: 5000

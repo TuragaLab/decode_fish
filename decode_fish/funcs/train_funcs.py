@@ -122,7 +122,7 @@ def train(cfg,
         # Update network parameters
         loss.backward()
 
-        if cfg.training.net.grad_clip: torch.nn.utils.clip_grad_norm_(model.network.parameters(), max_norm=cfg.training.net.grad_clip, norm_type=2)
+        if cfg.training.net.grad_clip: torch.nn.utils.clip_grad_norm_(model.unet.parameters(), max_norm=cfg.training.net.grad_clip, norm_type=2)
 
         optim_dict['optim_net'].step()
         optim_dict['sched_net'].step()

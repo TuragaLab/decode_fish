@@ -128,6 +128,8 @@ def train(cfg,
         optim_dict['optim_net'].step()
         optim_dict['sched_net'].step()
 
+#         optim_dict['optim_net'].zero_grad()
+
         if batch_idx > np.min([cfg.training.start_ae, cfg.training.start_ae]):
 
             out_inp = model.tensor_to_dict(model(x))

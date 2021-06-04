@@ -15,7 +15,6 @@ from .visualization import *
 from torch.utils.data import DataLoader
 from ..engine.microscope import Microscope
 from ..engine.point_process import PointProcessUniform
-from .dataset import EstimateBackground
 import h5py
 
 base_path =  '/groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/'

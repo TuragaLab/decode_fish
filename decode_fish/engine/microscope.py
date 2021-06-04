@@ -39,25 +39,29 @@ class Microscope(nn.Module):
     """
 
 
-    def __init__(self, psf: torch.nn.Module=None, noise: Union[torch.nn.Module, None]=None, scale: float = 10000.):
+    def __init__(self, psf: torch.nn.Module=None, noise: Union[torch.nn.Module, None]=None, scale: float = 10000., norm='max', sum_fac=1):
 
         super().__init__()
         self.psf = psf
         self.scale = scale
         self.noise = noise
+        self.norm = norm
 
         self.theta = self.noise.theta
+        self.sum_fac = sum_fac
 
     def forward(self, locations, x_os_val, y_os_val, z_os_val, i_val, output_shape, bg=None, eval_=None):
 
         if len(locations[0]):
 
+            if 'max' in self.norm:
+                psf_norm = self.psf.psf_volume.max()
+            else:
+                psf_norm = torch.clamp_min(self.psf.psf_volume, 0).sum()/self.sum_fac
             # Apply continuous shift
             psf = self.psf(x_os_val, y_os_val, z_os_val)
             torch.clamp_min_(psf,0)
-            # normalize psf
-            psf_max = psf.amax(dim=[2, 3, 4], keepdim=True)
-            psf = psf.div(psf_max)
+            psf = psf/psf_norm
             # applying intenseties
             tot_intensity = torch.clamp_min(i_val, 0)
             psf = psf * tot_intensity[:,None,None,None,None]

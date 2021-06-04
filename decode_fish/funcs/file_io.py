@@ -170,8 +170,10 @@ def load_psf_noise_micro(cfg):
 
     psf = load_psf(cfg)
     noise = hydra.utils.instantiate(cfg.noise)
-    micro = hydra.utils.instantiate(cfg.microscope, psf=psf, noise=noise).cuda()
-
+    if 'max' in cfg.microscope.norm:
+        micro = hydra.utils.instantiate(cfg.microscope, psf=psf, noise=noise).cuda()
+    else:
+        micro = hydra.utils.instantiate(cfg.microscope, psf=psf, noise=noise, sum_fac=psf.psf_volume.sum().item()).cuda()
     return psf, noise, micro
 
 def load_post_proc(cfg):
@@ -182,8 +184,10 @@ def load_post_proc(cfg):
 
 def get_dataloader(cfg):
 
-    imgs_3d        = [load_tiff_image(f)[0] for f in sorted(glob.glob(cfg.data_path.image_path))]
-    estimate_backg = hydra.utils.instantiate(cfg.bg_estimation)
+    imgs_3d       = [load_tiff_image(f)[0] for f in sorted(glob.glob(cfg.data_path.image_path))]
+    gen_bg        = [hydra.utils.instantiate(cfg.bg_estimation.smoothing)]
+    if cfg.bg_estimation.fractal.scale:
+        gen_bg.append(hydra.utils.instantiate(cfg.bg_estimation.fractal))
     roi_masks     = [get_roi_mask(img, tuple(cfg.roi_mask.pool_size), percentile= cfg.roi_mask.percentile) for img in imgs_3d]
 
     min_shape = tuple(np.stack([v.shape for v in imgs_3d]).min(0)[-3:])
@@ -197,7 +201,7 @@ def get_dataloader(cfg):
 #     probmap_generator = ScaleTensor(low=cfg.prob_generator.low,
 #                                     high=cfg.prob_generator.high)
 #     rand_scale = RandScale(0.1,1.)
-#     rate_tfms = [estimate_backg, probmap_generator, rand_scale]
+#     rate_tfms = [gen_bg, probmap_generator, rand_scale]
 
     probmap_generator = UniformValue(cfg.prob_generator.low, cfg.prob_generator.high)
     rate_tfms = [probmap_generator]
@@ -211,7 +215,7 @@ def get_dataloader(cfg):
     ds = DecodeDataset(path = cfg.data_path.image_path,
                        dataset_tfms =  dataset_tfms,
                        rate_tfms = rate_tfms,
-                       bg_transform = estimate_backg,
+                       bg_tfms = gen_bg,
                        device='cuda:0',
                        num_iter=(cfg.training.num_iters) * cfg.training.bs)
 

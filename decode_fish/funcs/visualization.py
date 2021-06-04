@@ -111,7 +111,7 @@ def eval_random_crop(decode_dl, model, post_proc, micro, proj_func=np.max, cuda=
 
             combine_figures([fig1,fig2], ['Predictions', 'Residual'], figsize=(20,10))
 
-def eval_random_sim(decode_dl, model, post_proc, micro, projection='mean', plot_gt=True, cuda=True, samples=1):
+def eval_random_sim(decode_dl, model, post_proc, micro, proj_func=np.max, plot_gt=True, cuda=True, samples=1):
 
     with torch.no_grad():
 
@@ -130,15 +130,9 @@ def eval_random_sim(decode_dl, model, post_proc, micro, projection='mean', plot_
             x = x[0,0].cpu().numpy()
             rec = rec[0,0].cpu().numpy()
 
-            axes = plot_3d_projections(x, projection=projection)
-            plot_dfs = [pred_df]
-            if plot_gt:
-                plot_dfs.append(sim_df)
+            fig1, axes = plot_3d_projections(x, proj_func=proj_func, display=False)
+            scat_3d_projections(axes, [pred_df])
 
-            scat_3d_projections(axes, plot_dfs)
+            fig2, axes = plot_3d_projections(x, proj_func=proj_func, display=False)
 
-            axes[1].set_title('Predictions', size=16)
-
-            axes = plot_3d_projections(rec, projection=projection)
-
-            axes[1].set_title(f'Reconstruction', size=16)
+            combine_figures([fig1,fig2], ['Predictions', 'Reconstruction'], figsize=(20,10))

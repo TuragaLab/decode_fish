@@ -35,12 +35,19 @@ prob_generator:
     low: 1e-8
     high: 0.005
     
-bg_estimation:
-    _target_: decode_fish.funcs.dataset.EstimateBackground
-    smoothing_filter_size: 5
-    
 random_crop: 
     crop_sz: 48
+    
+bg_estimation:
+    smoothing:
+        _target_: decode_fish.funcs.dataset.GaussianSmoothing
+        smoothing_filter_size: 5
+    fractal:
+        _target_: decode_fish.funcs.dataset.AddPerlinNoise
+        shape: ${random_crop.crop_sz}
+        res: [2,4,4]
+        octaves: 3
+        scale: 0
 
 roi_mask:
     pool_size: [10,10,10]
@@ -60,6 +67,7 @@ noise:
 microscope:
     _target_: decode_fish.engine.microscope.Microscope
     scale: 100
+    norm: 'max'
     
 foci:
     _target_: decode_fish.funcs.dataset.AddFoci
@@ -70,9 +78,9 @@ foci:
     mode: 'gaussian'
     
 intensity_dist:
-    int_conc: 4.
-    int_rate: 1.
-    int_loc: 1.
+    int_conc: 3.
+    int_rate: 3.
+    int_loc: 3.
     
 model:
     _target_: decode_fish.engine.model.UnetDecodeNoBn

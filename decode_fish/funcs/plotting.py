@@ -40,8 +40,8 @@ def sl_plot(x, xsim, pred_df, target_df, background, res):
 
         plt.subplot(152)
         im = plt.imshow(xsim[0][0].cpu().numpy().max(0))
-        plt.scatter(target_df['x'], target_df['y'],facecolors='black', edgecolors='black', marker='x', s=25.)
-        plt.scatter(pred_df['x'], pred_df['y'],facecolors='red', edgecolors='red', marker='o', s=5.)
+        plt.scatter(target_df['x'], target_df['y'],facecolors='black', marker='x', s=25.)
+        plt.scatter(pred_df['x'], pred_df['y'],facecolors='red', marker='o', s=5.)
         add_colorbar(im)
         plt.axis('off')
         plt.title('Sim. image')
@@ -78,8 +78,8 @@ def gt_plot(x, pred_df, gt_df, px_size, gt_rec=None, psf=None, fig_size=(24,6)):
         vmax = max_proj.max()
         im = plt.imshow(max_proj, vmax=vmax)
         add_colorbar(im)
-        plt.scatter(pred_df['x'], pred_df['y'],facecolors='red', edgecolors='red', marker='+', s=20)
-#         plt.scatter(gt_df['x'], gt_df['y'],facecolors='none', edgecolors='black', marker='o', s=20)
+        plt.scatter(pred_df['x'], pred_df['y'],facecolors='red', marker='+', s=20)
+#         plt.scatter(gt_df['x'], gt_df['y'],facecolors='none', marker='o', s=20)
         plt.axis('off')
         plt.title('Real image')
 

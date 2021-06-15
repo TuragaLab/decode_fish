@@ -259,12 +259,12 @@ class GaussianSmoothing(TransformBase):
         return torch.tensor(background)
 
 class AddPerlinNoise(TransformBase):
-    def __init__(self, shape, res, octaves, scale=1, persistency=0.5, lacunarity=2):
+    def __init__(self, shape, res, octaves, scale=1, persistence=0.5, lacunarity=2):
         self.shape = shape
         self.res = res
         self.scale = scale
         self.octaves = octaves
-        self.persistency = persistency
+        self.persistence = persistence
         self.lacunarity = lacunarity
 
     def __call__(self, image, **kwargs):
@@ -272,7 +272,7 @@ class AddPerlinNoise(TransformBase):
         bs = len(image)
         fractal_noise = [generate_fractal_noise_3d(shape=(self.shape,self.shape,self.shape),
                                                   res=self.res, octaves=self.octaves,
-                                                  tileable=(False, False, False)) for _ in range(bs)]
+                                                  tileable=(False, False, False), persistence=self.persistence) for _ in range(bs)]
         fractal_noise = torch.FloatTensor(fractal_noise).to(image.device)
         fractal_noise = fractal_noise[:,:image.shape[-3],:image.shape[-2],:image.shape[-1]]
         return image + self.scale*fractal_noise

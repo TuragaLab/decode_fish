@@ -14,7 +14,7 @@ from decode_fish.engine.model import UnetDecodeNoBn
 import shutil
 from decode_fish.engine.point_process import PointProcessUniform
 from decode_fish.engine.gmm_loss import PointProcessGaussian
-
+import torch_optimizer
 from decode_fish.funcs.train_funcs import *
 import wandb
 

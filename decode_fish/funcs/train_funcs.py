@@ -14,6 +14,7 @@ from .plotting import *
 import torch.nn.functional as F
 from torch import distributions as D
 from torch.utils.data import DataLoader
+import torch_optimizer
 from ..engine.microscope import Microscope
 from ..engine.model import UnetDecodeNoBn
 from ..engine.point_process import PointProcessUniform
@@ -130,12 +131,12 @@ def train(cfg,
 
 #         optim_dict['optim_net'].zero_grad()
 
-        if batch_idx > np.min([cfg.training.start_ae, cfg.training.start_ae]):
+        if batch_idx > cfg.training.start_ae:
 
             out_inp = model.tensor_to_dict(model(x))
             proc_out_inp = post_proc.get_micro_inp(out_inp) # locations, x_os_3d, y_os_3d, z_os_3d, ints_3d, output_shape, comb_sig
 
-            if batch_idx > cfg.training.start_ae:
+            if cfg.training.mic.enabled:
 
                 optim_dict['optim_mic'].zero_grad()
 
@@ -152,10 +153,11 @@ def train(cfg,
                 optim_dict['optim_mic'].step()
                 optim_dict['sched_mic'].step()
 
-            if  batch_idx > cfg.training.start_ae and len(proc_out_inp[4]):
+            if  cfg.training.int.enabled and len(proc_out_inp[4]):
 
                 optim_dict['optim_int'].zero_grad()
                 ints = proc_out_inp[4]
+                ints = torch.clamp_min(ints, model.int_dist.int_loc.detach() + 0.01)
 
                 gamma_int = D.Gamma(model.int_dist.int_conc, model.int_dist.int_rate)
                 loc_trafo = [D.AffineTransform(loc=model.int_dist.int_loc, scale=1)]
@@ -179,9 +181,10 @@ def train(cfg,
             wandb.log({'AE Losses/theta': microscope.noise.theta.item()}, step=batch_idx)
 
             if batch_idx > cfg.training.start_ae:
-                wandb.log({'AE Losses/p_x_given_z': log_p_x_given_z.detach().cpu()}, step=batch_idx)
-                wandb.log({'AE Losses/RMSE(rec)': torch.sqrt(((x-(ae_img+out_inp['background']))**2).mean()).detach().cpu()}, step=batch_idx)
-                wandb.log({'AE Losses/sum(psf)': F.relu(microscope.psf.psf_volume/microscope.psf.psf_volume.max())[0].sum().detach().cpu()}, step=batch_idx)
+                if cfg.training.mic.enabled:
+                    wandb.log({'AE Losses/p_x_given_z': log_p_x_given_z.detach().cpu()}, step=batch_idx)
+                    wandb.log({'AE Losses/RMSE(rec)': torch.sqrt(((x-(ae_img+out_inp['background']))**2).mean()).detach().cpu()}, step=batch_idx)
+                    wandb.log({'AE Losses/sum(psf)': F.relu(microscope.psf.psf_volume/microscope.psf.psf_volume.max())[0].sum().detach().cpu()}, step=batch_idx)
 #                     wandb.log({'AE Losses/theta': microscope.theta.item()}, step=batch_idx)
 
         if batch_idx % cfg.output.log_interval == 0:

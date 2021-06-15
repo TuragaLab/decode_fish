@@ -47,6 +47,7 @@ bg_estimation:
         shape: ${random_crop.crop_sz}
         res: [2,4,4]
         octaves: 3
+        persistence: 0.5
         scale: 0
 
 roi_mask:
@@ -105,8 +106,6 @@ training:
     bs: 2
     start_iter: 0
     num_iters: 30000
-#     start_micro: 3000
-#     start_int: 3000
     start_ae: 0
     net:
         bl_loss_scale: 0.01
@@ -117,22 +116,24 @@ training:
             gamma: 0.5
             step_size: 5000
         opt:
-            _target_: torch.optim.AdamW
+            _target_: torch_optimizer.QHAdam
             lr: 5e-4
     mic:
+        enabled: True
         grad_clip: 0.1
         norm_reg: 0.5
         opt:
-            _target_: torch.optim.RMSprop
+            _target_: torch_optimizer.QHAdam
             lr: 0.00025
         sched:
             _target_: torch.optim.lr_scheduler.StepLR
             gamma: 0.5
             step_size: 5000
     int:
+        enabled: True
         grad_clip: 
         opt:
-            _target_: torch.optim.AdamW
+            _target_: torch_optimizer.QHAdam
             lr: 0.001
         sched:
             _target_: torch.optim.lr_scheduler.StepLR

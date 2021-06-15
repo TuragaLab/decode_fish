@@ -7,13 +7,11 @@ from decode_fish.funcs.output_trafo import *
 from decode_fish.funcs.evaluation import *
 from decode_fish.funcs.plotting import *
 import torch.nn.functional as F
-from torch.optim import AdamW
 from torch.optim.lr_scheduler import MultiStepLR
 from torch.utils.data import DataLoader
 from decode_fish.engine.microscope import Microscope
 from decode_fish.engine.model import UnetDecodeNoBn
 import shutil
-from torch.utils.tensorboard import SummaryWriter
 from decode_fish.engine.point_process import PointProcessUniform
 from decode_fish.engine.gmm_loss import PointProcessGaussian
 
@@ -41,7 +39,7 @@ def my_app(cfg):
     
     post_proc = hydra.utils.instantiate(cfg.post_proc_isi)
     
-    with h5py.File(out_file, 'w') as f:
+    with h5py.File(out_file, 'a') as f:
         
         if cfg.eval_routines.densities:
         
@@ -74,7 +72,7 @@ def my_app(cfg):
 
                     with torch.no_grad():
                         for m in model_names:
-                            model = load_model_state(model, model_dir + m, 'model.pkl')
+                            model = load_model_state(model, Path(model_dir + m)/'model.pkl')
                             dec_df = shift_df(post_proc.get_df(model.tensor_to_dict(model(img[sl][None].cuda()))), [-100,-100,-300])
                             df_col[m] = cat_emitter_dfs([df_col[m], dec_df])
                             free_mem()
@@ -113,7 +111,7 @@ def my_app(cfg):
 
                 with torch.no_grad():
                     for m in model_names:
-                        model = load_model_state(model, model_dir + m, 'model.pkl')
+                        model = load_model_state(model, Path(model_dir + m)/'model.pkl')
                         res_dict = model.tensor_to_dict(model(img[None].cuda()))
                         dec_df = shift_df(post_proc.get_df(res_dict), [-100,-100,-300])
                         df_col[m] = cat_emitter_dfs([df_col[m], nm_to_px(dec_df, px_size_zyx=[300,100,100])]) 
@@ -149,15 +147,14 @@ def my_app(cfg):
             for m in model_names:
                 
                 gg = g.create_group(m)
-                model = load_model_state(model, model_dir + m + '/sl_save/', 'model.pkl')
                 train_cfg = OmegaConf.load(model_dir + m + '/train.yaml')
                 
-                gg.create_dataset('conc_pre', data=model.int_dist.int_conc.item())                
-                gg.create_dataset('rate_pre', data=model.int_dist.int_rate.item())                
-                gg.create_dataset('loc_pre', data=model.int_dist.int_loc.item())                
+                gg.create_dataset('conc_pre', data=train_cfg.intensity_dist.int_conc)                
+                gg.create_dataset('rate_pre', data=train_cfg.intensity_dist.int_rate)                
+                gg.create_dataset('loc_pre', data=train_cfg.intensity_dist.int_loc)                
                 gg.create_dataset('scale', data=train_cfg.microscope.scale) 
                 
-                model = load_model_state(model, model_dir + m, 'model.pkl')
+                model = load_model_state(model, Path(model_dir + m)/'model.pkl')
 
                 gg.create_dataset('conc_post', data=model.int_dist.int_conc.item())                
                 gg.create_dataset('rate_post', data=model.int_dist.int_rate.item())                

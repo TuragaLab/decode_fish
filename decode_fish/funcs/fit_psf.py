@@ -7,7 +7,7 @@ from ..imports import *
 # from decode_fish.funcs.file_io import *
 from .utils import *
 from .plotting import *
-from .dataset import EstimateBackground
+from .dataset import GaussianSmoothing
 import torch.nn.functional as F
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import MultiStepLR

@@ -565,7 +565,7 @@ class UnetDecodeNoBn(nn.Module):
     def tensor_to_dict(self, x):
 
         # Limit intensity
-        x[:,4] = x[:,4] + float(self.int_dist.int_loc.detach()) + 0.01
+#         x[:,4] = x[:,4] + float(self.int_dist.int_loc.detach()) + 0.01
         x[:,9] = x[:,9] * self.inp_scale
 
         return {'logits': x[:,0:1],

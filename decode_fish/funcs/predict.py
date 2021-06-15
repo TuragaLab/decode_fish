@@ -10,7 +10,7 @@ from .utils import *
 from monai.inferers import sliding_window_inference
 
 # Cell
-def predict(model, post_proc, image_paths, window_size=[128,256,256], device='cuda'):
+def predict(model, post_proc, image_paths, window_size=[None,256,256], device='cuda'):
 
     pred_df = DF()
     with torch.no_grad():

@@ -26,7 +26,7 @@ def load_model_state(model, path):
     return model
 
 # Cell
-def simfish_to_df(sim_file, frame_idx=0):
+def simfish_to_df(sim_file, frame_idx=0, int_fac=1.05):
 
     yxzi = []
     with open(sim_file) as f:
@@ -44,7 +44,7 @@ def simfish_to_df(sim_file, frame_idx=0):
     if yxzi.shape[1] == 4:
         # PSF.max() | PSF.sum() | 3**3 (superres)  | PSF.max() | microscope scale
         # ints = yxzi[:,3] * 65535.0 * 156772560.0 / 27 / 65535.0 / 10000.0
-        ints = yxzi[:,3] * 65535.0 / 100.0 / 1.23
+        ints = yxzi[:,3] * 65535.0 / 100.0 / int_fac
     else:
         ints = np.ones_like(loc_idx)
 
@@ -63,24 +63,24 @@ def simfish_to_df(sim_file, frame_idx=0):
     return df
 
 #export
-def load_sim_fish(basedir, mrna_lvl=200, shape='cell3D', exp_strength='strong', cell_nr=0, shift=[-38,-38,-110]):
+def load_sim_fish(basedir, mrna_lvl=200, shape='cell3D', exp_strength='strong', cell_nr=0, shift=[-38,-38,-110], int_fac=1.05):
 
     spec_dir = f'/mRNAlevel_{mrna_lvl}/{shape}/{exp_strength}/'
     img_path = sorted(glob.glob(basedir + spec_dir + 'w1*.tif'))[cell_nr]
     cellname = Path(img_path).name.split('.')[0]
 #     print(name)
     img = load_tiff_image(img_path)
-    gt_df = simfish_to_df(img_path.split('.')[0] + '.txt')
+    gt_df = simfish_to_df(img_path.split('.')[0] + '.txt', int_fac=int_fac)
     fq_nog_df = fq_gmm_df = DF()
     if os.path.exists(basedir + '/_results_detection/'):
         nog_path = Path(basedir + '/_results_detection/' + spec_dir + '/results_noGMM/' + cellname + '_res_NO_GMM.txt')
         gmm_path = Path(basedir + '/_results_detection/' + spec_dir + '/results_GMM/' + cellname + '_res_GMM.txt')
 
         if nog_path.is_file():
-            fq_nog_df = simfish_to_df(nog_path)
+            fq_nog_df = simfish_to_df(nog_path, int_fac=int_fac)
             fq_nog_df = shift_df(fq_nog_df, shift)
         if gmm_path.is_file():
-            fq_gmm_df = simfish_to_df(gmm_path)
+            fq_gmm_df = simfish_to_df(gmm_path, int_fac=int_fac)
             fq_gmm_df = shift_df(fq_gmm_df, shift)
 
     return img, gt_df, fq_nog_df, fq_gmm_df

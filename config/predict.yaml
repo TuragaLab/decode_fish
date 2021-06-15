@@ -19,5 +19,5 @@ post_proc_isi:
     diag: True
         
 predict:
-    window_size: [128,256,256]
+    window_size_xy: 128
     device: cuda

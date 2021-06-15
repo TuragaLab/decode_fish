@@ -50,14 +50,16 @@ class Microscope(nn.Module):
         self.theta = self.noise.theta
         self.sum_fac = sum_fac
 
-    def forward(self, locations, x_os_val, y_os_val, z_os_val, i_val, output_shape, bg=None, eval_=None):
+    def forward(self, locations, x_os_val, y_os_val, z_os_val, i_val, output_shape, eval_=None):
 
         if len(locations[0]):
 
             if 'max' in self.norm:
                 psf_norm = self.psf.psf_volume.max()
-            else:
+            elif 'sum' in self.norm:
                 psf_norm = torch.clamp_min(self.psf.psf_volume, 0).sum()/self.sum_fac
+            else:
+                psf_norm = 1
             # Apply continuous shift
             psf = self.psf(x_os_val, y_os_val, z_os_val)
             torch.clamp_min_(psf,0)

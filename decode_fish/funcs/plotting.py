@@ -148,8 +148,6 @@ def plot_3d_projections(volume, proj_func=np.max, size=6, vmax=None, display=Tru
 
     return fig, [ax_yx,ax_zx,ax_yz]
 
-    return fig, [ax_yx,ax_zx,ax_yz]
-
 def scat_3d_projections(axes, dfs, px_size_zyx=[1.,1.,1], s_fac=1.):
     colors = ['red','black','orange']
     markers = ['o','+','x']
@@ -180,6 +178,8 @@ def combine_figures(figures, titles, nrows=1, ncols=2, figsize=(10,5)):
     figure = plt.figure(figsize=figsize)
     axes = figure.subplots(nrows, ncols)
     plt.subplots_adjust(hspace=0.,wspace=0.)
+
+    axes = axes.reshape(-1)
 
     for i in range(len(imgs)):
         axes[i].imshow(imgs[i])

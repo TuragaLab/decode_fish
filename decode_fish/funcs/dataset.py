@@ -17,7 +17,7 @@ from perlin_numpy import generate_fractal_noise_3d, generate_perlin_noise_3d
 # Cell
 class DecodeDataset:
 
-    def __init__(self, path: Union[str, list],
+    def __init__(self, volumes: list,
                  dataset_tfms: list,
                  rate_tfms: list,
                  bg_tfms: list,
@@ -35,14 +35,13 @@ class DecodeDataset:
             device (str, optional): device cpu or gpu]. Defaults to 'cpu'.
         """
 
-        self.image_path = glob.glob(path)
+        self.volumes = volumes
         self.dataset_tfms = dataset_tfms
         self.num_iter = num_iter
         self.rate_tfms = rate_tfms
         self.bg_tfms = bg_tfms
         self.device = device
 
-        self.volumes = [load_tiff_image(f) for f in self.image_path]
         print(f'{len(self.volumes)} volumes')
 
     def __len__(self):
@@ -50,7 +49,7 @@ class DecodeDataset:
 
     def __getitem__(self, _):
         i = random.randint(0,len(self.volumes)-1)
-        x = self.volumes[i]
+        x = self.volumes[i][None] # Adding dimension here to get to 4.
         x = self._compose(x, self.dataset_tfms, ind = i)
         local_rate = self._compose(x, self.rate_tfms, ind = i)
         background = self._compose(x, self.bg_tfms)

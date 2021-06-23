@@ -43,7 +43,7 @@ def eval_logger(pred_df, target_df, iteration, data_str='Sim. '):
 
 def load_from_eval_dict(eval_dict):
 
-    eval_img = load_tiff_image(sorted(glob.glob(eval_dict['image_path']))[eval_dict['img_ind']])
+    eval_img = load_tiff_image(sorted(glob.glob(eval_dict['image_path']))[eval_dict['img_ind']])[eval_dict['sm_fish_ch']][None]
     eval_img = eval_img[eval_dict['crop_sl']]
     eval_df = None
     eval_psf = None
@@ -131,12 +131,12 @@ def train(cfg,
 
 #         optim_dict['optim_net'].zero_grad()
 
-        if batch_idx > cfg.training.start_ae:
+        if batch_idx > min(cfg.training.start_mic,cfg.training.start_int):
 
             out_inp = model.tensor_to_dict(model(x))
             proc_out_inp = post_proc.get_micro_inp(out_inp) # locations, x_os_3d, y_os_3d, z_os_3d, ints_3d, output_shape, comb_sig
 
-            if cfg.training.mic.enabled:
+            if cfg.training.mic.enabled and batch_idx > cfg.training.start_mic:
 
                 optim_dict['optim_mic'].zero_grad()
 
@@ -153,7 +153,7 @@ def train(cfg,
                 optim_dict['optim_mic'].step()
                 optim_dict['sched_mic'].step()
 
-            if  cfg.training.int.enabled and len(proc_out_inp[4]):
+            if  cfg.training.int.enabled and batch_idx > cfg.training.start_int and len(proc_out_inp[4]):
 
                 optim_dict['optim_int'].zero_grad()
                 ints = proc_out_inp[4]
@@ -180,7 +180,7 @@ def train(cfg,
             wandb.log({'AE Losses/int_loc': model.int_dist.int_loc.item()}, step=batch_idx)
             wandb.log({'AE Losses/theta': microscope.noise.theta.item()}, step=batch_idx)
 
-            if batch_idx > cfg.training.start_ae:
+            if batch_idx > cfg.training.start_mic:
                 if cfg.training.mic.enabled:
                     wandb.log({'AE Losses/p_x_given_z': log_p_x_given_z.detach().cpu()}, step=batch_idx)
                     wandb.log({'AE Losses/RMSE(rec)': torch.sqrt(((x-(ae_img+out_inp['background']))**2).mean()).detach().cpu()}, step=batch_idx)

@@ -24,17 +24,9 @@ model:
 post_proc_isi:
     _target_: decode_fish.funcs.output_trafo.ISIPostProcess
     m1_threshold: 0.03
-    samp_threshold: 0.7
+    samp_threshold: 0.5
     px_size_zyx: [300,100,100]
     diag: True
-    
-post_proc_si:
-    _target_: decode_fish.funcs.output_trafo.SIPostProcess
-    m1_threshold: 0.03
-    m2_threshold: 0.5
-    samp_threshold: 0.1
-    px_size_zyx: [300,100,100]
-    diag: False
     
 eval_routines:
     densities: True

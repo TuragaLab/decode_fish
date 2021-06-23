@@ -51,7 +51,7 @@ def my_app(cfg):
             sl = np.s_[:,:,:,:]
             basedir = '/groups/turaga/home/speisera/share_TUM/FishSIM/sim_density_fac1_2/'
 
-            densities = [250,500,1000,2000] #  [250,500, 1000, 2000, 4000]
+            densities = [250,500, 1000, 2000] #  [250,500, 1000, 2000, 4000]
             n_cells = 5
 
             g = f['eval_densities']    
@@ -67,14 +67,14 @@ def my_app(cfg):
                     img, gt_df, fq_nog_df, fq_gmm_df = load_sim_fish(basedir, d, 'random', 'NR', ind)
                     fq_gmm_df = crop_df(fq_gmm_df, sl, px_size_zyx=[300,100,100])
 
-                    df_col['GT'] = cat_emitter_dfs([df_col['GT'], gt_df])
-                    df_col['FQ'] = cat_emitter_dfs([df_col['FQ'], fq_gmm_df])
+                    df_col['GT'] = append_emitter_df(df_col['GT'], gt_df)
+                    df_col['FQ'] = append_emitter_df(df_col['FQ'], fq_gmm_df)
 
                     with torch.no_grad():
                         for m in model_names:
                             model = load_model_state(model, Path(model_dir + m)/'model.pkl')
                             dec_df = shift_df(post_proc.get_df(model.tensor_to_dict(model(img[sl][None].cuda()))), [-100,-100,-300])
-                            df_col[m] = cat_emitter_dfs([df_col[m], dec_df])
+                            df_col[m] = append_emitter_df(df_col[m], dec_df)
                             free_mem()
 
                 for k in df_col.keys():
@@ -106,15 +106,15 @@ def my_app(cfg):
                 df_col = {k:DF() for k in ['GT','FQ'] + model_names}
 
                 img, gt_df, fq_nog_df, fq_gmm_df = load_sim_fish(basedir, 100, 'foci', 'strong', ind)
-                df_col['GT'] = cat_emitter_dfs([df_col['GT'], nm_to_px(gt_df, px_size_zyx=[300,100,100])]) 
-                df_col['FQ'] = cat_emitter_dfs([df_col['FQ'], nm_to_px(fq_gmm_df, px_size_zyx=[300,100,100])]) 
+                df_col['GT'] = nm_to_px(gt_df, px_size_zyx=[300,100,100])
+                df_col['FQ'] = nm_to_px(fq_gmm_df, px_size_zyx=[300,100,100])
 
                 with torch.no_grad():
                     for m in model_names:
                         model = load_model_state(model, Path(model_dir + m)/'model.pkl')
                         res_dict = model.tensor_to_dict(model(img[None].cuda()))
                         dec_df = shift_df(post_proc.get_df(res_dict), [-100,-100,-300])
-                        df_col[m] = cat_emitter_dfs([df_col[m], nm_to_px(dec_df, px_size_zyx=[300,100,100])]) 
+                        df_col[m] = nm_to_px(dec_df, px_size_zyx=[300,100,100])
                         free_mem()
 
                 try:
@@ -178,8 +178,9 @@ def my_app(cfg):
                 psf_init = load_psf(train_cfg)
                 gg.create_dataset('init_psf', data=cpu(psf_init.psf_volume[0]))     
                 
-                psf_init.load_state_dict(torch.load(Path(train_cfg.output.save_dir)/'psf.pkl'))
-                gg.create_dataset('fit_psf', data=cpu(psf_init.psf_volume[0]))               
+                _, _, micro = load_psf_noise_micro(train_cfg)
+                micro.load_state_dict(torch.load(model_dir + m + '/microscope.pkl'))
+                gg.create_dataset('fit_psf', data=cpu(micro.psf.psf_volume[0]))               
                 
 if __name__ == "__main__":
     my_app()

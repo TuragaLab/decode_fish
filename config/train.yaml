@@ -20,11 +20,13 @@ output:
   
 data_path: 
     image_path: 
+    sm_fish_ch: 0
     psf_path: 
     model_init: 
     
 evaluation:
     image_path: ${data_path.image_path}
+    sm_fish_ch: ${data_path.sm_fish_ch}
     txt_path: 
     psf_path: 
     crop_sl: s_[:,:,:,:]
@@ -73,10 +75,10 @@ microscope:
 foci:
     _target_: decode_fish.funcs.dataset.AddFoci
     n_foci_avg: 0.
-    rad_range: [25,200]
-    n_mol_range: [5,30]
+    rad_range: [100,500]
+    n_mol_range: [5,40]
     px_size_zyx: ${evaluation.px_size_zyx}
-    mode: 'gaussian'
+    mode: 'bin'
     
 intensity_dist:
     int_conc: 3.
@@ -106,7 +108,8 @@ training:
     bs: 2
     start_iter: 0
     num_iters: 30000
-    start_ae: 0
+    start_int: 0
+    start_mic: 0 
     net:
         bl_loss_scale: 0.01
         cnt_loss_scale: 1

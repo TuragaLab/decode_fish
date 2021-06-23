@@ -148,7 +148,7 @@ def load_psf(cfg):
     if cfg.data_path.psf_path:
         if 'tif' in cfg.data_path.psf_path:
             psf_vol = load_tiff_image(cfg.data_path.psf_path)
-#             psf_vol = torch.log(psf_vol)
+            psf_vol = psf_vol/psf_vol.max()
             psf = LinearInterpolatedPSF(psf_vol.shape[-3:], cfg.PSF.device)
             psf = swap_psf_vol(psf, psf_vol)
 
@@ -184,7 +184,7 @@ def load_post_proc(cfg):
 
 def get_dataloader(cfg):
 
-    imgs_3d       = [load_tiff_image(f)[0] for f in sorted(glob.glob(cfg.data_path.image_path))]
+    imgs_3d       = [load_tiff_image(f)[cfg.data_path.sm_fish_ch] for f in sorted(glob.glob(cfg.data_path.image_path))]
     gen_bg        = [hydra.utils.instantiate(cfg.bg_estimation.smoothing)]
     if cfg.bg_estimation.fractal.scale:
         gen_bg.append(hydra.utils.instantiate(cfg.bg_estimation.fractal))
@@ -212,7 +212,7 @@ def get_dataloader(cfg):
         if cfg.foci.n_foci_avg > 0:
             rate_tfms.append(hydra.utils.instantiate(cfg.foci))
 
-    ds = DecodeDataset(path = cfg.data_path.image_path,
+    ds = DecodeDataset(volumes = imgs_3d,
                        dataset_tfms =  dataset_tfms,
                        rate_tfms = rate_tfms,
                        bg_tfms = gen_bg,

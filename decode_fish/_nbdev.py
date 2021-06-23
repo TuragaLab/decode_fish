@@ -100,7 +100,9 @@ index = {"number_of_features_per_level": "00_models.ipynb",
          "sim_data": "17_eval_routines.ipynb",
          "get_sim_perf": "17_eval_routines.ipynb",
          "get_reconstruction_from_df": "17_eval_routines.ipynb",
-         "predict": "18_predict_funcs.ipynb"}
+         "filt_perc": "17_eval_routines.ipynb",
+         "predict": "18_predict_funcs.ipynb",
+         "selective_predict": "18_predict_funcs.ipynb"}
 
 modules = ["engine/model.py",
            "engine/psf.py",

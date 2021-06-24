@@ -70,6 +70,7 @@ noise:
 microscope:
     _target_: decode_fish.engine.microscope.Microscope
     scale: 100
+    psf_noise: 0 
     norm: 'max'
     
 foci:

@@ -27,7 +27,9 @@ class sCMOS(nn.Module):
                  theta: float = 3.,
                  baseline: float = 0.):
         super().__init__()
-        self.theta = torch.nn.Parameter(torch.tensor(theta))
+
+        self.theta_scale = theta
+        self.theta_par = torch.nn.Parameter(torch.tensor(1.))
         self.register_buffer('baseline', torch.tensor(baseline))
 
     def forward(self, x_sim, background):
@@ -37,10 +39,12 @@ class sCMOS(nn.Module):
         """
 
         x_sim_background = x_sim + background
-        x_sim_background.clamp_(1.0)
+        x_sim_background.clamp_(1.0 + self.baseline)
 
-        conc = (x_sim_background - self.baseline) / self.theta
-        xsim_dist = D.Gamma(concentration=conc, rate=1 / self.theta)
+        theta = self.theta_scale * self.theta_par
+
+        conc = (x_sim_background - self.baseline) / theta
+        xsim_dist = D.Gamma(concentration=conc, rate=1 / theta)
 
         loc_trafo = [D.AffineTransform(loc=self.baseline, scale=1)]
         xsim_dist = D.TransformedDistribution(xsim_dist, loc_trafo)

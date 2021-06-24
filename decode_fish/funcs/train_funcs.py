@@ -178,7 +178,7 @@ def train(cfg,
             wandb.log({'AE Losses/int_mu': model.int_dist.int_conc.item()/model.int_dist.int_rate.item() + model.int_dist.int_loc.item()}, step=batch_idx)
             wandb.log({'AE Losses/int_rate': model.int_dist.int_rate.item()}, step=batch_idx)
             wandb.log({'AE Losses/int_loc': model.int_dist.int_loc.item()}, step=batch_idx)
-            wandb.log({'AE Losses/theta': microscope.noise.theta.item()}, step=batch_idx)
+            wandb.log({'AE Losses/theta': microscope.noise.theta_par.item()*microscope.noise.theta_scale}, step=batch_idx)
 
             if batch_idx > cfg.training.start_mic:
                 if cfg.training.mic.enabled:

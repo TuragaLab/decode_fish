@@ -39,7 +39,7 @@ class Microscope(nn.Module):
     """
 
 
-    def __init__(self, psf: torch.nn.Module=None, noise: Union[torch.nn.Module, None]=None, scale: float = 10000., norm='max', sum_fac=1):
+    def __init__(self, psf: torch.nn.Module=None, noise: Union[torch.nn.Module, None]=None, scale: float = 10000., norm='max', sum_fac=1, psf_noise=0):
 
         super().__init__()
         self.psf = psf
@@ -47,8 +47,15 @@ class Microscope(nn.Module):
         self.noise = noise
         self.norm = norm
 
-        self.theta = self.noise.theta
+        self.theta = self.noise.theta_scale * self.noise.theta_par
         self.sum_fac = sum_fac
+
+        self.psf_noise = psf_noise
+
+    def add_psf_noise(self, psf_stack):
+
+        noise = torch.distributions.Normal(loc=0, scale=self.psf_noise).sample(psf_stack.shape).to(psf_stack.device)
+        return psf_stack + noise
 
     def forward(self, locations, x_os_val, y_os_val, z_os_val, i_val, output_shape, eval_=None):
 
@@ -64,6 +71,9 @@ class Microscope(nn.Module):
             psf = self.psf(x_os_val, y_os_val, z_os_val)
             torch.clamp_min_(psf,0)
             psf = psf/psf_norm
+
+            if self.psf_noise: psf = self.add_psf_noise(psf)
+
             # applying intenseties
             tot_intensity = torch.clamp_min(i_val, 0)
             psf = psf * tot_intensity[:,None,None,None,None]

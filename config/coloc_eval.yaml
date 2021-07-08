@@ -1,0 +1,29 @@
+run_n: 3
+run_name: sep_models_${run_n}
+
+out_file: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/decode_fish/data/results/coloc_file_${run_name}.hdf5
+
+model_path_0: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm//models/fishcod/CL_dlg1/nb_run/CL_dlg1_ch0_${run_name}/
+model_path_1: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm//models/fishcod/CL_dlg1/nb_run/CL_dlg1_ch1_${run_name}/
+
+model_dir_0: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm//models/fishcod/CL_dlg1/sep_models_ch0_${run_n}/image_path:/groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/datasets/CodFish/raw_data_for_codetection/*
+model_dir_1: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm//models/fishcod/CL_dlg1/sep_models_ch1_${run_n}/image_path:/groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/datasets/CodFish/raw_data_for_codetection/*
+
+image_path: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/datasets/CodFish/raw_data_for_codetection/*.tiff
+         
+model:
+    _target_: decode_fish.engine.model.UnetDecodeNoBn
+    depth: 2
+    f_maps: 32
+    inp_scale: 
+    inp_offset: 
+    p_offset: -4.0
+    order: 'ce'
+    
+post_proc_isi:
+    _target_: decode_fish.funcs.output_trafo.ISIPostProcess
+    m1_threshold: 0.03
+    samp_threshold: 0.5
+    px_size_zyx: [100,100,100]
+    diag: True
+        

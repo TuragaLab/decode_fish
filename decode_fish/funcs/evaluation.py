@@ -57,7 +57,7 @@ def matching(target_df, pred_df, tolerance=500, print_res=True, eff_const=0.5):
 
     if len(pred_df):
 
-        for i in tqdm(range(0, pred_df['frame_idx'].max() + 1)):
+        for i in range(0, pred_df['frame_idx'].max() + 1):
 
             FC = 0
             sub_tar = target_df[target_df['frame_idx']==i].reset_index()
@@ -122,10 +122,11 @@ def matching(target_df, pred_df, tolerance=500, print_res=True, eff_const=0.5):
         print('{}{:0.3f}'.format('RMSE_vol: ', rmse_vol))
         print('{}{:0.3f}'.format('Eff_3d: ', eff_3d))
         print('FN: ' + str(np.round(FN)) + ' FP: ' + str(np.round(FP)))
+        print('{}{:0.3f}'.format('Num. matches: ', len(match_df)))
 
         print(f'Shift: {x_s:.2f},{y_s:.2f},{z_s:.2f}')
 
     perf_dict = {'recall': recall, 'precision': precision, 'jaccard': jaccard, 'rmse_vol': rmse_vol,
-            'rmse_x': rmse_x, 'rmse_y': rmse_y,  'rmse_z': rmse_z, 'eff_3d': eff_3d}
+            'rmse_x': rmse_x, 'rmse_y': rmse_y,  'rmse_z': rmse_z, 'eff_3d': eff_3d, 'n_matches':len(match_df)}
 
     return perf_dict, match_df, [x_s,y_s,z_s]

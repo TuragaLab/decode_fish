@@ -1,0 +1,39 @@
+run_n: 3
+run_name: p3_matl_${run_n}_bf_no_tx
+
+out_file: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/decode_fish/data/results/coloc_file_${run_name}.hdf5
+
+model_path_0: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm//models/fishcod/CL_dlg1/sep_models_ch0_${run_n}/image_path:/groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/datasets/CodFish/raw_data_for_codetection/*p3*.tiff/
+model_path_1: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm//models/fishcod/CL_dlg1/sep_models_ch1_${run_n}/image_path:/groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/datasets/CodFish/raw_data_for_codetection/*p3*.tiff/
+
+#model_path_0: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm//models/fishcod/CL_dlg1/nb_run/CL_dlg1_ch0_f1_psfn_5/
+#model_path_1: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm//models/fishcod/CL_dlg1/nb_run/CL_dlg1_ch1_f1_psfn_5/
+
+image_path: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/datasets/CodFish/raw_data_for_codetection/*p3*.tiff
+      
+#fq_path_0: /groups/turaga/home/speisera/share_TUM/coloc_data/results/*ch0_spots_th.txt
+#fq_path_1: /groups/turaga/home/speisera/share_TUM/coloc_data/results/*ch1_spots_th.txt
+
+fq_path_0: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/datasets/CodFish/raw_data_for_codetection/detections_rerun/YFP_ch1/*p3*.csv
+fq_path_1: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/datasets/CodFish/raw_data_for_codetection/detections_rerun/dlg1_ch2/*p3*.csv
+      
+model:
+    _target_: decode_fish.engine.model.UnetDecodeNoBn
+    depth: 2
+    f_maps: 32
+    inp_scale: 
+    inp_offset: 
+    p_offset: -4.0
+    order: 'ce'
+    
+post_proc_isi:
+    _target_: decode_fish.funcs.output_trafo.ISIPostProcess
+    m1_threshold: 0.03
+    samp_threshold: 0.5
+    px_size_zyx: [200,139,139]
+    diag: True
+
+filt_tx:
+    threshold: 62000
+    tx_size: [10,10,10]
+    px_size_zyx: ${post_proc_isi.px_size_zyx}

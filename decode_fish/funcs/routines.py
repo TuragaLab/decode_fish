@@ -85,10 +85,10 @@ def filt_perc(df, perc = 90, return_low=True, metric='comb_sig'):
     if perc >= 100:
         return df
     ret_df = DF()
-    for f in dec_df_col['frame_idx'].unique():
+    for f in df['frame_idx'].unique():
         frame_df = df[df['frame_idx']==f]
         filt_val = np.percentile(frame_df[metric], perc)
-        print(filt_val)
+#         print(filt_val)
         if return_low:
             frame_df = frame_df[frame_df[metric] < filt_val]
         else:

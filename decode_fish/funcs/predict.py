@@ -11,12 +11,12 @@ from monai.inferers import sliding_window_inference
 from .plotting import *
 
 # Cell
-def predict(model, post_proc, image_paths, window_size=[None,128,128], device='cuda'):
+def predict(model, post_proc, image_paths, sm_fish_ch=0, window_size=[None,128,128], device='cuda'):
     pred_df = DF()
     with torch.no_grad():
         for p in tqdm(image_paths):
             print(p.split('/')[-1])
-            img = load_tiff_image(p)
+            img = load_tiff_image(p)[sm_fish_ch]
             z, y, x = img.shape[-3:]
             img = img.reshape(-1,z,y,x)
             for i in range(len(img)):

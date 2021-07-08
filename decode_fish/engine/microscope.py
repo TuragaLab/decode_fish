@@ -9,6 +9,7 @@ from torch.jit import script
 from typing import Union, List
 import torch.nn.functional as F
 from ..funcs.plotting import *
+# import elasticdeform.torch as etorch
 
 # Cell
 class Microscope(nn.Module):
@@ -54,10 +55,21 @@ class Microscope(nn.Module):
 
     def add_psf_noise(self, psf_stack):
 
+        '''Gaussian noise'''
         noise = torch.distributions.Normal(loc=0, scale=self.psf_noise).sample(psf_stack.shape).to(psf_stack.device)
+        noise *= torch.sqrt(psf_stack)
+#         noise *= torch.rand(len(psf_stack), device='cuda')[:,None,None,None,None]
+
         return psf_stack + noise
 
-    def forward(self, locations, x_os_val, y_os_val, z_os_val, i_val, output_shape, eval_=None):
+        '''Individual elastic deformation for each PSF (to slow)'''
+#         psf_deformed = torch.cat([etorch.deform_grid(psf, torch.distributions.Normal(loc=0, scale=self.psf_noise).sample([3,3,3,3]).to(psf_stack.device), order=3)[None]
+#                                   for psf in psf_stack[:,0]])
+        '''Single deformation for all PSF in batch (kinda stupid)'''
+#         psf_deformed = etorch.deform_grid(psf_stack[:,0], torch.distributions.Normal(loc=0, scale=self.psf_noise).sample([3,3,3,3]).to(psf_stack.device), axis=(1,2,3),order=3)
+#         return psf_deformed[:,None]
+
+    def forward(self, locations, x_os_val, y_os_val, z_os_val, i_val, output_shape, eval_=None, add_noise=False):
 
         if len(locations[0]):
 
@@ -72,7 +84,8 @@ class Microscope(nn.Module):
             torch.clamp_min_(psf,0)
             psf = psf/psf_norm
 
-            if self.psf_noise: psf = self.add_psf_noise(psf)
+            if self.psf_noise and add_noise:
+                psf = self.add_psf_noise(psf)
 
             # applying intenseties
             tot_intensity = torch.clamp_min(i_val, 0)

@@ -134,7 +134,7 @@ class SIPostProcess(torch.nn.Module):
                  'z_sig': res_dict['xyzi_sigma'][:,[2]][locations]*self.px_size_zyx[2],
                  'comb_sig': torch.sqrt(res_dict['xyzi_sigma'][:,[0]][locations]**2
                                        +res_dict['xyzi_sigma'][:,[1]][locations]**2
-                                       +res_dict['xyzi_sigma'][:,[2]][locations])})
+                                       +res_dict['xyzi_sigma'][:,[2]][locations]**2)})
 
         return df
 
@@ -150,7 +150,7 @@ class SIPostProcess(torch.nn.Module):
         output_shape  = res_dict['Samples_si'].shape
         comb_sig = torch.sqrt(res_dict['xyzi_sigma'][:,[0]][locations]**2
                              +res_dict['xyzi_sigma'][:,[1]][locations]**2
-                             +res_dict['xyzi_sigma'][:,[2]][locations])
+                             +res_dict['xyzi_sigma'][:,[2]][locations]**2)
 
         return locations, x_os_3d, y_os_3d, z_os_3d, ints_3d, output_shape, comb_sig
 

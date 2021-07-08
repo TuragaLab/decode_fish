@@ -57,7 +57,8 @@ def get_peaks_3d(volume, threshold=500, min_distance=20):
         if valid:
             peaks.append(zyx)
 
-    return np.array(peaks)[:,::-1]
+    peak_df = DF(data=np.array(peaks)[:,::-1], columns=['x','y','z'])
+    return peak_df
 
 # Cell
 def plot_detection(volume, coordinates):

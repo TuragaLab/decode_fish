@@ -221,9 +221,6 @@ def load_post_proc(cfg):
 def get_dataloader(cfg):
 
     imgs_3d       = [load_tiff_image(f)[cfg.data_path.sm_fish_ch] for f in sorted(glob.glob(cfg.data_path.image_path))]
-    gen_bg        = [hydra.utils.instantiate(cfg.bg_estimation.smoothing)]
-    if cfg.bg_estimation.fractal.scale:
-        gen_bg.append(hydra.utils.instantiate(cfg.bg_estimation.fractal))
     roi_masks     = [get_roi_mask(img, tuple(cfg.roi_mask.pool_size), percentile= cfg.roi_mask.percentile) for img in imgs_3d]
 
     min_shape = tuple(np.stack([v.shape for v in imgs_3d]).min(0)[-3:])
@@ -232,12 +229,11 @@ def get_dataloader(cfg):
         crop_zyx = tuple(np.stack([min_shape, crop_zyx]).min(0))
         print('Crop size larger than volume in at least one dimension. Crop size changed to', crop_zyx)
 
-    rand_crop = RandomCrop3D(crop_zyx, roi_masks)
+    gen_bg        = [hydra.utils.instantiate(cfg.bg_estimation.smoothing, z_size=crop_zyx[0])]
+    if cfg.bg_estimation.fractal.scale:
+        gen_bg.append(hydra.utils.instantiate(cfg.bg_estimation.fractal))
 
-#     probmap_generator = ScaleTensor(low=cfg.prob_generator.low,
-#                                     high=cfg.prob_generator.high)
-#     rand_scale = RandScale(0.1,1.)
-#     rate_tfms = [gen_bg, probmap_generator, rand_scale]
+    rand_crop = RandomCrop3D(crop_zyx, roi_masks)
 
     probmap_generator = UniformValue(cfg.prob_generator.low, cfg.prob_generator.high)
     rate_tfms = [probmap_generator]

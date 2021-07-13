@@ -100,7 +100,11 @@ def gt_plot(x, pred_df, gt_df, px_size, gt_rec=None, psf=None, fig_size=(24,6)):
 
             if psf is not None:
                 plt.subplot(144)
-                im = plt.imshow(psf.psf_volume[0].detach().cpu().numpy().mean(1))
+                psf_vol = psf.psf_volume[0].detach().cpu().numpy()
+                if psf_vol.shape[0] == 1:
+                    im = plt.imshow(psf.psf_volume[0].detach().cpu().numpy().mean(0))
+                else:
+                    im = plt.imshow(psf.psf_volume[0].detach().cpu().numpy().mean(1))
                 plt.axis('off')
 
     return fig
@@ -148,14 +152,17 @@ def plot_3d_projections(volume, proj_func=np.max, size=6, vmax=None, display=Tru
 
     return fig, [ax_yx,ax_zx,ax_yz]
 
-def scat_3d_projections(axes, dfs, px_size_zyx=[1.,1.,1], s_fac=1.):
+def scat_3d_projections(axes, dfs, px_size_zyx=[1.,1.,1], s_fac=1., labels=None):
     colors = ['red','black','orange']
     markers = ['o','+','x']
+    if labels is None:
+        labels=[f'DF {i}' for i in range(3)]
+
     if not isinstance(dfs, list):
         dfs = [dfs]
     for i,df in enumerate(dfs):
         df = nm_to_px(df, px_size_zyx)
-        axes[0].scatter(df['x'],df['y'], color=colors[i], marker=markers[i], s=10*s_fac, label=f'DF {i}')
+        axes[0].scatter(df['x'],df['y'], color=colors[i], marker=markers[i], s=10*s_fac, label=labels[i])
         axes[1].scatter(df['x'],df['z'], color=colors[i], marker=markers[i], s=10*s_fac)
         axes[2].scatter(df['z'],df['y'], color=colors[i], marker=markers[i], s=10*s_fac)
     axes[0].legend()

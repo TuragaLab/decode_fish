@@ -108,7 +108,7 @@ def train(cfg,
 
         sim_vars = PointProcessUniform(local_rate, int_conc=model.int_dist.int_conc.detach(), int_rate=model.int_dist.int_rate.detach(), int_loc=model.int_dist.int_loc.detach(), sim_iters=5).sample()
         # sim_vars = locs_sl, x_os_sl, y_os_sl, z_os_sl, ints_sl, output_shape
-        xsim = microscope(*sim_vars, add_noise=True)
+        xsim = microscope(*sim_vars)
         xsim_noise = microscope.noise(xsim, background).sample()
 
         out_sim = model.tensor_to_dict(model(xsim_noise))
@@ -141,7 +141,7 @@ def train(cfg,
                 optim_dict['optim_mic'].zero_grad()
 
                 # Get autoencoder loss
-                ae_img = microscope(*proc_out_inp[:6], add_noise=False)
+                ae_img = microscope(*proc_out_inp[:6])
                 log_p_x_given_z = -microscope.noise(ae_img,out_inp['background']).log_prob(x).mean()
                 if cfg.training.mic.norm_reg:
                     log_p_x_given_z += cfg.training.mic.norm_reg * (microscope.psf.com_loss())
@@ -195,7 +195,7 @@ def train(cfg,
                 target_df = sample_to_df(*sim_vars[:5], px_size_zyx=px_size)
                 eval_logger(pred_df, target_df, batch_idx, data_str='Sim. ')
 
-                wandb.log({'Sim. Metrics/prob_fac': torch.sigmoid(out_sim['logits']).sum().item()/len(target_df)}, step=batch_idx)
+                wandb.log({'Sim. Metrics/prob_fac': torch.sigmoid(out_sim['logits']).sum().item()/(len(target_df)+0.1)}, step=batch_idx)
                 wandb.log({'Sim. Metrics/n_em_fac': len(pred_df)/len(target_df)}, step=batch_idx)
 #                 wandb.log({'Prob hist': wandb.Image(plot_prob_hist(out_sim))}, step=batch_idx)
 

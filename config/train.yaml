@@ -13,7 +13,7 @@ output:
     project: test
     group: nb_run 
     save_dir: ${base_dir}/models/fishcod/${output.project}/${output.group}/${run_name}
-    log_dir : ${base_dir}/decode_fish/runs/
+    log_dir : ${base_dir}/decode_fish/runsb
     log_figs : True
     log_interval: 100
     wandb_mode: online # offline , disabled
@@ -90,6 +90,7 @@ model:
     _target_: decode_fish.engine.model.UnetDecodeNoBn
     depth: 2
     f_maps: 32
+    is_2D: False
     inp_scale: 
     inp_offset: 
     p_offset: -4.0

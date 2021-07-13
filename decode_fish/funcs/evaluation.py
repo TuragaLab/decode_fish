@@ -7,6 +7,7 @@ from ..imports import *
 from .output_trafo import SIPostProcess
 from scipy.spatial.distance import cdist
 from  decode_fish.funcs.emitter_io import *
+from scipy.spatial import cKDTree
 
 # Cell
 def matching(target_df, pred_df, tolerance=500, print_res=True, eff_const=0.5):
@@ -62,30 +63,42 @@ def matching(target_df, pred_df, tolerance=500, print_res=True, eff_const=0.5):
             FC = 0
             sub_tar = target_df[target_df['frame_idx']==i].reset_index()
             sub_pred = pred_df[pred_df['frame_idx']==i].reset_index()
+
             tar_xyz = sub_tar[['x','y','z']]
             pred_xyz = sub_pred[['x','y','z']]
 
-            dist_arr = cdist(tar_xyz,pred_xyz)
+            u_dists = []
+            u_p_inds = []
+            u_t_inds = []
 
-            if dist_arr.size > 0:
-                r, c = np.unravel_index(dist_arr.argmin(), dist_arr.shape)
+            if len(tar_xyz) and len(pred_xyz):
 
-                while dist_arr[r,c] < tolerance:
+                tar_tree = cKDTree(tar_xyz)
+                pred_tree = cKDTree(pred_xyz)
+                sdm = tar_tree.sparse_distance_matrix(pred_tree, tolerance, output_type='ndarray')
 
-                    MSE_vol += dist_arr[r, c] ** 2
-                    TP += 1
-                    FC += 1
+                sort_inds = np.argsort(sdm['v'])
+                dists = sdm['v'][sort_inds]
+                t_inds = sdm['i'][sort_inds]
+                p_inds = sdm['j'][sort_inds]
 
-                    match_list.append(list(sub_tar.loc[r,tar_cols].values) + list(sub_pred.loc[c,pred_cols].values))
+                for d,p,t in zip(dists, p_inds, t_inds):
 
-                    dist_arr[r, :] = np.inf
-                    dist_arr[:, c] = np.inf
+                    if p not in u_p_inds and t not in u_t_inds:
+                        u_dists.append(d)
+                        u_p_inds.append(p)
+                        u_t_inds.append(t)
 
-                    r, c = np.unravel_index(dist_arr.argmin(), dist_arr.shape)
+            MSE_vol += (np.array(u_dists) ** 2).sum()
 
-            FP += len(pred_xyz) - FC
-            FN += len(tar_xyz) - FC
+            TP += len(u_t_inds)
 
+            FP += len(pred_xyz) - len(u_t_inds)
+            FN += len(tar_xyz) - len(u_t_inds)
+
+            if len(u_t_inds): match_list.append(np.concatenate([sub_tar.loc[u_t_inds,tar_cols].values, sub_pred.loc[u_p_inds,pred_cols].values], 1))
+
+    if len(match_list): match_list = np.concatenate(match_list, 0)
     match_df = pd.DataFrame(match_list, columns = ['tar_idx', 'frame_idx', 'x_tar', 'y_tar', 'z_tar', 'int_tar',
                                                    'pred_idx','prob_pred', 'x_pred','y_pred','z_pred','int_pred','x_sig_pred','y_sig_pred','z_sig_pred','int_sig_pred'])
 

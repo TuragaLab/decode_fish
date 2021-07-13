@@ -46,6 +46,7 @@ class PointProcessUniform(Distribution):
 
     def _sample(self, local_rate):
 
+        output_shape = tuple(local_rate.shape)
         local_rate = torch.clamp(local_rate,0.,1.)
         locations = D.Bernoulli(local_rate).sample()
         n_emitter = int(locations.sum().item())
@@ -55,7 +56,10 @@ class PointProcessUniform(Distribution):
         z_offset = D.Uniform(low=0 - zero_point_five, high=0 + zero_point_five).sample(sample_shape=[n_emitter])
         intensities = D.Gamma(self.int_conc, self.int_rate).sample(sample_shape=[n_emitter]).to(self.device) + self.int_loc
 
-        output_shape = tuple(locations.shape)
+        # If 2D data z-offset is 0
+        if output_shape[-3] == 1:
+            z_offset *= 0
+
         locations = locations.nonzero(as_tuple=False)
         return locations, x_offset, y_offset, z_offset, intensities, output_shape
 

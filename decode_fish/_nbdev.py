@@ -51,6 +51,7 @@ index = {"number_of_features_per_level": "00_models.ipynb",
          "print_class_signature": "08_dataset.ipynb",
          "TransformBase": "08_dataset.ipynb",
          "ScaleTensor": "08_dataset.ipynb",
+         "ShuffleChannel": "08_dataset.ipynb",
          "RandScale": "08_dataset.ipynb",
          "UniformValue": "08_dataset.ipynb",
          "get_forward_scaling": "08_dataset.ipynb",
@@ -108,7 +109,16 @@ index = {"number_of_features_per_level": "00_models.ipynb",
          "get_reconstruction_from_df": "17_eval_routines.ipynb",
          "filt_perc": "17_eval_routines.ipynb",
          "predict": "18_predict_funcs.ipynb",
-         "selective_predict": "18_predict_funcs.ipynb"}
+         "selective_predict": "18_predict_funcs.ipynb",
+         "index": "19_MERFISH_routines.ipynb",
+         "get_bin_code": "19_MERFISH_routines.ipynb",
+         "norm_features": "19_MERFISH_routines.ipynb",
+         "approximate_nearest_code": "19_MERFISH_routines.ipynb",
+         "code_from_groups": "19_MERFISH_routines.ipynb",
+         "get_bin_code_crossframe": "19_MERFISH_routines.ipynb",
+         "get_bin_code_frameiter": "19_MERFISH_routines.ipynb",
+         "get_bin_code_logorder": "19_MERFISH_routines.ipynb",
+         "plot_gene_numbers": "19_MERFISH_routines.ipynb"}
 
 modules = ["engine/model.py",
            "engine/psf.py",
@@ -127,7 +137,8 @@ modules = ["engine/model.py",
            "funcs/fit_psf.py",
            "funcs/visualization.py",
            "funcs/routines.py",
-           "funcs/predict.py"]
+           "funcs/predict.py",
+           "funcs/merfish_eval.py"]
 
 doc_url = "https://turagalab.github.io/decode_fish/"
 

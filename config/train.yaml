@@ -33,6 +33,11 @@ evaluation:
     img_ind: 0
     px_size_zyx: [100,100,100]
     
+merfish:
+    channels: 1
+    n_bits: 1
+    shuffle_ch: False
+    
 prob_generator:
     low: 1e-8
     high: 0.005
@@ -66,6 +71,7 @@ noise:
     _target_: decode_fish.engine.noise.sCMOS
     theta: 2. 
     baseline: 0.
+    channels: 1
     
 microscope:
     _target_: decode_fish.engine.microscope.Microscope
@@ -89,6 +95,7 @@ intensity_dist:
 model:
     _target_: decode_fish.engine.model.UnetDecodeNoBn
     depth: 2
+    ch_in: 1
     f_maps: 32
     is_2D: False
     inp_scale: 

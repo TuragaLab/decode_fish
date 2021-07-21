@@ -27,7 +27,7 @@ class PointProcessGaussian(Distribution):
         self.xyzi_mu = xyzi_mu
         self.xyzi_sigma = xyzi_sigma
 
-    def log_prob(self, locations, x_offset, y_offset, z_offset, intensities):
+    def log_prob(self, locations, x_offset, y_offset, z_offset, intensities, channel=0):
         """ Creates the distributions for the count and localization loss and evaluates the log probability for the given set of localizations under those distriubtions.
 
             Args:
@@ -39,6 +39,14 @@ class PointProcessGaussian(Distribution):
                 count_prob: count loss. Has langth of batch_size
                 spatial_prob: localizations loss. Has langth of batch_size
         """
+
+        if locations[1].max() > 0:
+            ch_inds = locations[1]==channel
+            locations = [l[ch_inds] for l in locations]
+            x_offset = x_offset[ch_inds]
+            y_offset = y_offset[ch_inds]
+            z_offset = z_offset[ch_inds]
+            intensities = intensities[ch_inds]
 
         batch_size = self.logits.shape[0]
         xyzi, s_mask = get_true_labels(batch_size, locations, x_offset, y_offset, z_offset, intensities)

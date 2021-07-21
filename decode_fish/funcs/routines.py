@@ -9,12 +9,12 @@ from .file_io import *
 from .emitter_io import *
 from .utils import *
 from .dataset import *
-from .output_trafo import *
 from .evaluation import *
 from .plotting import *
 from .visualization import *
 from torch.utils.data import DataLoader
 from ..engine.microscope import Microscope
+from .output_trafo import *
 from ..engine.point_process import PointProcessUniform
 import h5py
 
@@ -87,11 +87,12 @@ def filt_perc(df, perc = 90, return_low=True, metric='comb_sig'):
     ret_df = DF()
     for f in df['frame_idx'].unique():
         frame_df = df[df['frame_idx']==f]
-        filt_val = np.percentile(frame_df[metric], perc)
-#         print(filt_val)
+        m = frame_df[metric].copy()
         if return_low:
-            frame_df = frame_df[frame_df[metric] < filt_val]
+            filt_val = np.percentile(m, perc)
+            frame_df = frame_df[m < filt_val]
         else:
-            frame_df = frame_df[frame_df[metric] > filt_val]
+            filt_val = np.percentile(m, 100-perc)
+            frame_df = frame_df[m > filt_val]
         ret_df = ret_df.append(frame_df)
     return ret_df

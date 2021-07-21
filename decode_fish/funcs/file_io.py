@@ -220,7 +220,11 @@ def load_post_proc(cfg):
 
 def get_dataloader(cfg):
 
-    imgs_3d       = [load_tiff_image(f)[cfg.data_path.sm_fish_ch] for f in sorted(glob.glob(cfg.data_path.image_path))]
+    if cfg.data_path.sm_fish_ch is not None:
+        imgs_3d       = [load_tiff_image(f)[cfg.data_path.sm_fish_ch:cfg.data_path.sm_fish_ch+1] for f in sorted(glob.glob(cfg.data_path.image_path))]
+    else:
+        imgs_3d       = [load_tiff_image(f) for f in sorted(glob.glob(cfg.data_path.image_path))]
+
     roi_masks     = [get_roi_mask(img, tuple(cfg.roi_mask.pool_size), percentile= cfg.roi_mask.percentile) for img in imgs_3d]
 
     min_shape = tuple(np.stack([v.shape for v in imgs_3d]).min(0)[-3:])
@@ -230,6 +234,7 @@ def get_dataloader(cfg):
         print('Crop size larger than volume in at least one dimension. Crop size changed to', crop_zyx)
 
     gen_bg        = [hydra.utils.instantiate(cfg.bg_estimation.smoothing, z_size=crop_zyx[0])]
+
     if cfg.bg_estimation.fractal.scale:
         gen_bg.append(hydra.utils.instantiate(cfg.bg_estimation.fractal))
 

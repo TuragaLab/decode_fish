@@ -25,14 +25,21 @@ class sCMOS(nn.Module):
     """
     def __init__(self,
                  theta: float = 3.,
-                 baseline: float = 0.):
+                 baseline: float = 0.,
+                 channels: int = 0):
         super().__init__()
 
-        self.theta_scale = theta
-        self.theta_par = torch.nn.Parameter(torch.tensor(1.))
-        self.register_buffer('baseline', torch.tensor(baseline))
+        if channels:
+            self.theta_scale = theta * channels
+            self.theta_par = torch.nn.Parameter(torch.ones(channels)/channels)
+        else:
+            self.theta_scale = theta
+            self.theta_par = torch.nn.Parameter(torch.tensor(1.))
 
-    def forward(self, x_sim, background):
+        self.register_buffer('baseline', torch.tensor(baseline))
+        self.channels = channels
+
+    def forward(self, x_sim, background, ch_inds=[0]):
         """ Calculates the concentration (mean / theta) of a Gamma distribution given
         the signal x_sim and background tensors.
         Also applies a shift and returns resulting the Gamma distribution
@@ -41,7 +48,10 @@ class sCMOS(nn.Module):
         x_sim_background = x_sim + background
         x_sim_background.clamp_(1.0 + self.baseline)
 
-        theta = self.theta_scale * self.theta_par
+        if self.channels:
+            theta = (self.theta_scale * self.theta_par)[ch_inds].reshape([1,len(ch_inds),1,1,1])
+        else:
+            theta = (self.theta_scale * self.theta_par)
 
         conc = (x_sim_background - self.baseline) / theta
         xsim_dist = D.Gamma(concentration=conc, rate=1 / theta)

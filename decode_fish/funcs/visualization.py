@@ -19,7 +19,7 @@ from matplotlib.backends.backend_agg import FigureCanvas
 base_path =  '/groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/'
 
 # Cell
-def get_simulation_statistics(decode_dl, micro, int_conc, int_rate, int_loc, int_threshold=1, samples = 1):
+def get_simulation_statistics(decode_dl, micro, int_conc, int_rate, int_loc, int_threshold=1, samples = 1, channels=1, n_bits=1):
 
     """
     Draws a sample from the dataloader, and plots a slice of the real volume, the extracted background and
@@ -35,11 +35,12 @@ def get_simulation_statistics(decode_dl, micro, int_conc, int_rate, int_loc, int
                 x, local_rate, background = next(iter(decode_dl))
                 xmax = x[0,0,z_ind].max()
 
-            sim_vars = PointProcessUniform(local_rate, int_conc, int_rate, int_loc, sim_iters=5).sample()
+            sim_vars = PointProcessUniform(local_rate, int_conc, int_rate, int_loc, sim_iters=5, channels=channels, n_bits=n_bits).sample()
             xsim = micro(*sim_vars)
             xsim = micro.noise(xsim, background).sample()
             sim_df = sample_to_df(*sim_vars[:-1], px_size_zyx=[1.,1.,1.])
             sim_df = sim_df[sim_df['frame_idx'] == 0]
+            sim_df = sim_df[sim_df['ch_idx'] == 0]
 
             fig, axes = plt.subplots(ncols=3, figsize=(15,5))
             fig.suptitle('z slice', fontsize=15, y=0.96)

@@ -23,15 +23,17 @@ class PointProcessUniform(Distribution):
             This results in the same average number of sampled emitters but allows us to sample multiple emitters within one voxel.
 
     """
-    def __init__(self, local_rate: torch.tensor, int_conc=0., int_rate=1., int_loc=1., sim_iters: int = 5):
+    def __init__(self, local_rate: torch.tensor, int_conc=0., int_rate=1., int_loc=1., sim_iters: int = 5, channels=1, n_bits=1):
 
-        assert sim_iters > 1
+        assert sim_iters >= 1
         self.local_rate = local_rate
         self.device = self._get_device(self.local_rate)
         self.sim_iters = sim_iters
         self.int_conc = int_conc
         self.int_rate = int_rate
         self.int_loc = int_loc
+        self.channels = channels
+        self.n_bits = n_bits
 
     def sample(self):
 
@@ -46,7 +48,7 @@ class PointProcessUniform(Distribution):
 
     def _sample(self, local_rate):
 
-        output_shape = tuple(local_rate.shape)
+        output_shape = list(local_rate.shape)
         local_rate = torch.clamp(local_rate,0.,1.)
         locations = D.Bernoulli(local_rate).sample()
         n_emitter = int(locations.sum().item())
@@ -54,14 +56,27 @@ class PointProcessUniform(Distribution):
         x_offset = D.Uniform(low=0 - zero_point_five, high=0 + zero_point_five).sample(sample_shape=[n_emitter])
         y_offset = D.Uniform(low=0 - zero_point_five, high=0 + zero_point_five).sample(sample_shape=[n_emitter])
         z_offset = D.Uniform(low=0 - zero_point_five, high=0 + zero_point_five).sample(sample_shape=[n_emitter])
-        intensities = D.Gamma(self.int_conc, self.int_rate).sample(sample_shape=[n_emitter]).to(self.device) + self.int_loc
+        intensities = D.Gamma(self.int_conc, self.int_rate).sample(sample_shape=[n_emitter*self.n_bits]).to(self.device) + self.int_loc
 
         # If 2D data z-offset is 0
         if output_shape[-3] == 1:
             z_offset *= 0
 
         locations = locations.nonzero(as_tuple=False)
-        return locations, x_offset, y_offset, z_offset, intensities, output_shape
+
+        if self.channels > 1:
+            ch_draw = torch.multinomial(torch.ones([n_emitter,self.channels])/self.channels, self.n_bits, replacement=False)
+            locations = locations.repeat_interleave(self.n_bits, 0)
+            locations[:, 1] = ch_draw.reshape(-1)
+
+            # Exact positions are shared, but not intensities. Problems due to drift?
+            x_offset = x_offset.repeat_interleave(self.n_bits, 0)
+            y_offset = y_offset.repeat_interleave(self.n_bits, 0)
+            z_offset = z_offset.repeat_interleave(self.n_bits, 0)
+
+            output_shape[1] = self.channels
+
+        return locations, x_offset, y_offset, z_offset, intensities, tuple(output_shape)
 
 
     def log_prob(self, locations, x_offset=None, y_offset=None, z_offset=None, intensities=None, output_shape=None):

@@ -50,7 +50,7 @@ def approximate_nearest_code(ref_code, pred_code, targets):
     metric_output, indices = nn.kneighbors(pred_code)
     gene_ids = np.ravel(targets.values[indices])
 
-    return np.ravel(metric_output), gene_ids
+    return np.ravel(metric_output), gene_ids, indices
 
 # Cell
 def code_from_groups(loc_df):

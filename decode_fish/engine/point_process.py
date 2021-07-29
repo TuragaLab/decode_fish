@@ -60,7 +60,8 @@ class PointProcessUniform(Distribution):
 
         # If 2D data z-offset is 0
         if output_shape[-3] == 1:
-            z_offset *= 0
+#             z_offset *= 0
+            z_offset += 0.5
 
         locations = locations.nonzero(as_tuple=False)
 

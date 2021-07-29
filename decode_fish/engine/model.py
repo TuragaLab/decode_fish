@@ -443,6 +443,8 @@ class OutputNet(nn.Module):
     def __init__(self, f_maps=64, p_offset=-5., is_2D=False):
         super().__init__()
 
+        self.is_2D = is_2D
+
         kernel_size = [1,3,3] if is_2D else [3,3,3]
         padding = [0,1,1] if is_2D else [1,1,1]
 
@@ -477,7 +479,13 @@ class OutputNet(nn.Module):
         xyzi = F.elu(self.xyzi_out1(x))
         xyzi = self.xyzi_out2(xyzi)
 
-        xyz_mu   = torch.tanh(xyzi[:, :3])
+        if not self.is_2D:
+            xyz_mu   = torch.tanh(xyzi[:, :3])
+        else:
+            xy_mu   = torch.tanh(xyzi[:, :2])
+            z_mu   = torch.sigmoid(xyzi[:, 2:3])
+            xyz_mu = torch.cat((xy_mu, z_mu), dim=1)
+
         i_mu     = F.softplus(xyzi[:, 3:])
         xyzi_mu = torch.cat((xyz_mu, i_mu), dim=1)
 
@@ -556,10 +564,10 @@ class UnetDecodeNoBn(nn.Module):
 #         x[:,4] = x[:,4] + float(self.int_dist.int_loc.detach()) + 0.01
         x[:,9] = x[:,9] * self.inp_scale
 
-        if self.is_2D:
-            x[:,3] *= 0
-            x[:,7] *= 0
-            x[:,7] += 1
+#         if self.is_2D:
+#             x[:,3] *= 0
+#             x[:,7] *= 0
+#             x[:,7] += 1
 
         return {'logits': x[:,0:1],
                 'xyzi_mu': x[:,1:5],

@@ -5,6 +5,7 @@ __all__ = ['Microscope', 'place_psf']
 # Cell
 from ..imports import *
 import torch.nn as nn
+from ..funcs.utils import *
 from torch.jit import script
 from typing import Union, List
 import torch.nn.functional as F
@@ -40,7 +41,7 @@ class Microscope(nn.Module):
     """
 
 
-    def __init__(self, psf: torch.nn.Module=None, noise: Union[torch.nn.Module, None]=None, scale: float = 10000., norm='max', sum_fac=1, psf_noise=0):
+    def __init__(self, psf: torch.nn.Module=None, noise: Union[torch.nn.Module, None]=None, scale: float = 10000., norm='max', sum_fac=1, psf_noise=0, is_2D=False):
 
         super().__init__()
         self.psf = psf
@@ -52,6 +53,8 @@ class Microscope(nn.Module):
         self.sum_fac = sum_fac
 
         self.psf_noise = psf_noise
+        self.is_2D = is_2D
+        self.psf_z_size = self.psf.psf_volume.shape[-3]//2
 
     def add_psf_noise(self, psf_stack):
 
@@ -80,7 +83,14 @@ class Microscope(nn.Module):
             else:
                 psf_norm = 1
             # Apply continuous shift
-            psf = self.psf(x_os_val, y_os_val, z_os_val)
+            if not self.is_2D:
+                psf = self.psf(x_os_val, y_os_val, z_os_val)
+            else:
+                z_scaled = z_os_val * self.psf_z_size
+                psf = self.psf(x_os_val, y_os_val, z_scaled%1.)
+                z_inds = (z_scaled//1 + self.psf_z_size + 1).type(torch.cuda.LongTensor)
+                psf = psf[torch.arange(len(z_os_val)),:,z_inds][:,:,None]
+
             torch.clamp_min_(psf,0)
             psf = psf/psf_norm
 

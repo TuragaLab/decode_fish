@@ -175,7 +175,7 @@ def train(cfg,
                 ints = torch.clamp_min(ints, model.int_dist.int_loc.detach() + 0.01)
 
                 gamma_int = D.Gamma(model.int_dist.int_conc, model.int_dist.int_rate)
-                loc_train = model.int_dist.int_loc.detach()
+                loc_train = model.int_dist.int_loc
                 loc_trafo = [D.AffineTransform(loc=loc_train, scale=1)]
                 int_loss = -D.TransformedDistribution(gamma_int, loc_trafo).log_prob(ints.detach()).mean()
 

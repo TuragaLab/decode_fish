@@ -22,10 +22,7 @@ import wandb
 def my_app(cfg):
 
     """ General setup """
-    
-    print(cfg.model)
-    
-    """
+    print(cfg.data_path)
     seed_everything(cfg.seed)
     
     img_3d, decode_dl = get_dataloader(cfg)
@@ -89,8 +86,6 @@ def my_app(cfg):
          dl=decode_dl, 
          optim_dict=optim_dict, 
          eval_dict=eval_dict)
-         
-    """
 
 if __name__ == "__main__":
     my_app()

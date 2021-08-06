@@ -1,0 +1,7 @@
+name: merfish
+shuffle_ch : True
+channels : 16
+n_bits : 4
+is_2D: True
+pred_z: False
+sm_fish_ch: 0

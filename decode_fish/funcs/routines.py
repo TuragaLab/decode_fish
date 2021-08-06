@@ -35,7 +35,7 @@ def add_df_to_hdf5(parent, name, df):
         g.create_dataset(k, data=df[k].values)
 
 # Cell
-def sim_data(decode_dl, batches, micro, model):
+def sim_data(decode_dl, batches, micro, model, channels=1, n_bits=1, sim_z=True):
 
     gt_dfs = []
     xsim_col = []
@@ -43,13 +43,15 @@ def sim_data(decode_dl, batches, micro, model):
     for _ in range(batches):
         with torch.no_grad():
             x, local_rate, background = next(iter(decode_dl))
-            sim_vars = PointProcessUniform(local_rate,model.int_dist.int_conc, model.int_dist.int_rate, model.int_dist.int_loc).sample()
+            sim_vars = PointProcessUniform(local_rate,model.int_dist.int_conc, model.int_dist.int_rate, model.int_dist.int_loc, channels=channels, n_bits=n_bits, sim_z=sim_z).sample()
             xsim = micro(*sim_vars)
             x = micro.noise(xsim, background).sample()
 
             xsim_col.append(x)
             gt_vars = sim_vars[:-1]
-            gt_dfs.append(sample_to_df(*gt_vars, px_size_zyx=[1.,1.,1.]))
+            gt_df = sample_to_df(*gt_vars, px_size_zyx=[1.,1.,1.])
+            gt_df = gt_df[gt_df['ch_idx'] ==0]
+            gt_dfs.append(gt_df)
 
     return torch.cat(xsim_col), cat_emitter_dfs(gt_dfs, decode_dl.batch_size)
 

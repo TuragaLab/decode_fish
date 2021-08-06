@@ -224,8 +224,12 @@ def load_post_proc(cfg):
 
 def get_dataloader(cfg):
 
-    if cfg.data_path.sm_fish_ch is not None:
-        imgs_3d       = [load_tiff_image(f)[cfg.data_path.sm_fish_ch:cfg.data_path.sm_fish_ch+1] for f in sorted(glob.glob(cfg.data_path.image_path))]
+    if  cfg.exp_type.name == 'smfish':
+        if not cfg.exp_type.ch_to_batch:
+            imgs_3d = [load_tiff_image(f)[cfg.exp_type.sm_fish_ch:cfg.exp_type.sm_fish_ch+1] for f in sorted(glob.glob(cfg.data_path.image_path))]
+        else:
+            imgs_3d = [load_tiff_image(f) for f in sorted(glob.glob(cfg.data_path.image_path))]
+            imgs_3d = [img.shape([-1,1,img.shape[-3],img.shape[-2],img.shape[-1]]) for img in imgs_3d]
     else:
         imgs_3d       = [load_tiff_image(f) for f in sorted(glob.glob(cfg.data_path.image_path))]
 

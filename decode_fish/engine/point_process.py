@@ -23,7 +23,7 @@ class PointProcessUniform(Distribution):
             This results in the same average number of sampled emitters but allows us to sample multiple emitters within one voxel.
 
     """
-    def __init__(self, local_rate: torch.tensor, int_conc=0., int_rate=1., int_loc=1., sim_iters: int = 5, channels=1, n_bits=1):
+    def __init__(self, local_rate: torch.tensor, int_conc=0., int_rate=1., int_loc=1., sim_iters: int = 5, channels=1, n_bits=1, sim_z=True):
 
         assert sim_iters >= 1
         self.local_rate = local_rate
@@ -34,6 +34,7 @@ class PointProcessUniform(Distribution):
         self.int_loc = int_loc
         self.channels = channels
         self.n_bits = n_bits
+        self.sim_z=sim_z
 
     def sample(self):
 
@@ -59,9 +60,8 @@ class PointProcessUniform(Distribution):
         intensities = D.Gamma(self.int_conc, self.int_rate).sample(sample_shape=[n_emitter*self.n_bits]).to(self.device) + self.int_loc
 
         # If 2D data z-offset is 0
-        if output_shape[-3] == 1:
-#             z_offset *= 0
-            z_offset += 0.5
+        if not self.sim_z:
+            z_offset *= 0
 
         locations = locations.nonzero(as_tuple=False)
 

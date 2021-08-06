@@ -1,12 +1,13 @@
-device:
-    gpu_device: cuda 
-  
+defaults:
+    - exp_type: smfish
+
 base_dir: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/
 run_name: test/test_sub
-
 cfg_path: ${base_dir}/decode_fish/config/train.yaml
-
 seed: 0
+
+device:
+    gpu_device: cuda 
   
 output:
     project: test
@@ -19,23 +20,17 @@ output:
   
 data_path: 
     image_path: 
-    sm_fish_ch: 0
     psf_path: 
     model_init: 
     
 evaluation:
     image_path: ${data_path.image_path}
-    sm_fish_ch: ${data_path.sm_fish_ch}
+    sm_fish_ch: ${exp_type.sm_fish_ch}
     txt_path: 
     psf_path: 
     crop_sl: s_[:,:,:,:]
     img_ind: 0
     px_size_zyx: [100,100,100]
-
-merfish:
-    channels: 1
-    n_bits: 1
-    shuffle_ch: True
     
 prob_generator:
     low: 1e-8
@@ -65,17 +60,19 @@ PSF:
     device: ${device.gpu_device}
     gauss_radii: [1.,1.,1.]
     psf_extent_zyx : [21,21,21]
+    abs_z: False
     
 noise:
     _target_: decode_fish.engine.noise.sCMOS
     theta: 2. 
     baseline: 0.
-    channels: 1
+    channels: ${exp_type.channels} 
     
 microscope:
     _target_: decode_fish.engine.microscope.Microscope
     scale: 100
     psf_noise: 0.1
+    pred_z: ${exp_type.pred_z} 
     norm: 'max'
     
 foci:
@@ -94,10 +91,10 @@ intensity_dist:
 model:
     _target_: decode_fish.engine.model.UnetDecodeNoBn
     depth: 2
-    ch_in: 1
+    ch_in: ${exp_type.channels} 
     f_maps: 32
-    is_2D: False
-    pred_z: True
+    is_2D: ${exp_type.is_2D}
+    pred_z: ${exp_type.pred_z}
     inp_scale: 
     inp_offset: 
     p_offset: -4.0

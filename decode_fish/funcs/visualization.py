@@ -42,24 +42,26 @@ def get_simulation_statistics(decode_dl, micro, int_conc, int_rate, int_loc, int
             sim_df = sim_df[sim_df['frame_idx'] == 0]
             sim_df = sim_df[sim_df['ch_idx'] == 0]
 
-            fig, axes = plt.subplots(ncols=3, figsize=(15,5))
-            fig.suptitle('z slice', fontsize=15, y=0.96)
-
             x = cpu(x[0,0])
             xsim = cpu(xsim[0,0])
 
-            im = axes[0].imshow(x[z_ind])
-            add_colorbar(im)
-            axes[0].set_title('Recording')
+            if xsim.shape[-3] > 1:
 
-            im = axes[1].imshow(cpu(background[0,0])[z_ind])
-            add_colorbar(im)
-            axes[1].set_title('Background')
+                fig, axes = plt.subplots(ncols=3, figsize=(15,5))
+                fig.suptitle('z slice', fontsize=15, y=0.96)
 
-            im = axes[2].imshow(xsim[z_ind])
-            add_colorbar(im)
-            axes[2].set_title('Simulation')
-            plt.show()
+                im = axes[0].imshow(x[z_ind])
+                add_colorbar(im)
+                axes[0].set_title('Recording')
+
+                im = axes[1].imshow(cpu(background[0,0])[z_ind])
+                add_colorbar(im)
+                axes[1].set_title('Background')
+
+                im = axes[2].imshow(xsim[z_ind])
+                add_colorbar(im)
+                axes[2].set_title('Simulation')
+                plt.show()
 
             fig1, axes = plot_3d_projections(x, display=False)
             fig2, axes = plot_3d_projections(xsim, display=False)
@@ -88,9 +90,13 @@ def get_prediction(model, post_proc, img, micro=None, cuda=True, return_rec=Fals
 
         return pred_df
 
-def eval_random_crop(decode_dl, model, post_proc, micro, proj_func=np.max, cuda=False, samples=1, int_threshold=1):
+def eval_random_crop(decode_dl, model, post_proc, micro, proj_func=np.max, cuda=False, samples=1, int_threshold=1, plot='rec', crop_sz_xy=40, ret_preds=False):
 
     with torch.no_grad():
+
+        decode_dl.dataset.dataset_tfms[0].crop_sz = (decode_dl.dataset.dataset_tfms[0].crop_sz[0], crop_sz_xy, crop_sz_xy)
+
+        if ret_preds: samples = 1
 
         for _ in range(samples):
 
@@ -106,11 +112,26 @@ def eval_random_crop(decode_dl, model, post_proc, micro, proj_func=np.max, cuda=
             fig1, axes = plot_3d_projections(x, proj_func=proj_func, display=False)
             scat_3d_projections(axes, [pred_df])
 
-            diff = abs(x-rec)
-            fig2, axes = plot_3d_projections(diff, proj_func=proj_func, display=False)
-            rmse = np.sqrt(((diff)**2).mean())
+            if 'res' in plot:
 
-            combine_figures([fig1,fig2], ['Predictions', 'Residual'], figsize=(20,10))
+                diff = abs(x-rec)
+                fig2, axes = plot_3d_projections(diff, proj_func=proj_func, display=False)
+                combine_figures([fig1,fig2], ['Predictions', 'Residual'], figsize=(20,10))
+
+            if 'rec' in plot:
+
+                fig2, axes = plot_3d_projections(rec, proj_func=proj_func, display=False)
+                combine_figures([fig1,fig2], ['Predictions', 'Reconstruction'], figsize=(20,10))
+
+            if 'bg' in plot:
+
+                fig2, axes = plot_3d_projections(res_dict['background'], proj_func=proj_func, display=False)
+                combine_figures([fig1,fig2], ['Predictions', 'BG pred.'], figsize=(20,10))
+
+        if ret_preds:
+
+            return pred_df, rec, res_dict
+
 
 def eval_random_sim(decode_dl, model, post_proc, micro, proj_func=np.max, plot_gt=True, cuda=True, samples=1):
 

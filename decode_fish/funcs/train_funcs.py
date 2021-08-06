@@ -21,6 +21,8 @@ from ..engine.point_process import PointProcessUniform
 from ..engine.gmm_loss import PointProcessGaussian
 import shutil
 import wandb
+
+from hydra import compose, initialize
 # from decode_fish.funcs.visualization vimport get_simulation_statistics
 
 # Cell
@@ -111,17 +113,19 @@ def train(cfg,
         optim_dict['optim_net'].zero_grad()
 
         sim_vars = PointProcessUniform(local_rate, int_conc=model.int_dist.int_conc.detach(), int_rate=model.int_dist.int_rate.detach(), int_loc=model.int_dist.int_loc.detach(),
-                                       sim_iters=5, channels=cfg.merfish.channels, n_bits=cfg.merfish.n_bits).sample()
+                                       sim_iters=5, channels=cfg.exp_type.channels, n_bits=cfg.exp_type.n_bits, sim_z=cfg.exp_type.pred_z).sample()
+
         # sim_vars = locs_sl, x_os_sl, y_os_sl, z_os_sl, ints_sl, output_shape
         xsim = microscope(*sim_vars, add_noise=True)
         xsim_noise = microscope.noise(xsim, background).sample()
 
         ch_inds = [0]
-        if cfg.merfish.shuffle_ch:
-            ch_inds = torch.randperm(xsim_noise.shape[1])
-            xsim_noise = xsim_noise[:,ch_inds]
-            x = x[:,ch_inds]
-            background =  background[:, ch_inds]
+        if cfg.exp_type.name == 'merfish':
+            if cfg.exp_type.shuffle_ch:
+                ch_inds = torch.randperm(xsim_noise.shape[1])
+                xsim_noise = xsim_noise[:,ch_inds]
+                x = x[:,ch_inds]
+                background =  background[:, ch_inds]
 
         out_sim = model.tensor_to_dict(model(xsim_noise))
 

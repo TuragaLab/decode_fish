@@ -479,12 +479,7 @@ class OutputNet(nn.Module):
         xyzi = F.elu(self.xyzi_out1(x))
         xyzi = self.xyzi_out2(xyzi)
 
-        if not self.is_2D:
-            xyz_mu   = torch.tanh(xyzi[:, :3])
-        else:
-            xy_mu   = torch.tanh(xyzi[:, :2])
-            z_mu   = torch.sigmoid(xyzi[:, 2:3])
-            xyz_mu = torch.cat((xy_mu, z_mu), dim=1)
+        xyz_mu   = torch.tanh(xyzi[:, :3])
 
         i_mu     = F.softplus(xyzi[:, 3:])
         xyzi_mu = torch.cat((xyz_mu, i_mu), dim=1)
@@ -533,7 +528,7 @@ class UnetDecodeNoBn(nn.Module):
 
 
     """
-    def __init__(self, ch_in=1, ch_out=10, depth=3, inp_scale=1., inp_offset=0., order='ce', f_maps=64, is_2D=False, p_offset=-5.,
+    def __init__(self, ch_in=1, ch_out=10, depth=3, inp_scale=1., inp_offset=0., order='ce', f_maps=64, is_2D=False, pred_z=True, p_offset=-5.,
                 int_conc=4., int_rate=1., int_loc=1.):
         super().__init__()
 
@@ -541,6 +536,7 @@ class UnetDecodeNoBn(nn.Module):
         self.inp_offset = inp_offset
 
         self.is_2D = is_2D
+        self.pred_z = pred_z
 
         self.unet = UNet3D(ch_in, ch_out, final_sigmoid=False, num_levels=depth, is_2D=is_2D,
                            layer_order = order, f_maps=f_maps)
@@ -564,10 +560,10 @@ class UnetDecodeNoBn(nn.Module):
 #         x[:,4] = x[:,4] + float(self.int_dist.int_loc.detach()) + 0.01
         x[:,9] = x[:,9] * self.inp_scale
 
-#         if self.is_2D:
-#             x[:,3] *= 0
-#             x[:,7] *= 0
-#             x[:,7] += 1
+        if not self.pred_z:
+            x[:,3] *= 0
+            x[:,7] *= 0
+            x[:,7] += 1
 
         return {'logits': x[:,0:1],
                 'xyzi_mu': x[:,1:5],

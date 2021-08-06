@@ -41,7 +41,7 @@ class Microscope(nn.Module):
     """
 
 
-    def __init__(self, psf: torch.nn.Module=None, noise: Union[torch.nn.Module, None]=None, scale: float = 10000., norm='max', sum_fac=1, psf_noise=0, is_2D=False):
+    def __init__(self, psf: torch.nn.Module=None, noise: Union[torch.nn.Module, None]=None, scale: float = 10000., norm='max', sum_fac=1, psf_noise=0, pred_z=False):
 
         super().__init__()
         self.psf = psf
@@ -53,7 +53,7 @@ class Microscope(nn.Module):
         self.sum_fac = sum_fac
 
         self.psf_noise = psf_noise
-        self.is_2D = is_2D
+        self.pred_z = pred_z
         self.psf_z_size = self.psf.psf_volume.shape[-3]//2
 
     def add_psf_noise(self, psf_stack):
@@ -83,13 +83,13 @@ class Microscope(nn.Module):
             else:
                 psf_norm = 1
             # Apply continuous shift
-            if not self.is_2D:
-                psf = self.psf(x_os_val, y_os_val, z_os_val)
-            else:
-                z_scaled = z_os_val * self.psf_z_size
+            if self.pred_z and self.psf_z_size > 1:
+                z_scaled = (z_os_val + 0.5) * self.psf_z_size
                 psf = self.psf(x_os_val, y_os_val, z_scaled%1.)
                 z_inds = (z_scaled//1 + self.psf_z_size + 1).type(torch.cuda.LongTensor)
                 psf = psf[torch.arange(len(z_os_val)),:,z_inds][:,:,None]
+            else:
+                psf = self.psf(x_os_val, y_os_val, z_os_val)
 
             torch.clamp_min_(psf,0)
             psf = psf/psf_norm

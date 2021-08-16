@@ -293,12 +293,6 @@ class Abstract3DUNet(nn.Module):
     Base class for standard and residual UNet.
     Args:
         in_channels (int): number of input channels
-        out_channels (int): number of output segmentation masks;
-            Note that that the of out_channels might correspond to either
-            different semantic classes or to different binary segmentation mask.
-            It's up to the user of the class to interpret the out_channels and
-            use the proper loss criterion during training (i.e. CrossEntropyLoss (multi-class)
-            or BCEWithLogitsLoss (two-class) respectively)
         f_maps (int, tuple): number of feature maps at each level of the encoder; if it's an integer the number
             of feature maps is given by the geometric progression: f_maps ^ k, k=1,2,3,4
         final_sigmoid (bool): if True apply element-wise nn.Sigmoid after the
@@ -322,7 +316,7 @@ class Abstract3DUNet(nn.Module):
         conv_padding (int or tuple): add zero-padding added to all three sides of the input
     """
 
-    def __init__(self, in_channels, out_channels, final_sigmoid, basic_module, f_maps=64, is_2D=False, layer_order='gcr',
+    def __init__(self, in_channels, final_sigmoid, basic_module, f_maps=64, is_2D=False, layer_order='gcr',
                  num_groups=8, num_levels=4, is_segmentation=True, testing=False,
                  conv_kernel_size=3, pool_kernel_size=2, conv_padding=1, **kwargs):
         super(Abstract3DUNet, self).__init__()
@@ -412,9 +406,9 @@ class UNet3D(Abstract3DUNet):
     Uses `DoubleConv` as a basic_module and nearest neighbor upsampling in the decoder
     """
 
-    def __init__(self, in_channels, out_channels, final_sigmoid=True, f_maps=64, is_2D=False, layer_order='gcr',
+    def __init__(self, in_channels, final_sigmoid=True, f_maps=64, is_2D=False, layer_order='gcr',
                  num_groups=8, num_levels=4, is_segmentation=True, conv_padding=1,  **kwargs):
-        super(UNet3D, self).__init__(in_channels=in_channels, out_channels=out_channels, final_sigmoid=final_sigmoid,
+        super(UNet3D, self).__init__(in_channels=in_channels, final_sigmoid=final_sigmoid,
                                      basic_module=DoubleConv, f_maps=f_maps, is_2D=is_2D, layer_order=layer_order,
                                      num_groups=num_groups, num_levels=num_levels, is_segmentation=is_segmentation,
                                      conv_padding=conv_padding, **kwargs)
@@ -440,10 +434,14 @@ class OutputNet(nn.Module):
         f_maps: number of channels of the U-net output
         p_offset: probability channel bias
     """
-    def __init__(self, f_maps=64, p_offset=-5., is_2D=False):
+    def __init__(self, f_maps=64, p_offset=-5., is_2D=False, code_inf=False):
         super().__init__()
 
         self.is_2D = is_2D
+        self.code_inf = code_inf
+
+        xyzi_dim = 19 if code_inf else 4
+        bg_dim = 16 if code_inf else 1
 
         kernel_size = [1,3,3] if is_2D else [3,3,3]
         padding = [0,1,1] if is_2D else [1,1,1]
@@ -453,13 +451,13 @@ class OutputNet(nn.Module):
         nn.init.constant_(self.p_out2.bias,p_offset)
 
         self.xyzi_out1 = nn.Conv3d(f_maps, f_maps, kernel_size=kernel_size, padding=padding)
-        self.xyzi_out2 = nn.Conv3d(f_maps, 4, kernel_size=1, padding=0)
+        self.xyzi_out2 = nn.Conv3d(f_maps, xyzi_dim, kernel_size=1, padding=0)
 
         self.xyzis_out1 = nn.Conv3d(f_maps, f_maps, kernel_size=kernel_size, padding=padding)
-        self.xyzis_out2 = nn.Conv3d(f_maps, 4, kernel_size=1, padding=0)
+        self.xyzis_out2 = nn.Conv3d(f_maps, xyzi_dim, kernel_size=1, padding=0)
 
         self.bg_out1 = nn.Conv3d(f_maps, f_maps, kernel_size=kernel_size, padding=padding)
-        self.bg_out2 = nn.Conv3d(f_maps, 1, kernel_size=1, padding=0)
+        self.bg_out2 = nn.Conv3d(f_maps, bg_dim, kernel_size=1, padding=0)
 
         nn.init.kaiming_normal_(self.p_out1.weight, mode='fan_in', nonlinearity='relu')
         nn.init.kaiming_normal_(self.p_out2.weight, mode='fan_in', nonlinearity='linear')
@@ -494,6 +492,7 @@ class OutputNet(nn.Module):
 
         return torch.cat([logit,xyzi_mu,xyzi_sig,background],1)
 
+
 class UnetDecodeNoBn(nn.Module):
     """
     Our DECODE network consists of a 3D U-net, and an output net module.
@@ -508,8 +507,6 @@ class UnetDecodeNoBn(nn.Module):
     Args:
         ch_in (int): number of input channels
             Multiple input channels are currently not supported
-        ch_out (int): number of output channels
-            Currently 10: probability (1), xyzi_mu (4), xyzi_sig (4), background (1)
         depth (int): number of levels in the encoder/decoder path (applied only if f_maps is an int)
         inp_offset, inp_scale (float): Values used for normalizing the input.
         order (string): determines the order of layers
@@ -528,19 +525,20 @@ class UnetDecodeNoBn(nn.Module):
 
 
     """
-    def __init__(self, ch_in=1, ch_out=10, depth=3, inp_scale=1., inp_offset=0., order='ce', f_maps=64, is_2D=False, pred_z=True, p_offset=-5.,
-                int_conc=4., int_rate=1., int_loc=1.):
+    def __init__(self, ch_in=1, depth=3, inp_scale=1., inp_offset=0., order='ce', f_maps=64,
+                 is_2D=False, code_inf=False, pred_z=True, p_offset=-5., int_conc=4., int_rate=1., int_loc=1.):
         super().__init__()
 
         self.inp_scale = inp_scale
         self.inp_offset = inp_offset
 
         self.is_2D = is_2D
+        self.code_inf = code_inf
         self.pred_z = pred_z
 
-        self.unet = UNet3D(ch_in, ch_out, final_sigmoid=False, num_levels=depth, is_2D=is_2D,
+        self.unet = UNet3D(ch_in, final_sigmoid=False, num_levels=depth, is_2D=is_2D,
                            layer_order = order, f_maps=f_maps)
-        self.outnet = OutputNet(f_maps=f_maps, p_offset=p_offset, is_2D=is_2D)
+        self.outnet = OutputNet(f_maps=f_maps, p_offset=p_offset, is_2D=is_2D, code_inf=code_inf)
 
         self.network = nn.ModuleList([self.unet, self.outnet])
         self.int_dist = IntensityDist(int_conc, int_rate, int_loc)
@@ -558,14 +556,23 @@ class UnetDecodeNoBn(nn.Module):
 
         # Limit intensity
 #         x[:,4] = x[:,4] + float(self.int_dist.int_loc.detach()) + 0.01
-        x[:,9] = x[:,9] * self.inp_scale
+        x[:,39:] = x[:,39:] * self.inp_scale
 
         if not self.pred_z:
-            x[:,3] *= 0
-            x[:,7] *= 0
-            x[:,7] += 1
 
-        return {'logits': x[:,0:1],
-                'xyzi_mu': x[:,1:5],
-                'xyzi_sigma': x[:,5:9],
-                'background': x[:,9:10]}
+            x[:,3] *= 0
+            x[:,7 + 15*self.code_inf] *= 0
+            x[:,7 + 15*self.code_inf] += 1
+
+        if not self.code_inf:
+            ret_dict = {'logits': x[:,0:1],
+                        'xyzi_mu': x[:,1:5],
+                        'xyzi_sigma': x[:,5:9],
+                        'background': x[:,9:]}
+        else:
+            ret_dict = {'logits': x[:,0:1],
+                        'xyzi_mu': x[:,1:20],
+                        'xyzi_sigma': x[:,20:39],
+                        'background': x[:,39:]}
+
+        return ret_dict

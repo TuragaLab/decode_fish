@@ -53,8 +53,12 @@ def matching(target_df, pred_df, tolerance=500, print_res=True, eff_const=0.5):
 
     match_list = []
 
-    tar_cols = ['loc_idx', 'frame_idx', 'x', 'y', 'z', 'int']
-    pred_cols = ['loc_idx', 'prob', 'x', 'y', 'z', 'int','x_sig', 'y_sig', 'z_sig', 'int_sig']
+    if 'int_1' in pred_df and 'int_1' in target_df:
+        tar_cols = ['loc_idx', 'frame_idx', 'x', 'y', 'z'] + [f'int_{i}' for i in range(16)]
+        pred_cols = ['loc_idx', 'prob', 'x', 'y', 'z', 'x_sig', 'y_sig', 'z_sig'] + [f'int_{i}' for i in range(16)] + [f'int_sig_{i}' for i in range(16)]
+    else:
+        tar_cols = ['loc_idx', 'frame_idx', 'x', 'y', 'z', 'int']
+        pred_cols = ['loc_idx', 'prob', 'x', 'y', 'z', 'int','x_sig', 'y_sig', 'z_sig', 'int_sig']
 
     if len(pred_df):
 
@@ -99,7 +103,15 @@ def matching(target_df, pred_df, tolerance=500, print_res=True, eff_const=0.5):
             if len(u_t_inds): match_list.append(np.concatenate([sub_tar.loc[u_t_inds,tar_cols].values, sub_pred.loc[u_p_inds,pred_cols].values], 1))
 
     if len(match_list): match_list = np.concatenate(match_list, 0)
-    match_df = pd.DataFrame(match_list, columns = ['tar_idx', 'frame_idx', 'x_tar', 'y_tar', 'z_tar', 'int_tar',
+
+    if 'int_1' in pred_df and 'int_1' in target_df:
+        match_df = pd.DataFrame(match_list, columns = ['tar_idx', 'frame_idx', 'x_tar', 'y_tar', 'z_tar'] + \
+                                                      [f'int_tar_{i}' for i in range(16)] + \
+                                                      ['pred_idx','prob_pred', 'x_pred','y_pred','z_pred', 'x_sig_pred','y_sig_pred','z_sig_pred'] + \
+                                                      [f'int_pred_{i}' for i in range(16)] + \
+                                                      [f'int_sig_pred_{i}' for i in range(16)])
+    else:
+        match_df = pd.DataFrame(match_list, columns = ['tar_idx', 'frame_idx', 'x_tar', 'y_tar', 'z_tar', 'int_tar',
                                                    'pred_idx','prob_pred', 'x_pred','y_pred','z_pred','int_pred','x_sig_pred','y_sig_pred','z_sig_pred','int_sig_pred'])
 
 

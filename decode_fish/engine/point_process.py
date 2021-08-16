@@ -23,7 +23,7 @@ class PointProcessUniform(Distribution):
             This results in the same average number of sampled emitters but allows us to sample multiple emitters within one voxel.
 
     """
-    def __init__(self, local_rate: torch.tensor, int_conc=0., int_rate=1., int_loc=1., sim_iters: int = 5, channels=1, n_bits=1, sim_z=True):
+    def __init__(self, local_rate: torch.tensor, int_conc=0., int_rate=1., int_loc=1., sim_iters: int = 5, channels=1, n_bits=1, sim_z=True, codebook=None):
 
         assert sim_iters >= 1
         self.local_rate = local_rate
@@ -35,10 +35,11 @@ class PointProcessUniform(Distribution):
         self.channels = channels
         self.n_bits = n_bits
         self.sim_z=sim_z
+        self.codebook=codebook
 
-    def sample(self):
+    def sample(self, from_code_book=False):
 
-        res_ = [self._sample(self.local_rate/self.sim_iters) for i in range(self.sim_iters)]
+        res_ = [self._sample(self.local_rate/self.sim_iters, from_code_book) for i in range(self.sim_iters)]
         locations = torch.cat([i[0] for i in res_], dim=0)
         x_offset = torch.cat([i[1] for i in res_], dim=0)
         y_offset = torch.cat([i[2] for i in res_], dim=0)
@@ -47,7 +48,7 @@ class PointProcessUniform(Distribution):
 
         return tuple(locations.T), x_offset, y_offset, z_offset, intensities, res_[0][5]
 
-    def _sample(self, local_rate):
+    def _sample(self, local_rate, from_code_book):
 
         output_shape = list(local_rate.shape)
         local_rate = torch.clamp(local_rate,0.,1.)
@@ -66,7 +67,11 @@ class PointProcessUniform(Distribution):
         locations = locations.nonzero(as_tuple=False)
 
         if self.channels > 1:
-            ch_draw = torch.multinomial(torch.ones([n_emitter,self.channels])/self.channels, self.n_bits, replacement=False)
+            if from_code_book:
+                ch_draw = torch.randint(0, len(self.codebook),size=[n_emitter])
+                ch_draw = self.codebook[ch_draw]
+            else:
+                ch_draw = torch.multinomial(torch.ones([n_emitter,self.channels])/self.channels, self.n_bits, replacement=False)
             locations = locations.repeat_interleave(self.n_bits, 0)
             locations[:, 1] = ch_draw.reshape(-1)
 

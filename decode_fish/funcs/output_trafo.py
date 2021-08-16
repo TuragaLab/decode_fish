@@ -9,7 +9,7 @@ from .plotting import *
 from .emitter_io import *
 
 # Cell
-def sample_to_df(locs, x_os, y_os, z_os, ints, px_size_zyx=[100,100,100]):
+def sample_to_df(locs, x_os, y_os, z_os, ints, px_size_zyx=[100,100,100], channels=16, n_bits=4):
 
     n_locs = len(ints)
 
@@ -19,7 +19,9 @@ def sample_to_df(locs, x_os, y_os, z_os, ints, px_size_zyx=[100,100,100]):
 
     frame_idx = locs[0]
     ch_idx = locs[1]
-    loc_idx = torch.arange(n_locs)
+
+    n_gt = n_locs//n_bits
+    loc_idx = torch.arange(n_gt).repeat_interleave(n_bits)
 
     df = DF({'loc_idx': loc_idx.cpu(),
              'frame_idx': frame_idx.cpu(),
@@ -28,6 +30,13 @@ def sample_to_df(locs, x_os, y_os, z_os, ints, px_size_zyx=[100,100,100]):
              'y': y.cpu()*px_size_zyx[1],
              'z': z.cpu()*px_size_zyx[0],
              'int': ints.cpu()})
+
+    int_arr = np.zeros([n_gt, channels])
+    int_arr[df['loc_idx'], df['ch_idx']] = ints.cpu()
+
+    df = df[::n_bits]
+    for i in range(16):
+        df[f'int_{i}'] = int_arr[:,i]
 
     return df
 
@@ -138,9 +147,13 @@ class SIPostProcess(torch.nn.Module):
                                        +res_dict['xyzi_sigma'][:,[1]][locations]**2
                                        +res_dict['xyzi_sigma'][:,[2]][locations]**2)})
 
+        for i in range(16):
+            df[f'int_{i}'] = res_dict['xyzi_mu'][:,[3+i]][locations]
+            df[f'int_sig_{i}'] = res_dict['xyzi_sigma'][:,[3+i]][locations]
+
         return df
 
-    def get_micro_inp(self, res_dict, p_si=None):
+    def get_micro_inp(self, res_dict, p_si=None, channel=0):
 
         res_dict = self.get_si_resdict(res_dict, p_si)
 
@@ -148,13 +161,10 @@ class SIPostProcess(torch.nn.Module):
         x_os_3d = res_dict['xyzi_mu'][:,[0]][locations]
         y_os_3d = res_dict['xyzi_mu'][:,[1]][locations]
         z_os_3d = res_dict['xyzi_mu'][:,[2]][locations]
-        ints_3d = res_dict['xyzi_mu'][:,[3]][locations]
+        ints_3d = res_dict['xyzi_mu'][:,[3+channel]][locations]
         output_shape  = res_dict['Samples_si'].shape
-        comb_sig = torch.sqrt(res_dict['xyzi_sigma'][:,[0]][locations]**2
-                             +res_dict['xyzi_sigma'][:,[1]][locations]**2
-                             +res_dict['xyzi_sigma'][:,[2]][locations]**2)
 
-        return locations, x_os_3d, y_os_3d, z_os_3d, ints_3d, output_shape, comb_sig
+        return locations, x_os_3d, y_os_3d, z_os_3d, ints_3d, output_shape
 
 # p_col = []
 

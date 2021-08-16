@@ -358,11 +358,12 @@ def code_from_xy_logs(pred_df, code_ref, targets, group_rad=150, prob_smoothing=
                     code_err.append(code_errors[min_ind])
                     code_ind.append(min_ind)
 
+                    loc_df.loc[i,['ch_err']] = np.array(frame_probs, dtype='object')
+
     loc_df = loc_df.loc[seed_inds]
     loc_df['code_err'] = code_err
     loc_df['code_inds'] = code_ind
     loc_df['gene'] = targets[code_ind]
-    loc_df['code'] = code_ref[code_ind]
 
     return loc_df
 

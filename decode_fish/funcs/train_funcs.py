@@ -23,12 +23,13 @@ import shutil
 import wandb
 
 from hydra import compose, initialize
+from .merfish_eval2 import *
 # from decode_fish.funcs.visualization vimport get_simulation_statistics
 
 # Cell
 def eval_logger(pred_df, target_df, iteration, data_str='Sim. '):
 
-    perf_dict,_,shift = matching(target_df, pred_df, print_res=False)
+    perf_dict,matches,shift = matching(target_df, pred_df, print_res=False)
     if 'Inp' in data_str:
         pred_corr = shift_df(pred_df, shift)
         perf_dict, _, _ = matching(target_df, pred_corr, print_res=False)
@@ -42,6 +43,8 @@ def eval_logger(pred_df, target_df, iteration, data_str='Sim. '):
     wandb.log({data_str +'Metrics/rmse_x': perf_dict['rmse_x']}, step=iteration)
     wandb.log({data_str +'Metrics/rmse_y': perf_dict['rmse_y']}, step=iteration)
     wandb.log({data_str +'Metrics/rmse_z': perf_dict['rmse_z']}, step=iteration)
+
+    return matches
 
 def load_from_eval_dict(eval_dict):
 
@@ -102,44 +105,40 @@ def train(cfg,
     model.cuda().train()
     torch.save(microscope.psf.state_dict(), str(save_dir) + '/psf_init.pkl' )
 
+    _, code_ref, _ = get_benchmark()
+    code_inds = np.stack([np.nonzero(c)[0] for c in code_ref])
+
     for batch_idx in range(cfg.training.start_iter, cfg.training.num_iters):
 
 #         t0 = time.time()
-
         x, local_rate, background = next(iter(dl))
 
 #         print('Iter ', time.time()-t0); t0 = time.time()
 
         optim_dict['optim_net'].zero_grad()
 
-        sim_vars = PointProcessUniform(local_rate, int_conc=model.int_dist.int_conc.detach(), int_rate=model.int_dist.int_rate.detach(), int_loc=model.int_dist.int_loc.detach(),
-                                       sim_iters=5, channels=cfg.exp_type.channels, n_bits=cfg.exp_type.n_bits, sim_z=cfg.exp_type.pred_z).sample()
+        sim_vars = PointProcessUniform(local_rate, int_conc=model.int_dist.int_conc.detach(),
+                                       int_rate=model.int_dist.int_rate.detach(), int_loc=model.int_dist.int_loc.detach(),
+                                       sim_iters=5, channels=cfg.exp_type.channels, n_bits=cfg.exp_type.n_bits,
+                                       sim_z=cfg.exp_type.pred_z, codebook=torch.tensor(code_inds)).sample(from_code_book=cfg.exp_type.sample_from_codebook)
 
         # sim_vars = locs_sl, x_os_sl, y_os_sl, z_os_sl, ints_sl, output_shape
         xsim = microscope(*sim_vars, add_noise=True)
         xsim_noise = microscope.noise(xsim, background).sample()
 
-        ch_inds = [0]
-        if cfg.exp_type.name == 'merfish':
-            if cfg.exp_type.shuffle_ch:
-                ch_inds = torch.randperm(xsim_noise.shape[1])
-                xsim_noise = xsim_noise[:,ch_inds]
-                x = x[:,ch_inds]
-                background =  background[:, ch_inds]
-
         out_sim = model.tensor_to_dict(model(xsim_noise))
 
-        count_prob, spatial_prob = PointProcessGaussian(**out_sim).log_prob(*sim_vars[:5], channel=ch_inds[0])
+        count_prob, spatial_prob = PointProcessGaussian(**out_sim).log_prob(*sim_vars[:5], n_bits=cfg.exp_type.n_bits,
+                                                                            channels=cfg.exp_type.channels, min_int_sig=cfg.training.net.min_int_sig)
         gmm_loss = -(spatial_prob + cfg.training.net.cnt_loss_scale*count_prob).mean()
 
-        background_loss = F.mse_loss(out_sim['background'], background[:,:1]) * cfg.training.net.bl_loss_scale
+        background_loss = F.mse_loss(out_sim['background'], background) * cfg.training.net.bl_loss_scale
 
         loss = gmm_loss + background_loss
 
         # Update network parameters
         loss.backward()
 
-#         if cfg.training.net.grad_clip: torch.nn.utils.clip_grad_norm_(model.unet.parameters(), max_norm=cfg.training.net.grad_clip, norm_type=2)
         if cfg.training.net.grad_clip: torch.nn.utils.clip_grad_norm_(model.network.parameters(), max_norm=cfg.training.net.grad_clip, norm_type=2)
 
         optim_dict['optim_net'].step()
@@ -150,16 +149,22 @@ def train(cfg,
         if batch_idx > min(cfg.training.start_mic,cfg.training.start_int):
 
             out_inp = model.tensor_to_dict(model(x))
-            proc_out_inp = post_proc.get_micro_inp(out_inp) # locations, x_os_3d, y_os_3d, z_os_3d, ints_3d, output_shape, comb_sig
+            rand_ch = torch.randint(0,cfg.exp_type.channels, size=[1])[0]
+            locations, x_os_3d, y_os_3d, z_os_3d, ints_3d, output_shape = post_proc.get_micro_inp(out_inp, channel=rand_ch)
+            # locations, x_os_3d, y_os_3d, z_os_3d, ints_3d, output_shape
+            filt_inds = [ints_3d >  model.int_dist.int_loc.detach()]
+            locations = [l[filt_inds] for l in locations]
+            x_os_3d, y_os_3d, z_os_3d, ints_3d = x_os_3d[filt_inds], y_os_3d[filt_inds], z_os_3d[filt_inds], ints_3d[filt_inds]
+            proc_out_inp = locations, x_os_3d, y_os_3d, z_os_3d, ints_3d, output_shape
 
             if cfg.training.mic.enabled and batch_idx > cfg.training.start_mic:
 
                 optim_dict['optim_mic'].zero_grad()
 
                 # Get autoencoder loss
-                ae_img = microscope(*proc_out_inp[:6], add_noise=False)
+                ae_img = microscope(*proc_out_inp, add_noise=False, rec_ch=rand_ch)
 
-                log_p_x_given_z = -microscope.noise(ae_img,out_inp['background'],ch_inds[:1]).log_prob(x[:,:1]).mean()
+                log_p_x_given_z = -microscope.noise(ae_img,out_inp['background'],rec_ch=rand_ch).log_prob(x[:,rand_ch:rand_ch+1]).mean()
                 if cfg.training.mic.norm_reg:
                     log_p_x_given_z += cfg.training.mic.norm_reg * (microscope.psf.com_loss())
 
@@ -179,8 +184,7 @@ def train(cfg,
                 ints = torch.clamp_min(ints, model.int_dist.int_loc.detach() + 0.01)
 
                 gamma_int = D.Gamma(model.int_dist.int_conc, model.int_dist.int_rate)
-                loc_train = model.int_dist.int_loc
-                loc_trafo = [D.AffineTransform(loc=loc_train, scale=1)]
+                loc_trafo = [D.AffineTransform(loc=model.int_dist.int_loc, scale=1)]
                 int_loss = -D.TransformedDistribution(gamma_int, loc_trafo).log_prob(ints.detach()).mean()
 
                 if cfg.training.int.grad_clip:
@@ -194,7 +198,8 @@ def train(cfg,
 
         # Logging
         if batch_idx % 10 == 0:
-            wandb.log({'SL Losses/gmm_loss': gmm_loss.detach().cpu()}, step=batch_idx)
+            wandb.log({'SL Losses/xyz_loss': spatial_prob.mean().detach().cpu().item()}, step=batch_idx)
+#             wandb.log({'SL Losses/ints_loss': int_prob.mean().detach().cpu().item()}, step=batch_idx)
             wandb.log({'SL Losses/count_loss': (-count_prob.mean()).detach().cpu()}, step=batch_idx)
             wandb.log({'SL Losses/bg_loss': background_loss.detach().cpu()}, step=batch_idx)
             wandb.log({'AE Losses/int_mu': model.int_dist.int_conc.item()/model.int_dist.int_rate.item() + model.int_dist.int_loc.item()}, step=batch_idx)
@@ -216,8 +221,14 @@ def train(cfg,
                 pred_df = post_proc.get_df(out_sim)
                 px_size = cfg.evaluation.px_size_zyx
                 target_df = sample_to_df(*sim_vars[:5], px_size_zyx=px_size)
-                target_df = target_df[target_df['ch_idx'] == ch_inds[0].item()]
-                eval_logger(pred_df, target_df, batch_idx, data_str='Sim. ')
+                matches = eval_logger(pred_df, target_df, batch_idx, data_str='Sim. ')
+
+                try:
+                    int_corrs = [np.corrcoef(matches[f'int_pred_{i}'],matches[f'int_tar_{i}'])[0,1] for i in range(16)]
+                except ZeroDivisionError:
+                    int_corrs = [0]
+
+                wandb.log({'Sim. Metrics/int_corrs': np.mean(int_corrs)}, step=batch_idx)
 
                 wandb.log({'Sim. Metrics/prob_fac': torch.sigmoid(out_sim['logits']).sum().item()/(len(target_df)+0.1)}, step=batch_idx)
                 wandb.log({'Sim. Metrics/n_em_fac': len(pred_df)/(len(target_df)+0.1)}, step=batch_idx)

@@ -171,10 +171,13 @@ def swap_psf_vol(psf, vol):
     psf.load_state_dict(state_dict)
     return psf
 
-def get_gaussian_psf(size_zyx, radii):
+def get_gaussian_psf(size_zyx, radii, pred_z):
+    if not pred_z:
+        size_zyx[0] = 1
     psf = LinearInterpolatedPSF(size_zyx, device='cuda')
     gauss_vol = gaussian_sphere(size_zyx, radii, [size_zyx[0]//2,size_zyx[1]//2,size_zyx[2]//2])
     gauss_vol = gauss_vol/gauss_vol.max()
+
 #     gauss_vol = np.log(gauss_vol+1e-6)
     psf = swap_psf_vol(psf, gauss_vol)
     return psf
@@ -202,7 +205,7 @@ def load_psf(cfg):
     if cfg.data_path.psf_path:
         psf = get_vol_psf(cfg.data_path.psf_path,cfg.PSF.device, cfg.PSF.psf_extent_zyx)
     else:
-        psf = get_gaussian_psf(cfg.PSF.psf_extent_zyx, cfg.PSF.gauss_radii)
+        psf = get_gaussian_psf(cfg.PSF.psf_extent_zyx, cfg.PSF.gauss_radii, cfg.exp_type.pred_z)
 
     return psf
 

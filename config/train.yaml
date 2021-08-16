@@ -60,7 +60,6 @@ PSF:
     device: ${device.gpu_device}
     gauss_radii: [1.,1.,1.]
     psf_extent_zyx : [21,21,21]
-    abs_z: False
     
 noise:
     _target_: decode_fish.engine.noise.sCMOS
@@ -95,6 +94,7 @@ model:
     f_maps: 32
     is_2D: ${exp_type.is_2D}
     pred_z: ${exp_type.pred_z}
+    code_inf: False
     inp_scale: 
     inp_offset: 
     p_offset: -4.0
@@ -120,6 +120,8 @@ training:
         bl_loss_scale: 0.01
         cnt_loss_scale: 1
         grad_clip: 0.005
+        int_weight: 1
+        min_int_sig: 0.01
         sched:   
             _target_: torch.optim.lr_scheduler.StepLR
             gamma: 0.5

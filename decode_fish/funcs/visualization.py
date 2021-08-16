@@ -19,7 +19,7 @@ from matplotlib.backends.backend_agg import FigureCanvas
 base_path =  '/groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/'
 
 # Cell
-def get_simulation_statistics(decode_dl, micro, int_conc, int_rate, int_loc, int_threshold=1, samples = 1, channels=1, n_bits=1):
+def get_simulation_statistics(decode_dl, micro, int_conc, int_rate, int_loc, int_threshold=1, samples = 1, channels=1, n_bits=1, psf_noise=True):
 
     """
     Draws a sample from the dataloader, and plots a slice of the real volume, the extracted background and
@@ -31,19 +31,22 @@ def get_simulation_statistics(decode_dl, micro, int_conc, int_rate, int_loc, int
         for _ in range(samples):
 
             xmax = 0
-            while xmax < int_threshold:
+            while xmax <= int_threshold:
                 x, local_rate, background = next(iter(decode_dl))
                 xmax = x[0,0,z_ind].max()
 
+            rand_ch = np.random.randint(0,channels)
+
             sim_vars = PointProcessUniform(local_rate, int_conc, int_rate, int_loc, sim_iters=5, channels=channels, n_bits=n_bits).sample()
-            xsim = micro(*sim_vars)
+            xsim = micro(*sim_vars, add_noise=psf_noise)
             xsim = micro.noise(xsim, background).sample()
+
             sim_df = sample_to_df(*sim_vars[:-1], px_size_zyx=[1.,1.,1.])
             sim_df = sim_df[sim_df['frame_idx'] == 0]
-            sim_df = sim_df[sim_df['ch_idx'] == 0]
+            sim_df = sim_df[sim_df[f'int_{rand_ch}'] > 0]
 
-            x = cpu(x[0,0])
-            xsim = cpu(xsim[0,0])
+            x = cpu(x[0,rand_ch])
+            xsim = cpu(xsim[0,rand_ch])
 
             if xsim.shape[-3] > 1:
 
@@ -54,7 +57,7 @@ def get_simulation_statistics(decode_dl, micro, int_conc, int_rate, int_loc, int
                 add_colorbar(im)
                 axes[0].set_title('Recording')
 
-                im = axes[1].imshow(cpu(background[0,0])[z_ind])
+                im = axes[1].imshow(cpu(background[0,rand_ch])[z_ind])
                 add_colorbar(im)
                 axes[1].set_title('Background')
 
@@ -67,7 +70,7 @@ def get_simulation_statistics(decode_dl, micro, int_conc, int_rate, int_loc, int
             fig2, axes = plot_3d_projections(xsim, display=False)
             scat_3d_projections(axes, sim_df)
 
-            figure = combine_figures([fig1,fig2],['Data','Simulation'], nrows=1, ncols=2, figsize=(20,10))
+            figure = combine_figures([fig1,fig2],[f'Data {rand_ch}','Simulation'], nrows=1, ncols=2, figsize=(20,10))
             figure.suptitle('Max projection', fontsize=15, y=0.9)
 
 # Cell

@@ -54,7 +54,9 @@ class Microscope(nn.Module):
 
         self.psf_noise = psf_noise
         self.pred_z = pred_z
-        self.psf_z_size = self.psf.psf_volume.shape[-3]//2
+        self.psf_z_size = self.psf.psf_volume.shape[-3]
+
+        self.channel_shifts = self.noise.channel_shifts
 
     def add_psf_noise(self, psf_stack):
 
@@ -72,9 +74,18 @@ class Microscope(nn.Module):
 #         psf_deformed = etorch.deform_grid(psf_stack[:,0], torch.distributions.Normal(loc=0, scale=self.psf_noise).sample([3,3,3,3]).to(psf_stack.device), axis=(1,2,3),order=3)
 #         return psf_deformed[:,None]
 
-    def forward(self, locations, x_os_val, y_os_val, z_os_val, i_val, output_shape, eval_=None, add_noise=False):
+    def forward(self, locations, x_os_val, y_os_val, z_os_val, i_val, output_shape, eval_=None, add_noise=False, rec_ch=0):
 
         if len(locations[0]):
+
+            # We get the right channels when simulating, but for reconstruction we use ch = 0 for a single reconstructed image.
+            ch_inds = locations[1] + rec_ch
+            if ch_inds.max() > 0:
+                shifts = self.channel_shifts - self.channel_shifts.mean(0)[None]
+
+                x_os_val = x_os_val + shifts[ch_inds, 0]
+                y_os_val = y_os_val + shifts[ch_inds, 1]
+                z_os_val = z_os_val + shifts[ch_inds, 2]
 
             if 'max' in self.norm:
                 psf_norm = self.psf.psf_volume.max()
@@ -84,9 +95,10 @@ class Microscope(nn.Module):
                 psf_norm = 1
             # Apply continuous shift
             if self.pred_z and self.psf_z_size > 1:
+                z_os_val = torch.clamp(z_os_val,-0.4999,0.4999)
                 z_scaled = (z_os_val + 0.5) * self.psf_z_size
                 psf = self.psf(x_os_val, y_os_val, z_scaled%1.)
-                z_inds = (z_scaled//1 + self.psf_z_size + 1).type(torch.cuda.LongTensor)
+                z_inds = (z_scaled//1).type(torch.cuda.LongTensor)
                 psf = psf[torch.arange(len(z_os_val)),:,z_inds][:,:,None]
             else:
                 psf = self.psf(x_os_val, y_os_val, z_os_val)

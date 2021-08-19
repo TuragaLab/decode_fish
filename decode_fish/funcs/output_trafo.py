@@ -4,6 +4,7 @@ __all__ = ['sample_to_df', 'df_to_micro', 'SIPostProcess', 'ISIPostProcess']
 
 # Cell
 from ..imports import *
+from .utils import *
 import torch.nn.functional as F
 from .plotting import *
 from .emitter_io import *
@@ -11,19 +12,22 @@ from .emitter_io import *
 # Cell
 def sample_to_df(locs, x_os, y_os, z_os, ints, px_size_zyx=[100,100,100], channels=16, n_bits=4):
 
-    n_locs = len(ints)
-
     x = locs[-1] + x_os + 0.5
     y = locs[-2] + y_os + 0.5
     z = locs[-3] + z_os + 0.5
 
+    b_inds = torch.cat([torch.tensor([0], device=x_os.device),((x_os[1:] - x_os[:-1]).nonzero() + 1)[:,0],
+                        torch.tensor([len(x_os)], device=x_os.device)])
+    n_gt = len(b_inds) - 1
+
     frame_idx = locs[0]
     ch_idx = locs[1]
 
-    n_gt = n_locs//n_bits
-    loc_idx = torch.arange(n_gt).repeat_interleave(n_bits)
+    loc_idx = []
+    for i in range(n_gt):
+        loc_idx += [i] * (b_inds[i+1] - b_inds[i])
 
-    df = DF({'loc_idx': loc_idx.cpu(),
+    df = DF({'loc_idx': loc_idx,
              'frame_idx': frame_idx.cpu(),
              'ch_idx': ch_idx.cpu(),
              'x': x.cpu()*px_size_zyx[2],
@@ -34,7 +38,7 @@ def sample_to_df(locs, x_os, y_os, z_os, ints, px_size_zyx=[100,100,100], channe
     int_arr = np.zeros([n_gt, channels])
     int_arr[df['loc_idx'], df['ch_idx']] = ints.cpu()
 
-    df = df[::n_bits]
+    df = df.iloc[cpu(b_inds[:-1])]
     for i in range(16):
         df[f'int_{i}'] = int_arr[:,i]
 
@@ -158,6 +162,7 @@ class SIPostProcess(torch.nn.Module):
         res_dict = self.get_si_resdict(res_dict, p_si)
 
         locations = res_dict['Samples_si'].nonzero(as_tuple=True)
+        locations = [l for l in locations]
         x_os_3d = res_dict['xyzi_mu'][:,[0]][locations]
         y_os_3d = res_dict['xyzi_mu'][:,[1]][locations]
         z_os_3d = res_dict['xyzi_mu'][:,[2]][locations]

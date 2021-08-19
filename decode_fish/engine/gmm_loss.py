@@ -111,10 +111,14 @@ def get_true_labels(bs, locations, x_os, y_os, z_os, *args):
 
 def get_true_labels_mf(bs, n_bits, channels, locations, x_os, y_os, z_os, int_ch):
 
-    xyz_locs = [l[::n_bits] for l in locations]
-    x_os = x_os[::n_bits]
-    y_os = y_os[::n_bits]
-    z_os = z_os[::n_bits]
+    b_inds = torch.cat([torch.tensor([0], device=x_os.device),((x_os[1:] - x_os[:-1]).nonzero() + 1)[:,0],
+                        torch.tensor([len(x_os)], device=x_os.device)])
+    n_gt = len(b_inds) - 1
+
+    xyz_locs = [l[b_inds[:-1]] for l in locations]
+    x_os = x_os[b_inds[:-1]]
+    y_os = y_os[b_inds[:-1]]
+    z_os = z_os[b_inds[:-1]]
 
     s_mask, s_arr = get_sample_mask(bs, xyz_locs)
     max_counts = s_mask.shape[1]
@@ -123,9 +127,12 @@ def get_true_labels_mf(bs, n_bits, channels, locations, x_os, y_os, z_os, int_ch
     y =  y_os + xyz_locs[3].type(torch.cuda.FloatTensor) + 0.5
     z =  z_os + xyz_locs[2].type(torch.cuda.FloatTensor) + 0.5
 
-    int_ch = int_ch.reshape(-1, n_bits)
-    intensity = torch.zeros([len(int_ch), channels]).to(x.device)
-    intensity[torch.arange(len(int_ch))[:,None], locations[1].reshape(-1, n_bits)] = int_ch
+    loc_idx = []
+    for i in range(n_gt):
+        loc_idx += [i] * (b_inds[i+1] - b_inds[i])
+
+    intensity = torch.zeros([n_gt, channels]).to(x.device)
+    intensity[loc_idx, locations[1]] = int_ch
 
     gt_vars = torch.stack([x, y, z], dim=1)
     gt_vars = torch.cat([gt_vars, intensity], dim=1)

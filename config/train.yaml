@@ -60,6 +60,7 @@ PSF:
     device: ${device.gpu_device}
     gauss_radii: [1.,1.,1.]
     psf_extent_zyx : [21,21,21]
+    n_cols: 1
     
 noise:
     _target_: decode_fish.engine.noise.sCMOS

@@ -22,10 +22,11 @@ class LinearInterpolatedPSF(nn.Module):
         Eventually remove unneeded losses.
     """
 
-    def __init__(self, size_zyx=[21,21,21], device='cuda'):
+    def __init__(self, size_zyx=[21,21,21], n_cols=1, device='cuda'):
         super().__init__()
 
         self.psf_size = list(np.array(size_zyx).astype('int'))
+        self.n_cols = n_cols
         # +- /sz so that the values correspond to the pixel centers
         v = [torch.linspace(-1+1/sz, 1-1/sz, int(sz)) for sz in self.psf_size]
 
@@ -34,7 +35,7 @@ class LinearInterpolatedPSF(nn.Module):
         self.register_buffer('y', v[1])
         self.register_buffer('z', v[0])
         self.device=device
-        self.psf_volume = nn.Parameter(0.01*torch.rand(1, *self.psf_size))
+        self.psf_volume = nn.Parameter(0.01*torch.rand(self.n_cols, *self.psf_size))
         self.forward_nonlin = torch.nn.Identity()
 
     def forward(self, x_offset_val, y_offset_val, z_offset_val):

@@ -2,7 +2,7 @@
 
 __all__ = ['load_model_state', 'simfish_to_df', 'matlab_fq_to_df', 'load_sim_fish', 'big_fishq_to_df', 'rsfish_to_df',
            'swap_psf_vol', 'get_gaussian_psf', 'get_vol_psf', 'load_psf', 'load_psf_noise_micro', 'load_post_proc',
-           'get_dataloader', 'load_all']
+           'get_dataloader', 'load_all', 'psf']
 
 # Cell
 from ..imports import *
@@ -167,20 +167,27 @@ def rsfish_to_df(file_str):
 # Cell
 def swap_psf_vol(psf, vol):
     state_dict = psf.state_dict()
-    state_dict['psf_volume'][0] = torch.cuda.FloatTensor(torch.Tensor(vol).cuda())
+    for i in range(len(state_dict['psf_volume'])):
+        state_dict['psf_volume'][i] = torch.cuda.FloatTensor(torch.Tensor(vol).cuda())
     psf.load_state_dict(state_dict)
     return psf
 
-def get_gaussian_psf(size_zyx, radii, pred_z):
+def get_gaussian_psf(size_zyx, radii, pred_z, n_cols=1):
+
     if not pred_z:
         size_zyx[0] = 1
-    psf = LinearInterpolatedPSF(size_zyx, device='cuda')
+
+    if not isinstance(radii, list):
+        radii = 3*[radii]
+
+    psf = LinearInterpolatedPSF(size_zyx, device='cuda', n_cols=n_cols)
     gauss_vol = gaussian_sphere(size_zyx, radii, [size_zyx[0]//2,size_zyx[1]//2,size_zyx[2]//2])
     gauss_vol = gauss_vol/gauss_vol.max()
 
-#     gauss_vol = np.log(gauss_vol+1e-6)
     psf = swap_psf_vol(psf, gauss_vol)
     return psf
+
+psf = get_gaussian_psf([11,21,21], 0.2, True, 2)
 
 def get_vol_psf(filename, device='cuda', psf_extent_zyx=None):
 
@@ -205,7 +212,7 @@ def load_psf(cfg):
     if cfg.data_path.psf_path:
         psf = get_vol_psf(cfg.data_path.psf_path,cfg.PSF.device, cfg.PSF.psf_extent_zyx)
     else:
-        psf = get_gaussian_psf(cfg.PSF.psf_extent_zyx, cfg.PSF.gauss_radii, cfg.exp_type.pred_z)
+        psf = get_gaussian_psf(cfg.PSF.psf_extent_zyx, cfg.PSF.gauss_radii, cfg.exp_type.pred_z, cfg.PSF.n_cols)
 
     return psf
 

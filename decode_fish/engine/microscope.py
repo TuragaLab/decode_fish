@@ -55,6 +55,7 @@ class Microscope(nn.Module):
         self.psf_noise = psf_noise
         self.pred_z = pred_z
         self.psf_z_size = self.psf.psf_volume.shape[-3]
+        self.n_cols = self.psf.n_cols
 
         self.channel_shifts = self.noise.channel_shifts
 
@@ -113,6 +114,7 @@ class Microscope(nn.Module):
             tot_intensity = torch.clamp_min(i_val, 0)
             psf = psf * tot_intensity[:,None,None,None,None]
             # place psf according to locations
+            locations[1] = ch_inds
             xsim = place_psf(locations, psf, output_shape)
             # scale (not learnable)
             xsim = self.scale * xsim
@@ -189,6 +191,12 @@ def _place_psf(psf_vols, b, ch, z, y, x, output_shape):
                              output_shape[2] + 2*(pad_zyx[0]),
                              output_shape[3] + 2*(pad_zyx[1]),
                              output_shape[4] + 2*(pad_zyx[2])).to(x.device)
+
+    if psf_c == 2:
+        psf_ch_ind = torch.where(ch >= 8, 1, 0)
+        psf_vols = psf_vols[torch.arange(len(psf_ch_ind)),psf_ch_ind]
+    if output_shape[1] == 1:
+        ch = torch.zeros_like(ch)
 
     psf_vols = psf_vols.reshape(-1, psf_h, psf_w, psf_d)
 

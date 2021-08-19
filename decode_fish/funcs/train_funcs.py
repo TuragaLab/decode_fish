@@ -120,11 +120,12 @@ def train(cfg,
         sim_vars = PointProcessUniform(local_rate, int_conc=model.int_dist.int_conc.detach(),
                                        int_rate=model.int_dist.int_rate.detach(), int_loc=model.int_dist.int_loc.detach(),
                                        sim_iters=5, channels=cfg.exp_type.channels, n_bits=cfg.exp_type.n_bits,
-                                       sim_z=cfg.exp_type.pred_z, codebook=torch.tensor(code_inds)).sample(from_code_book=cfg.exp_type.sample_from_codebook)
+                                       sim_z=cfg.exp_type.pred_z, codebook=torch.tensor(code_inds)).sample(from_code_book=cfg.exp_type.sample_from_codebook,
+                                                                                                           phasing=cfg.exp_type.phasing)
 
         # sim_vars = locs_sl, x_os_sl, y_os_sl, z_os_sl, ints_sl, output_shape
         xsim = microscope(*sim_vars, add_noise=True)
-        xsim_noise = microscope.noise(xsim, background).sample()
+        xsim_noise = microscope.noise(xsim, background, const_theta_sim=cfg.exp_type.const_theta_sim).sample()
 
         out_sim = model.tensor_to_dict(model(xsim_noise))
 
@@ -152,7 +153,7 @@ def train(cfg,
             rand_ch = torch.randint(0,cfg.exp_type.channels, size=[1])[0]
             locations, x_os_3d, y_os_3d, z_os_3d, ints_3d, output_shape = post_proc.get_micro_inp(out_inp, channel=rand_ch)
             # locations, x_os_3d, y_os_3d, z_os_3d, ints_3d, output_shape
-            filt_inds = [ints_3d >  model.int_dist.int_loc.detach()]
+            filt_inds = [ints_3d >  0]
             locations = [l[filt_inds] for l in locations]
             x_os_3d, y_os_3d, z_os_3d, ints_3d = x_os_3d[filt_inds], y_os_3d[filt_inds], z_os_3d[filt_inds], ints_3d[filt_inds]
             proc_out_inp = locations, x_os_3d, y_os_3d, z_os_3d, ints_3d, output_shape
@@ -164,7 +165,7 @@ def train(cfg,
                 # Get autoencoder loss
                 ae_img = microscope(*proc_out_inp, add_noise=False, rec_ch=rand_ch)
 
-                log_p_x_given_z = -microscope.noise(ae_img,out_inp['background'],rec_ch=rand_ch).log_prob(x[:,rand_ch:rand_ch+1]).mean()
+                log_p_x_given_z = -microscope.noise(ae_img,out_inp['background'], rec_ch=rand_ch, const_theta_sim=False).log_prob(x[:,rand_ch:rand_ch+1]).mean()
                 if cfg.training.mic.norm_reg:
                     log_p_x_given_z += cfg.training.mic.norm_reg * (microscope.psf.com_loss())
 
@@ -224,7 +225,7 @@ def train(cfg,
                 matches = eval_logger(pred_df, target_df, batch_idx, data_str='Sim. ')
 
                 try:
-                    int_corrs = [np.corrcoef(matches[f'int_pred_{i}'],matches[f'int_tar_{i}'])[0,1] for i in range(16)]
+                    int_corrs = [np.corrcoef(matches[f'int_{i}_pred'],matches[f'int_{i}_tar'])[0,1] for i in range(16)]
                 except ZeroDivisionError:
                     int_corrs = [0]
 

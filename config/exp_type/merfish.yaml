@@ -6,3 +6,5 @@ is_2D: True
 pred_z: False
 sm_fish_ch: 0
 sample_from_codebook: False
+const_theta_sim: False
+phasing: False

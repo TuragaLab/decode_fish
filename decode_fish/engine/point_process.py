@@ -23,7 +23,7 @@ class PointProcessUniform(Distribution):
             This results in the same average number of sampled emitters but allows us to sample multiple emitters within one voxel.
 
     """
-    def __init__(self, local_rate: torch.tensor, int_conc=0., int_rate=1., int_loc=1., sim_iters: int = 5, channels=1, n_bits=1, sim_z=True, codebook=None):
+    def __init__(self, local_rate: torch.tensor, int_conc=0., int_rate=1., int_loc=1., sim_iters: int = 5, channels=1, n_bits=1, sim_z=True, codebook=None, phase_fac=0.2):
 
         assert sim_iters >= 1
         self.local_rate = local_rate
@@ -36,19 +36,20 @@ class PointProcessUniform(Distribution):
         self.n_bits = n_bits
         self.sim_z=sim_z
         self.codebook=codebook
+        self.phase_fac=phase_fac
 
-    def sample(self, from_code_book=False):
+    def sample(self, from_code_book=False, phasing=False):
 
-        res_ = [self._sample(self.local_rate/self.sim_iters, from_code_book) for i in range(self.sim_iters)]
+        res_ = [self._sample(self.local_rate/self.sim_iters, from_code_book, phasing) for i in range(self.sim_iters)]
         locations = torch.cat([i[0] for i in res_], dim=0)
         x_offset = torch.cat([i[1] for i in res_], dim=0)
         y_offset = torch.cat([i[2] for i in res_], dim=0)
         z_offset = torch.cat([i[3] for i in res_], dim=0)
         intensities = torch.cat([i[4] for i in res_], dim=0)
 
-        return tuple(locations.T), x_offset, y_offset, z_offset, intensities, res_[0][5]
+        return list(locations.T), x_offset, y_offset, z_offset, intensities, res_[0][5]
 
-    def _sample(self, local_rate, from_code_book):
+    def _sample(self, local_rate, from_code_book, phasing):
 
         output_shape = list(local_rate.shape)
         local_rate = torch.clamp(local_rate,0.,1.)
@@ -81,6 +82,22 @@ class PointProcessUniform(Distribution):
             z_offset = z_offset.repeat_interleave(self.n_bits, 0)
 
             output_shape[1] = self.channels
+
+            if phasing:
+                locations = locations.repeat_interleave(2, 0)
+                locations[1::2,1] = locations[1::2,1] + 1
+                x_offset = x_offset.repeat_interleave(2, 0)
+                y_offset = y_offset.repeat_interleave(2, 0)
+                z_offset = z_offset.repeat_interleave(2, 0)
+                intensities = intensities.repeat_interleave(2, 0)
+
+                phase_facs = torch.rand(size=intensities[1::2].shape, device=intensities.device) * self.phase_fac
+                intensities[1::2] = intensities[1::2]*phase_facs
+
+                inds = [locations[:,1] < self.channels][0]
+                x_offset, y_offset, z_offset = x_offset[inds], y_offset[inds], z_offset[inds]
+                intensities = intensities[inds]
+                locations = locations[inds]
 
         return locations, x_offset, y_offset, z_offset, intensities, tuple(output_shape)
 

@@ -1,0 +1,16 @@
+sweep_name: sweep_sl_2
+run_name: 'psf_noise:0.1'
+
+out_file: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/decode_fish/data/results/MERFISH/merfish_${sweep_name}_${run_name}.csv
+# out_file: /nrs/turaga/speisera/temp_save/MERFISH/merfish_${sweep_name}_${run_name}.csv
+model_cfg: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/models/fishcod/MERFISH_starfish/${sweep_name}/${run_name}/train.yaml
+        
+training:
+    enabled: False
+    num_iters: 100
+    rate_fac: 2.
+    crop_sz: 64
+    opt:
+        _target_: torch_optimizer.QHAdam
+        lr: 5e-3
+        

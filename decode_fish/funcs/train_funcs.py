@@ -23,7 +23,7 @@ import shutil
 import wandb
 
 from hydra import compose, initialize
-from .merfish_eval2 import *
+from .merfish_eval import *
 # from decode_fish.funcs.visualization vimport get_simulation_statistics
 
 # Cell
@@ -127,7 +127,7 @@ def train(cfg,
         xsim = microscope(*sim_vars, add_noise=True)
         xsim_noise = microscope.noise(xsim, background, const_theta_sim=cfg.exp_type.const_theta_sim).sample()
 
-        out_sim = model.tensor_to_dict(model(xsim_noise))
+        out_sim = model.tensor_to_dict(model(xsim_noise, shuffle_ch=cfg.training.shuffle_ch))
 
         count_prob, spatial_prob = PointProcessGaussian(**out_sim).log_prob(*sim_vars[:5], n_bits=cfg.exp_type.n_bits,
                                                                             channels=cfg.exp_type.channels, min_int_sig=cfg.training.net.min_int_sig)
@@ -149,7 +149,7 @@ def train(cfg,
 
         if batch_idx > min(cfg.training.start_mic,cfg.training.start_int):
 
-            out_inp = model.tensor_to_dict(model(x))
+            out_inp = model.tensor_to_dict(model(x, shuffle_ch=cfg.training.shuffle_ch))
             rand_ch = torch.randint(0,cfg.exp_type.channels, size=[1])[0]
             locations, x_os_3d, y_os_3d, z_os_3d, ints_3d, output_shape = post_proc.get_micro_inp(out_inp, channel=rand_ch)
             # locations, x_os_3d, y_os_3d, z_os_3d, ints_3d, output_shape
@@ -185,7 +185,7 @@ def train(cfg,
                 ints = torch.clamp_min(ints, model.int_dist.int_loc.detach() + 0.01)
 
                 gamma_int = D.Gamma(model.int_dist.int_conc, model.int_dist.int_rate)
-                loc_trafo = [D.AffineTransform(loc=model.int_dist.int_loc, scale=1)]
+                loc_trafo = [D.AffineTransform(loc=model.int_dist.int_loc.detach(), scale=1)]
                 int_loss = -D.TransformedDistribution(gamma_int, loc_trafo).log_prob(ints.detach()).mean()
 
                 if cfg.training.int.grad_clip:

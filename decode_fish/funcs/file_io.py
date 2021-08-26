@@ -14,6 +14,7 @@ from ..engine.psf import LinearInterpolatedPSF
 from .emitter_io import *
 from .dataset import *
 from torch.utils.data import DataLoader
+from collections.abc import MutableSequence
 
 # Cell
 def load_model_state(model, path):
@@ -177,7 +178,7 @@ def get_gaussian_psf(size_zyx, radii, pred_z, n_cols=1):
     if not pred_z:
         size_zyx[0] = 1
 
-    if not isinstance(radii, list):
+    if not isinstance(radii, MutableSequence):
         radii = 3*[radii]
 
     psf = LinearInterpolatedPSF(size_zyx, device='cuda', n_cols=n_cols)
@@ -194,12 +195,12 @@ def get_vol_psf(filename, device='cuda', psf_extent_zyx=None):
     if 'tif' in filename:
         psf_vol = load_tiff_image(filename)
         psf_vol = psf_vol/psf_vol.max()
-        psf = LinearInterpolatedPSF(psf_vol.shape[-3:], device)
+        psf = LinearInterpolatedPSF(psf_vol.shape[-3:], device=device)
         psf = swap_psf_vol(psf, psf_vol)
 
     else:
         psf_state = torch.load(filename)
-        psf = LinearInterpolatedPSF(psf_state['psf_volume'].shape[-3:], device)
+        psf = LinearInterpolatedPSF(psf_state['psf_volume'].shape[-3:], device=device)
         psf.load_state_dict(psf_state)
 
         if psf_extent_zyx:

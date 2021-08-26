@@ -115,7 +115,9 @@ index = {"number_of_features_per_level": "00_models.ipynb",
          "get_reconstruction_from_df": "17_eval_routines.ipynb",
          "filt_perc": "17_eval_routines.ipynb",
          "predict": "18_predict_funcs.ipynb",
+         "merfish_predict": "18_predict_funcs.ipynb",
          "selective_predict": "18_predict_funcs.ipynb",
+         "get_benchmark_from_starfish": "19_MERFISH_routines.ipynb",
          "get_benchmark": "19_MERFISH_routines.ipynb",
          "get_istdeco": "19_MERFISH_routines.ipynb",
          "index": "19_MERFISH_routines.ipynb",
@@ -123,10 +125,15 @@ index = {"number_of_features_per_level": "00_models.ipynb",
          "approximate_nearest_code": "19_MERFISH_routines.ipynb",
          "vcorrcoef": "19_MERFISH_routines.ipynb",
          "bce_code": "19_MERFISH_routines.ipynb",
-         "match_bench": "20_MERFISH_visualization.ipynb",
+         "match_bench": "19_MERFISH_routines.ipynb",
          "get_code_from_ints": "19_MERFISH_routines.ipynb",
          "plot_gene_numbers": "20_MERFISH_visualization.ipynb",
-         "make_roc": "20_MERFISH_visualization.ipynb"}
+         "plot_gene_panels": "19_MERFISH_routines.ipynb",
+         "make_roc": "22_MERFISH_codenet.ipynb",
+         "input_from_df": "22_MERFISH_codenet.ipynb",
+         "extract_rmses": "22_MERFISH_codenet.ipynb",
+         "code_net": "22_MERFISH_codenet.ipynb",
+         "net": "22_MERFISH_codenet.ipynb"}
 
 modules = ["engine/model.py",
            "engine/psf.py",
@@ -147,7 +154,8 @@ modules = ["engine/model.py",
            "funcs/routines.py",
            "funcs/predict.py",
            "funcs/merfish_eval.py",
-           "funcs/merfish_viz.py"]
+           "funcs/merfish_viz.py",
+           "funcs/merfish_codenet.py"]
 
 doc_url = "https://turagalab.github.io/decode_fish/"
 

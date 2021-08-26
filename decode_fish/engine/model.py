@@ -532,6 +532,7 @@ class UnetDecodeNoBn(nn.Module):
         self.inp_scale = inp_scale
         self.inp_offset = inp_offset
 
+        self.ch_in = ch_in
         self.is_2D = is_2D
         self.code_inf = code_inf
         self.pred_z = pred_z
@@ -543,12 +544,21 @@ class UnetDecodeNoBn(nn.Module):
         self.network = nn.ModuleList([self.unet, self.outnet])
         self.int_dist = IntensityDist(int_conc, int_rate, int_loc)
 
-    def forward(self, x):
+    def forward(self, x, shuffle_ch=False):
+
+        if shuffle_ch:
+            perm_inds = np.random.permutation(np.arange(self.ch_in))
+            x = x[:,perm_inds]
 
         x = (x-self.inp_offset) / self.inp_scale
 
         for net in self.network:
             x = net(x)
+
+        if shuffle_ch:
+            x[:,4:20] = x[:,4:20][:,np.argsort(perm_inds)]
+            x[:,23:39] = x[:,23:39][:,np.argsort(perm_inds)]
+            x[:,39:] = x[:,39:][:,np.argsort(perm_inds)]
 
         return x
 

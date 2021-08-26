@@ -22,6 +22,9 @@ from decode_fish.funcs.routines import *
 from decode_fish.funcs.predict import predict
 import wandb
 
+from decode_fish.funcs.train_funcs import *
+from decode_fish.funcs.routines import *
+
 import h5py
 
 @hydra.main(config_path='../config', config_name='coloc_eval')

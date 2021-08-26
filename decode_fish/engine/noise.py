@@ -30,14 +30,14 @@ class sCMOS(nn.Module):
         super().__init__()
 
         if channels:
-            self.theta_scale = theta * channels
+            self.theta_scale = torch.tensor(theta) * channels
             self.theta_par = torch.nn.Parameter(torch.ones(channels)/channels)
             self.channel_shifts = torch.nn.Parameter(torch.zeros([channels, 3]))
         else:
             self.theta_scale = theta
             self.theta_par = torch.nn.Parameter(torch.tensor(1.))
 
-        self.theta_const = (self.theta_scale * self.theta_par).detach().cuda()
+        self.theta_const = (self.theta_scale.to(self.theta_par.device) * self.theta_par).detach().cuda()
 
         self.register_buffer('baseline', torch.tensor(baseline))
         self.channels = channels
@@ -48,7 +48,7 @@ class sCMOS(nn.Module):
         Also applies a shift and returns resulting the Gamma distribution
         """
 
-        theta = (self.theta_scale * self.theta_par)
+        theta = (self.theta_scale.to(self.theta_par.device) * self.theta_par)
         if const_theta_sim:
             theta = self.theta_const
         if rec_ch:

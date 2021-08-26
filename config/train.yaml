@@ -117,6 +117,7 @@ training:
     num_iters: 30000
     start_int: 0
     start_mic: 0 
+    shuffle_ch: False
     net:
         bl_loss_scale: 0.01
         cnt_loss_scale: 1

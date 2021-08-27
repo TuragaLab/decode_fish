@@ -28,7 +28,7 @@ class PointProcessGaussian(Distribution):
         self.xyzi_mu = xyzi_mu
         self.xyzi_sigma = xyzi_sigma
 
-    def log_prob(self, locations, x_offset, y_offset, z_offset, intensities, n_bits, channels, min_int_sig):
+    def log_prob(self, locations, x_offset, y_offset, z_offset, intensities, n_bits, channels, min_int_sig, int_fac=1):
         """ Creates the distributions for the count and localization loss and evaluates the log probability for the given set of localizations under those distriubtions.
 
             Args:
@@ -70,13 +70,30 @@ class PointProcessGaussian(Distribution):
 
         mix = D.Categorical(mixture_probs[pix_inds].reshape(batch_size,-1))
 
-        xyzi_sig[:,:,3:] = xyzi_sig[:,:,3:] + min_int_sig
-        comp = D.Independent(D.Normal(xyzi_mu, xyzi_sig + 0.00001), 1)
-        spatial_gmm = D.MixtureSameFamily(mix, comp)
-        spatial_prob = spatial_gmm.log_prob(xyzi.transpose(0, 1)).transpose(0,1)
-        spatial_prob = (spatial_prob * s_mask).sum(-1)
+#         xyzi_sig[:,:,3:] = xyzi_sig[:,:,3:] + min_int_sig
+#         comp = D.Independent(D.Normal(xyzi_mu, xyzi_sig + 0.00001), 1)
+#         spatial_gmm = D.MixtureSameFamily(mix, comp)
+#         spatial_prob = spatial_gmm.log_prob(xyzi.transpose(0, 1)).transpose(0,1)
+#         total_prob = (spatial_prob * s_mask).sum(-1)
 
-        return count_prob, spatial_prob
+        xyz_sl = np.s_[:,:,:3]
+        int_sl = np.s_[:,:,3:]
+
+        xyzi_sig[int_sl] = xyzi_sig[int_sl] + min_int_sig
+
+        comp_xyz = D.Independent(D.Normal(xyzi_mu[xyz_sl], xyzi_sig[xyz_sl] + 0.00001), 1)
+        comp_int = D.Independent(D.Normal(xyzi_mu[int_sl], xyzi_sig[int_sl] + 0.00001), 1)
+
+        spatial_gmm = D.MixtureSameFamily(mix, comp_xyz)
+        int_gmm = D.MixtureSameFamily(mix, comp_int)
+
+        spatial_prob, log_mix_prob = ext_log_prob(spatial_gmm, xyzi[xyz_sl].transpose(0, 1))
+        int_prob, _                = ext_log_prob(int_gmm, xyzi[int_sl].transpose(0, 1))
+
+        total_prob = torch.logsumexp(spatial_prob + int_fac*int_prob + log_mix_prob,-1).transpose(0, 1)
+        total_prob = (total_prob * s_mask).sum(-1)
+
+        return count_prob, total_prob
 
 def get_sample_mask(bs, locations):
 

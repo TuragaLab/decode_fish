@@ -124,6 +124,7 @@ training:
         grad_clip: 0.005
         int_weight: 1
         min_int_sig: 0.01
+        int_fac: 1.
         sched:   
             _target_: torch.optim.lr_scheduler.StepLR
             gamma: 0.5

@@ -154,6 +154,7 @@ class SIPostProcess(torch.nn.Module):
         for i in range(16):
             df[f'int_{i}'] = res_dict['xyzi_mu'][:,[3+i]][locations]
             df[f'int_sig_{i}'] = res_dict['xyzi_sigma'][:,[3+i]][locations]
+            df[f'int_p_{i}'] = torch.sigmoid(res_dict['int_logits'][:,[i]][locations])
 
         return df
 

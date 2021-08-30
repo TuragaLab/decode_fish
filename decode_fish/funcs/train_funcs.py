@@ -130,7 +130,8 @@ def train(cfg,
         out_sim = model.tensor_to_dict(model(xsim_noise, shuffle_ch=cfg.training.shuffle_ch))
 
         count_prob, spatial_prob = PointProcessGaussian(**out_sim).log_prob(*sim_vars[:5], n_bits=cfg.exp_type.n_bits,
-                                                                            channels=cfg.exp_type.channels, min_int_sig=cfg.training.net.min_int_sig, int_fac=cfg.training.net.int_fac)
+                                                                            channels=cfg.exp_type.channels, min_int_sig=cfg.training.net.min_int_sig)
+
         gmm_loss = -(spatial_prob + cfg.training.net.cnt_loss_scale*count_prob).mean()
 
         background_loss = F.mse_loss(out_sim['background'], background) * cfg.training.net.bl_loss_scale
@@ -226,10 +227,13 @@ def train(cfg,
 
                 try:
                     int_corrs = [np.corrcoef(matches[f'int_{i}_pred'],matches[f'int_{i}_tar'])[0,1] for i in range(16)]
+                    int_p_corrs = [np.corrcoef(matches[f'int_p_{i}_pred'],np.where(matches[f'int_{i}_tar'].values,1,0))[0,1] for i in range(16)]
                 except ZeroDivisionError:
                     int_corrs = [0]
+                    int_p_corrs = [0]
 
                 wandb.log({'Sim. Metrics/int_corrs': np.mean(int_corrs)}, step=batch_idx)
+                wandb.log({'Sim. Metrics/int_p_corrs': np.mean(int_p_corrs)}, step=batch_idx)
 
                 wandb.log({'Sim. Metrics/prob_fac': torch.sigmoid(out_sim['logits']).sum().item()/(len(target_df)+0.1)}, step=batch_idx)
                 wandb.log({'Sim. Metrics/n_em_fac': len(pred_df)/(len(target_df)+0.1)}, step=batch_idx)

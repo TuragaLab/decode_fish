@@ -450,6 +450,9 @@ class OutputNet(nn.Module):
         self.p_out2 = nn.Conv3d(f_maps, 1, kernel_size=1, padding=0)
         nn.init.constant_(self.p_out2.bias,p_offset)
 
+        self.int_p_out1 = nn.Conv3d(f_maps, f_maps, kernel_size=kernel_size, padding=padding)
+        self.int_p_out2 = nn.Conv3d(f_maps, 16, kernel_size=1, padding=0)
+
         self.xyzi_out1 = nn.Conv3d(f_maps, f_maps, kernel_size=kernel_size, padding=padding)
         self.xyzi_out2 = nn.Conv3d(f_maps, xyzi_dim, kernel_size=1, padding=0)
 
@@ -474,6 +477,10 @@ class OutputNet(nn.Module):
         logit    = self.p_out2(logit)
         logit    = torch.clamp(logit, -15., 15)
 
+        int_logit    = F.elu(self.int_p_out1(x))
+        int_logit    = self.int_p_out2(int_logit)
+        int_logit    = torch.clamp(int_logit, -15., 15)
+
         xyzi = F.elu(self.xyzi_out1(x))
         xyzi = self.xyzi_out2(xyzi)
 
@@ -490,7 +497,7 @@ class OutputNet(nn.Module):
         background = self.bg_out2(background)
         background = F.softplus(background)
 
-        return torch.cat([logit,xyzi_mu,xyzi_sig,background],1)
+        return torch.cat([logit,xyzi_mu,xyzi_sig,background, int_logit],1)
 
 
 class UnetDecodeNoBn(nn.Module):
@@ -546,19 +553,19 @@ class UnetDecodeNoBn(nn.Module):
 
     def forward(self, x, shuffle_ch=False):
 
-        if shuffle_ch:
-            perm_inds = np.random.permutation(np.arange(self.ch_in))
-            x = x[:,perm_inds]
+#         if shuffle_ch:
+#             perm_inds = np.random.permutation(np.arange(self.ch_in))
+#             x = x[:,perm_inds]
 
         x = (x-self.inp_offset) / self.inp_scale
 
         for net in self.network:
             x = net(x)
 
-        if shuffle_ch:
-            x[:,4:20] = x[:,4:20][:,np.argsort(perm_inds)]
-            x[:,23:39] = x[:,23:39][:,np.argsort(perm_inds)]
-            x[:,39:] = x[:,39:][:,np.argsort(perm_inds)]
+#         if shuffle_ch:
+#             x[:,4:20] = x[:,4:20][:,np.argsort(perm_inds)]
+#             x[:,23:39] = x[:,23:39][:,np.argsort(perm_inds)]
+#             x[:,39:] = x[:,39:][:,np.argsort(perm_inds)]
 
         return x
 
@@ -566,7 +573,7 @@ class UnetDecodeNoBn(nn.Module):
 
         # Limit intensity
 #         x[:,4] = x[:,4] + float(self.int_dist.int_loc.detach()) + 0.01
-        x[:,39:] = x[:,39:] * self.inp_scale
+        x[:,39:55] = x[:,39:55] * self.inp_scale
 
         if not self.pred_z:
 
@@ -583,6 +590,7 @@ class UnetDecodeNoBn(nn.Module):
             ret_dict = {'logits': x[:,0:1],
                         'xyzi_mu': x[:,1:20],
                         'xyzi_sigma': x[:,20:39],
-                        'background': x[:,39:]}
+                        'background': x[:,39:55],
+                        'int_logits': x[:,55:]}
 
         return ret_dict

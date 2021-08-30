@@ -7,6 +7,7 @@ __all__ = ['ext_log_prob', 'PointProcessGaussian', 'get_sample_mask', 'get_true_
 from ..imports import *
 from torch import distributions as D, Tensor
 from torch.distributions import Distribution
+from torch.distributions.utils import _sum_rightmost
 
 # Cell
 def ext_log_prob(mix, x):
@@ -80,28 +81,28 @@ class PointProcessGaussian(Distribution):
 
         mix = D.Categorical(mixture_probs[pix_inds].reshape(batch_size,-1))
 
-#         xyzi_sig[:,:,3:] = xyzi_sig[:,:,3:] + min_int_sig
-#         comp = D.Independent(D.Normal(xyzi_mu, xyzi_sig + 0.00001), 1)
-#         spatial_gmm = D.MixtureSameFamily(mix, comp)
-#         spatial_prob = spatial_gmm.log_prob(xyzi.transpose(0, 1)).transpose(0,1)
-#         total_prob = (spatial_prob * s_mask).sum(-1)
+        xyzi_sig[:,:,3:] = xyzi_sig[:,:,3:] + min_int_sig
+        comp = D.Independent(D.Normal(xyzi_mu, xyzi_sig + 0.00001), 1)
+        spatial_gmm = D.MixtureSameFamily(mix, comp)
+        spatial_prob = spatial_gmm.log_prob(xyzi.transpose(0, 1)).transpose(0,1)
+        total_prob = (spatial_prob * s_mask).sum(-1)
 
-        xyz_sl = np.s_[:,:,:3]
-        int_sl = np.s_[:,:,3:]
+#         xyz_sl = np.s_[:,:,:3]
+#         int_sl = np.s_[:,:,3:]
 
-        xyzi_sig[int_sl] = xyzi_sig[int_sl] + min_int_sig
+#         xyzi_sig[int_sl] = xyzi_sig[int_sl] + min_int_sig
 
-        comp_xyz = D.Independent(D.Normal(xyzi_mu[xyz_sl], xyzi_sig[xyz_sl] + 0.00001), 1)
-        comp_int = D.Independent(D.Normal(xyzi_mu[int_sl], xyzi_sig[int_sl] + 0.00001), 1)
+#         comp_xyz = D.Independent(D.Normal(xyzi_mu[xyz_sl], xyzi_sig[xyz_sl] + 0.00001), 1)
+#         comp_int = D.Independent(D.Normal(xyzi_mu[int_sl], xyzi_sig[int_sl] + 0.00001), 1)
 
-        spatial_gmm = D.MixtureSameFamily(mix, comp_xyz)
-        int_gmm = D.MixtureSameFamily(mix, comp_int)
+#         spatial_gmm = D.MixtureSameFamily(mix, comp_xyz)
+#         int_gmm = D.MixtureSameFamily(mix, comp_int)
 
-        spatial_prob, log_mix_prob = ext_log_prob(spatial_gmm, xyzi[xyz_sl].transpose(0, 1))
-        int_prob, _                = ext_log_prob(int_gmm, xyzi[int_sl].transpose(0, 1))
+#         spatial_prob, log_mix_prob = ext_log_prob(spatial_gmm, xyzi[xyz_sl].transpose(0, 1))
+#         int_prob, _                = ext_log_prob(int_gmm, xyzi[int_sl].transpose(0, 1))
 
-        total_prob = torch.logsumexp(spatial_prob + int_fac*int_prob + log_mix_prob,-1).transpose(0, 1)
-        total_prob = (total_prob * s_mask).sum(-1)
+#         total_prob = torch.logsumexp(spatial_prob + int_fac*int_prob + log_mix_prob,-1).transpose(0, 1)
+#         total_prob = (total_prob * s_mask).sum(-1)
 
         return count_prob, total_prob
 

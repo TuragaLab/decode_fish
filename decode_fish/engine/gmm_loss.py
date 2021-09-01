@@ -41,8 +41,73 @@ class PointProcessGaussian(Distribution):
         self.xyzi_sigma = xyzi_sigma
         self.int_logits = int_logits
 
-
     def log_prob(self, locations, x_offset, y_offset, z_offset, intensities, n_bits, channels, min_int_sig, int_fac=1):
+
+        gauss_dim = 3 + channels
+        batch_size = self.logits.shape[0]
+        if channels == 1:
+            xyzi, s_mask = get_true_labels(batch_size, locations, x_offset, y_offset, z_offset, intensities)
+        else:
+            xyzi, s_mask = get_true_labels_mf(batch_size, n_bits, channels,
+                                              locations, x_offset, y_offset, z_offset, intensities)
+        counts = s_mask.sum(-1)
+
+        P = torch.sigmoid(self.logits)
+        count_mean = P.sum(dim=[2, 3, 4]).squeeze(-1)
+        count_var = (P - P ** 2).sum(dim=[2, 3, 4]).squeeze(-1)
+        count_dist = D.Normal(count_mean, torch.sqrt(count_var))
+
+        count_prob =  count_dist.log_prob(counts) # * counts
+
+        pix_inds = torch.nonzero(P,as_tuple=True)
+
+        xyzi_mu = self.xyzi_mu[pix_inds[0],:,pix_inds[2],pix_inds[3],pix_inds[4]]
+        xyzi_mu[:,:3] += torch.stack([pix_inds[4],pix_inds[3],pix_inds[2]], 1) + 0.5
+        xyzi_mu = xyzi_mu.reshape(batch_size,-1,gauss_dim)
+        xyzi_sig = self.xyzi_sigma[pix_inds[0],:,pix_inds[2],pix_inds[3],pix_inds[4]].reshape(batch_size,-1,gauss_dim)
+
+
+        int_P = torch.sigmoid(self.int_logits)[:,:channels]
+
+        int_mean = int_P.sum(dim=[1])
+        int_var = (int_P - int_P ** 2).sum(dim=[1])
+        int_dist = D.Normal(int_mean, torch.sqrt(int_var))
+
+        int_count_prob = (P[:,0].detach() * int_dist.log_prob(torch.ones_like(int_mean).cuda() * n_bits)).sum(dim=[1,2,3])
+
+        mix_logits = self.logits[pix_inds].reshape(batch_size,-1)
+        int_logits = rearrange(self.int_logits[pix_inds[0],:,pix_inds[2],pix_inds[3],pix_inds[4]], '(b p) ch -> b p ch', b=batch_size)
+
+        '''split int 2'''
+        xyz_sl = np.s_[:,:,:3]
+        int_sl = np.s_[:,:,3:3+channels]
+
+        comp_xyz = D.Independent(D.Normal(xyzi_mu[xyz_sl], xyzi_sig[xyz_sl] + 0.00001), 1)
+        comp_int = D.Independent(D.Normal(xyzi_mu[int_sl], xyzi_sig[int_sl] + min_int_sig), 1)
+
+        xyz = xyzi[xyz_sl].transpose(0, 1)[:,:,None,:]
+        log_prob_xyz = comp_xyz.base_dist.log_prob(xyz)
+        log_prob_xyz = _sum_rightmost(log_prob_xyz, 1)
+
+        log_mix_prob_xyz = torch.log_softmax(mix_logits, -1)
+
+        ''' '''
+        int_ch = xyzi[int_sl].transpose(0, 1)[:,:,None,:]
+        int_bin = torch.where(int_ch > 0, torch.ones_like(int_ch), torch.zeros_like(int_ch))
+        log_prob_int = comp_int.base_dist.log_prob(int_ch)
+
+        log_mix_prob_int = torch.log_softmax(int_logits, dim=-1) + torch.log(4*torch.ones(1)).cuda()
+
+        total_prob_int = torch.logsumexp(torch.gather((log_prob_int + log_mix_prob_int), -1, int_bin.argsort(-1, descending=True).expand(-1,-1,log_prob_int.shape[2],-1))[...,:4] ,-1)
+        total_prob_xyz = torch.logsumexp(log_prob_xyz + log_mix_prob_xyz + total_prob_int,-1).transpose(0, 1)
+
+#         total_prob_xyz = torch.logsumexp(log_prob_xyz + log_mix_prob_xyz + _sum_rightmost(log_prob_int, 1),-1).transpose(0, 1)
+
+        total_prob = ((total_prob_xyz) * s_mask).sum(-1)
+
+        return count_prob + 0.0*int_count_prob, total_prob
+
+    def log_prob_old(self, locations, x_offset, y_offset, z_offset, intensities, n_bits, channels, min_int_sig, int_fac=1):
         """ Creates the distributions for the count and localization loss and evaluates the log probability for the given set of localizations under those distriubtions.
 
             Args:
@@ -91,46 +156,21 @@ class PointProcessGaussian(Distribution):
 #         spatial_prob = spatial_gmm.log_prob(xyzi.transpose(0, 1)).transpose(0,1)
 #         total_prob = (spatial_prob * s_mask).sum(-1)
         '''split int'''
-#         xyz_sl = np.s_[:,:,:3]
-#         int_sl = np.s_[:,:,3:]
-
-#         xyzi_sig[int_sl] = xyzi_sig[int_sl] + min_int_sig
-
-#         comp_xyz = D.Independent(D.Normal(xyzi_mu[xyz_sl], xyzi_sig[xyz_sl] + 0.00001), 1)
-#         comp_int = D.Independent(D.Normal(xyzi_mu[int_sl], xyzi_sig[int_sl] + 0.00001), 1)
-
-#         spatial_gmm = D.MixtureSameFamily(mix, comp_xyz)
-#         int_gmm = D.MixtureSameFamily(mix, comp_int)
-
-#         spatial_prob, log_mix_prob = ext_log_prob(spatial_gmm, xyzi[xyz_sl].transpose(0, 1))
-#         int_prob, _                = ext_log_prob(int_gmm, xyzi[int_sl].transpose(0, 1))
-
-#         total_prob = torch.logsumexp(spatial_prob + int_fac*int_prob + log_mix_prob,-1).transpose(0, 1)
-#         total_prob = (total_prob * s_mask).sum(-1)
-        '''split int 2'''
         xyz_sl = np.s_[:,:,:3]
-        int_sl = np.s_[:,:,3:3+channels]
+        int_sl = np.s_[:,:,3:]
+
+        xyzi_sig[int_sl] = xyzi_sig[int_sl] + min_int_sig
 
         comp_xyz = D.Independent(D.Normal(xyzi_mu[xyz_sl], xyzi_sig[xyz_sl] + 0.00001), 1)
-        comp_int = D.Independent(D.Normal(xyzi_mu[int_sl], xyzi_sig[int_sl] + min_int_sig), 1)
+        comp_int = D.Independent(D.Normal(xyzi_mu[int_sl], xyzi_sig[int_sl] + 0.00001), 1)
 
         spatial_gmm = D.MixtureSameFamily(mix, comp_xyz)
-        # int_gmm = D.MixtureSameFamily(int_mix, comp_int)
+        int_gmm = D.MixtureSameFamily(mix, comp_int)
 
-        spatial_prob, log_mix_prob1 = ext_log_prob(spatial_gmm, xyzi[xyz_sl].transpose(0, 1))
+        spatial_prob, log_mix_prob = ext_log_prob(spatial_gmm, xyzi[xyz_sl].transpose(0, 1))
+        int_prob, _                = ext_log_prob(int_gmm, xyzi[int_sl].transpose(0, 1))
 
-        ''' '''
-        x = xyzi[int_sl].transpose(0, 1)
-        x = spatial_gmm._pad(x)
-#         x_bin = torch.where(x > 0, torch.ones_like(x), torch.zeros_like(x))
-        log_prob_x = comp_int.base_dist.log_prob(x) # * x_bin
-        int_prob = _sum_rightmost(log_prob_x, 1)
-        log_mix_prob2 = 0
-#         log_mix_prob2 = torch.log_softmax(rearrange(int_mix.logits, 'b (ch p) -> b p ch', ch=channels), dim=-1)
-#         log_mix_prob2 = _sum_rightmost(log_mix_prob2, 1)
-        ''' '''
-        total_prob = torch.logsumexp(spatial_prob + log_mix_prob1 + int_prob + log_mix_prob2,-1).transpose(0, 1)
-
+        total_prob = torch.logsumexp(spatial_prob + 0*int_prob + log_mix_prob,-1).transpose(0, 1)
         total_prob = (total_prob * s_mask).sum(-1)
 
         return count_prob, total_prob

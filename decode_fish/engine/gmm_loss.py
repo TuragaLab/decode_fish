@@ -9,6 +9,7 @@ from torch import distributions as D, Tensor
 from torch.distributions import Distribution
 from torch.distributions.utils import _sum_rightmost
 from einops import rearrange
+import torch.tensor as T
 
 # Cell
 def ext_log_prob(mix, x):
@@ -65,8 +66,6 @@ class PointProcessGaussian(Distribution):
         xyzi_mu[:,:3] += torch.stack([pix_inds[4],pix_inds[3],pix_inds[2]], 1) + 0.5
         xyzi_mu = xyzi_mu.reshape(batch_size,-1,gauss_dim)
         xyzi_sig = self.xyzi_sigma[pix_inds[0],:,pix_inds[2],pix_inds[3],pix_inds[4]].reshape(batch_size,-1,gauss_dim)
-
-
         int_P = torch.sigmoid(self.int_logits)[:,:channels]
 
         int_mean = int_P.sum(dim=[1])
@@ -78,32 +77,61 @@ class PointProcessGaussian(Distribution):
         mix_logits = self.logits[pix_inds].reshape(batch_size,-1)
         int_logits = rearrange(self.int_logits[pix_inds[0],:,pix_inds[2],pix_inds[3],pix_inds[4]], '(b p) ch -> b p ch', b=batch_size)
 
-        '''split int 2'''
-        xyz_sl = np.s_[:,:,:3]
-        int_sl = np.s_[:,:,3:3+channels]
+        '''w4'''
+        comp_xyz = D.Independent(D.Normal(xyzi_mu, xyzi_sig + 0.00001), 1)
 
-        comp_xyz = D.Independent(D.Normal(xyzi_mu[xyz_sl], xyzi_sig[xyz_sl] + 0.00001), 1)
-        comp_int = D.Independent(D.Normal(xyzi_mu[int_sl], xyzi_sig[int_sl] + min_int_sig), 1)
+        xyzi = xyzi.transpose(0, 1)[:,:,None,:]
+        log_prob_xyzi = comp_xyz.base_dist.log_prob(xyzi)
 
-        xyz = xyzi[xyz_sl].transpose(0, 1)[:,:,None,:]
-        log_prob_xyz = comp_xyz.base_dist.log_prob(xyz)
-        log_prob_xyz = _sum_rightmost(log_prob_xyz, 1)
-
-        log_mix_prob_xyz = torch.log_softmax(mix_logits, -1)
-
+        log_cat_prob = torch.log_softmax(mix_logits, -1)
+        log_mix_prob_int = torch.log_softmax(int_logits, dim=-1) + torch.log(T(4)).cuda()
+        log_mix_prob_xyzi = torch.cat([torch.zeros_like(log_mix_prob_int[...,:3]),log_mix_prob_int], -1)
         ''' '''
-        int_ch = xyzi[int_sl].transpose(0, 1)[:,:,None,:]
-        int_bin = torch.where(int_ch > 0, torch.ones_like(int_ch), torch.zeros_like(int_ch))
-        log_prob_int = comp_int.base_dist.log_prob(int_ch)
 
-        log_mix_prob_int = torch.log_softmax(int_logits, dim=-1) + torch.log(4*torch.ones(1)).cuda()
+        int_bin = torch.where(xyzi != 0, torch.ones_like(xyzi), torch.zeros_like(xyzi))
+        log_prob_xyzi[int_bin.expand(-1,-1,log_prob_xyzi.shape[2],-1) == 0] = -10000
 
-        total_prob_int = torch.logsumexp(torch.gather((log_prob_int + log_mix_prob_int), -1, int_bin.argsort(-1, descending=True).expand(-1,-1,log_prob_int.shape[2],-1))[...,:4] ,-1)
-        total_prob_xyz = torch.logsumexp(log_prob_xyz + log_mix_prob_xyz + total_prob_int,-1).transpose(0, 1)
+        w2_inp = log_prob_xyzi + log_mix_prob_xyzi
 
-#         total_prob_xyz = torch.logsumexp(log_prob_xyz + log_mix_prob_xyz + _sum_rightmost(log_prob_int, 1),-1).transpose(0, 1)
+        total_prob_int = torch.logsumexp(w2_inp ,-1)
+        total_prob_xyz = torch.logsumexp(total_prob_int + log_cat_prob,-1).transpose(0, 1)
 
         total_prob = ((total_prob_xyz) * s_mask).sum(-1)
+
+        '''split int 2'''
+#         xyz_sl = np.s_[:,:,:3]
+#         int_sl = np.s_[:,:,3:3+channels]
+
+#         comp_xyz = D.Independent(D.Normal(xyzi_mu[xyz_sl], xyzi_sig[xyz_sl] + 0.00001), 1)
+#         comp_int = D.Independent(D.Normal(xyzi_mu[int_sl], xyzi_sig[int_sl] + min_int_sig), 1)
+
+#         xyz = xyzi[xyz_sl].transpose(0, 1)[:,:,None,:]
+#         log_prob_xyz = comp_xyz.base_dist.log_prob(xyz)
+#         log_prob_xyz = _sum_rightmost(log_prob_xyz, 1)
+
+#         log_mix_prob_xyz = torch.log_softmax(mix_logits, -1)
+
+#         ''' '''
+#         int_ch = xyzi[int_sl].transpose(0, 1)[:,:,None,:]
+#         int_bin = torch.where(int_ch > 0, torch.ones_like(int_ch), torch.zeros_like(int_ch))-
+#         log_prob_int = comp_int.base_dist.log_prob(int_ch)
+
+#         if int_fac:
+
+#             log_mix_prob_int = torch.log_softmax(int_logits, dim=-1) # + torch.log(4*torch.ones(1)).cuda()
+
+#     #         w1_inp = torch.gather((log_prob_int + log_mix_prob_int), -1, int_bin.argsort(-1, descending=True).expand(-1,-1,log_prob_int.shape[2],-1))[...,:4]
+
+#             log_prob_int[int_bin.expand(-1,-1,log_prob_int.shape[2],-1) == 0] = -100
+#             w2_inp = log_prob_int + log_mix_prob_int
+
+#             total_prob_int = torch.logsumexp(w2_inp ,-1)
+#             total_prob_xyz = torch.logsumexp(log_prob_xyz + log_mix_prob_xyz + total_prob_int,-1).transpose(0, 1)
+#         else:
+#             total_prob_xyz = torch.logsumexp(log_prob_xyz + log_mix_prob_xyz + _sum_rightmost(log_prob_int, 1),-1).transpose(0, 1) # old loss new format
+#             int_count_prob = 0
+
+#         total_prob = ((total_prob_xyz) * s_mask).sum(-1)
 
         return count_prob + 0.0*int_count_prob, total_prob
 

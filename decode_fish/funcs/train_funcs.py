@@ -226,10 +226,14 @@ def train(cfg,
 
                 try:
                     int_corrs = [np.corrcoef(matches[f'int_{i}_pred'],matches[f'int_{i}_tar'])[0,1] for i in range(16)]
+                    int_p_corrs = [np.corrcoef(matches[f'int_p_{i}_pred'],np.where(matches[f'int_{i}_tar'].values,1,0))[0,1] for i in range(16)]
                 except ZeroDivisionError:
                     int_corrs = [0]
+                    int_p_corrs = [0]
+
 
                 wandb.log({'Sim. Metrics/int_corrs': np.mean(int_corrs)}, step=batch_idx)
+                wandb.log({'Sim. Metrics/int_p_corrs': np.mean(int_p_corrs)}, step=batch_idx)
 
                 wandb.log({'Sim. Metrics/prob_fac': torch.sigmoid(out_sim['logits']).sum().item()/(len(target_df)+0.1)}, step=batch_idx)
                 wandb.log({'Sim. Metrics/n_em_fac': len(pred_df)/(len(target_df)+0.1)}, step=batch_idx)

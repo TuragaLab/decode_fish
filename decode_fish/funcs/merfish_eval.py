@@ -125,7 +125,7 @@ def vcorrcoef(X,y):
 def bce_code(ref_code, pred_code):
 
     bce = torch.nn.BCELoss(reduction='none')
-    return bce(T(ref_code, dtype=torch.float32), T(pred_code[None].repeat(len(ref_code),0), dtype=torch.float32)).mean(-1)
+    return np.array(bce(T(ref_code, dtype=torch.float32), T(pred_code[None].repeat(len(ref_code),0), dtype=torch.float32)).mean(-1))
 
 # Cell
 def match_bench(pred_df, bench_df):
@@ -145,9 +145,9 @@ def match_bench(pred_df, bench_df):
     return matches, bench_match
 
 # Cell
-def get_code_from_ints(pred_df, code_ref, targets, func=vcorrcoef, int_str=''):
+def get_code_from_ints(pred_df, code_ref, targets, func=vcorrcoef, int_str='', p_str=''):
 
-    int_keys = [f'int_{i}{int_str}' for i in range(16)]
+    int_keys = [f'int_{p_str}{i}{int_str}' for i in range(16)]
     int_pred = pred_df[int_keys].values
 
     res_df = pred_df.copy()

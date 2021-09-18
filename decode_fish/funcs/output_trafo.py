@@ -168,8 +168,15 @@ class SIPostProcess(torch.nn.Module):
         x_os_3d = res_dict['xyzi_mu'][:,[0]][locations]
         y_os_3d = res_dict['xyzi_mu'][:,[1]][locations]
         z_os_3d = res_dict['xyzi_mu'][:,[2]][locations]
-        ints_3d = res_dict['xyzi_mu'][:,[3+channel]][locations]
         output_shape  = res_dict['Samples_si'].shape
+
+        int_p_mask = torch.where(torch.sigmoid(res_dict['int_logits']) > 0.8, torch.ones_like(res_dict['int_logits']), torch.zeros_like(res_dict['int_logits']))
+        ints_3d = (int_p_mask * res_dict['xyzi_mu'][:,3:])[:,[channel]][locations]
+
+#         int_p_mask = torch.where(res_dict['int_logits'] >= res_dict['int_logits'].sort(1, descending=True).values[:,3:4], torch.ones_like(res_dict['int_logits']), torch.zeros_like(res_dict['int_logits']))
+#         ints_3d = (int_p_mask * res_dict['xyzi_mu'][:,3:])[:,[channel]][locations]
+
+#         ints_3d = res_dict['xyzi_mu'][:,[3+channel]][locations]
 
         return locations, x_os_3d, y_os_3d, z_os_3d, ints_3d, output_shape
 

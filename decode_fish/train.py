@@ -40,7 +40,7 @@ def my_app(cfg):
     model.to(cfg.device.gpu_device)
     micro.to(cfg.device.gpu_device)
     
-    if cfg.evaluation is not None:
+    if cfg.evaluation.image_path is not None:
         eval_dict = dict(cfg.evaluation)
         eval_dict['crop_sl'] = eval(eval_dict['crop_sl'],{'__builtins__': None},{'s_': np.s_})
         eval_dict['px_size_zyx'] = list(eval_dict['px_size_zyx'])

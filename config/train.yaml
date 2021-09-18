@@ -3,6 +3,7 @@ defaults:
 
 base_dir: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/
 run_name: test/test_sub
+sub_name: 
 cfg_path: ${base_dir}/decode_fish/config/train.yaml
 seed: 0
 
@@ -19,7 +20,8 @@ output:
     wandb_mode: online # offline , disabled
   
 data_path: 
-    image_path: 
+    image_path:
+    image_shape: 
     psf_path: 
     model_init: 
     
@@ -43,6 +45,10 @@ bg_estimation:
     smoothing:
         _target_: decode_fish.funcs.dataset.GaussianSmoothing
         smoothing_filter_size: 5
+    uniform:
+        _target_: decode_fish.funcs.dataset.UniformValue
+        min_val: 100.
+        max_val: 100.
     fractal:
         _target_: decode_fish.funcs.dataset.AddPerlinNoise
         shape: ${random_crop.crop_sz}
@@ -118,6 +124,7 @@ training:
     start_int: 0
     start_mic: 0 
     shuffle_ch: False
+    old_loss: False
     net:
         bl_loss_scale: 0.01
         cnt_loss_scale: 1

@@ -129,8 +129,12 @@ def train(cfg,
 
         out_sim = model.tensor_to_dict(model(xsim_noise, shuffle_ch=cfg.training.shuffle_ch))
 
-        count_prob, spatial_prob = PointProcessGaussian(**out_sim).log_prob(*sim_vars[:5], n_bits=cfg.exp_type.n_bits,
-                                                                            channels=cfg.exp_type.channels, min_int_sig=cfg.training.net.min_int_sig, int_fac=cfg.training.net.int_fac)
+        ppg = PointProcessGaussian(**out_sim)
+        if not cfg.training.old_loss:
+            count_prob, spatial_prob = ppg.log_prob(*sim_vars[:5], n_bits=cfg.exp_type.n_bits, channels=cfg.exp_type.channels, min_int_sig=cfg.training.net.min_int_sig, int_fac=cfg.training.net.int_fac)
+        else:
+            count_prob, spatial_prob = ppg.log_prob_old(*sim_vars[:5], n_bits=cfg.exp_type.n_bits, channels=cfg.exp_type.channels, min_int_sig=cfg.training.net.min_int_sig, int_fac=cfg.training.net.int_fac)
+
         gmm_loss = -(spatial_prob + cfg.training.net.cnt_loss_scale*count_prob).mean()
 
         background_loss = F.mse_loss(out_sim['background'], background) * cfg.training.net.bl_loss_scale

@@ -235,24 +235,30 @@ def load_post_proc(cfg):
 
 def get_dataloader(cfg):
 
-    if  cfg.exp_type.name == 'smfish':
-        if not cfg.exp_type.ch_to_batch:
-            imgs_3d = [load_tiff_image(f)[cfg.exp_type.sm_fish_ch:cfg.exp_type.sm_fish_ch+1] for f in sorted(glob.glob(cfg.data_path.image_path))]
+    if cfg.data_path.image_path is not None:
+        if  cfg.exp_type.name == 'smfish':
+            if not cfg.exp_type.ch_to_batch:
+                imgs_3d = [load_tiff_image(f)[cfg.exp_type.sm_fish_ch:cfg.exp_type.sm_fish_ch+1] for f in sorted(glob.glob(cfg.data_path.image_path))]
+            else:
+                imgs_3d = [load_tiff_image(f) for f in sorted(glob.glob(cfg.data_path.image_path))]
+                imgs_3d = [img.shape([-1,1,img.shape[-3],img.shape[-2],img.shape[-1]]) for img in imgs_3d]
         else:
-            imgs_3d = [load_tiff_image(f) for f in sorted(glob.glob(cfg.data_path.image_path))]
-            imgs_3d = [img.shape([-1,1,img.shape[-3],img.shape[-2],img.shape[-1]]) for img in imgs_3d]
-    else:
-        imgs_3d       = [load_tiff_image(f) for f in sorted(glob.glob(cfg.data_path.image_path))]
+            imgs_3d       = [load_tiff_image(f) for f in sorted(glob.glob(cfg.data_path.image_path))]
 
-    roi_masks     = [get_roi_mask(img, tuple(cfg.roi_mask.pool_size), percentile= cfg.roi_mask.percentile) for img in imgs_3d]
+        roi_masks     = [get_roi_mask(img, tuple(cfg.roi_mask.pool_size), percentile= cfg.roi_mask.percentile) for img in imgs_3d]
+        gen_bg        = [hydra.utils.instantiate(cfg.bg_estimation.smoothing, z_size=crop_zyx[0])]
+        dataset_tfms  = [rand_crop]
+    else:
+        imgs_3d = [torch.empty(list(cfg.data_path.image_shape))]
+        roi_masks     = None
+        gen_bg        = [hydra.utils.instantiate(cfg.bg_estimation.uniform)]
+        dataset_tfms  = []
 
     min_shape = tuple(np.stack([v.shape for v in imgs_3d]).min(0)[-3:])
     crop_zyx = (cfg.random_crop.crop_sz, cfg.random_crop.crop_sz,cfg.random_crop.crop_sz)
     if crop_zyx > min_shape:
         crop_zyx = tuple(np.stack([min_shape, crop_zyx]).min(0))
         print('Crop size larger than volume in at least one dimension. Crop size changed to', crop_zyx)
-
-    gen_bg        = [hydra.utils.instantiate(cfg.bg_estimation.smoothing, z_size=crop_zyx[0])]
 
     if cfg.bg_estimation.fractal.scale:
         gen_bg.append(hydra.utils.instantiate(cfg.bg_estimation.fractal))
@@ -261,8 +267,6 @@ def get_dataloader(cfg):
 
     probmap_generator = UniformValue(cfg.prob_generator.low, cfg.prob_generator.high)
     rate_tfms = [probmap_generator]
-
-    dataset_tfms = [rand_crop]
 
     if cfg.foci is not None:
         if cfg.foci.n_foci_avg > 0:

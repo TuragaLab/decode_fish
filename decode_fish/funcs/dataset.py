@@ -69,10 +69,12 @@ class DecodeDataset:
 
     @staticmethod
     def _compose(x, list_func, **kwargs):
-        if not list_func: list_func.append(lambda x: x)
+#         if not list_func: list_func.append(lambda x: x)
+        if not list_func:
+            return x
         for func in list_func:
             x = func(x, **kwargs)
-        return x
+            return x
 
 # Cell
 def print_class_signature(self, nms):
@@ -143,7 +145,7 @@ class RandScale(TransformBase):
         return ratio * x
 
 class UniformValue(TransformBase):
-    def __init__(self, min_val, max_val):
+    def __init__(self, min_val=0., max_val=0.):
         self.min_val = min_val
         self.max_val = max_val
 
@@ -187,7 +189,7 @@ class RandomCrop3D(TransformBase):
     def __call__(self, x, **kwargs):
         ch, h, w, d = x.shape
         img_sz  = tuple((h, w, d))
-        assert (img_sz) >  self.crop_sz
+        assert (img_sz) >=  self.crop_sz
         super().__call__(x, **kwargs)
         slice_hwd = [self._get_slice(i, k) for i, k in zip(img_sz, self.crop_sz)]
         if 'ind' in kwargs:

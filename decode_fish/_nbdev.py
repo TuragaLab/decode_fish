@@ -73,6 +73,7 @@ index = {"number_of_features_per_level": "00_models.ipynb",
          "ISIPostProcess": "09_output_trafo.ipynb",
          "matching": "10_evaluation.ipynb",
          "shift_df": "11_emitter_io.ipynb",
+         "percentile_filter": "11_emitter_io.ipynb",
          "sig_filt": "11_emitter_io.ipynb",
          "nm_to_px": "11_emitter_io.ipynb",
          "px_to_nm": "11_emitter_io.ipynb",
@@ -134,7 +135,10 @@ index = {"number_of_features_per_level": "00_models.ipynb",
          "input_from_df": "22_MERFISH_codenet.ipynb",
          "extract_rmses": "22_MERFISH_codenet.ipynb",
          "code_net": "22_MERFISH_codenet.ipynb",
-         "net": "22_MERFISH_codenet.ipynb"}
+         "net": "22_MERFISH_codenet.ipynb",
+         "get_istdeco_df": "23_MERFISH_comparison.ipynb",
+         "get_bardensr_tensor": "23_MERFISH_comparison.ipynb",
+         "get_bardensr_df": "23_MERFISH_comparison.ipynb"}
 
 modules = ["engine/model.py",
            "engine/psf.py",
@@ -156,7 +160,8 @@ modules = ["engine/model.py",
            "funcs/predict.py",
            "funcs/merfish_eval.py",
            "funcs/merfish_viz.py",
-           "funcs/merfish_codenet.py"]
+           "funcs/merfish_codenet.py",
+           "funcs/merfish_comparison.py"]
 
 doc_url = "https://turagalab.github.io/decode_fish/"
 

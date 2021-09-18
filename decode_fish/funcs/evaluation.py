@@ -10,7 +10,7 @@ from  decode_fish.funcs.emitter_io import *
 from scipy.spatial import cKDTree
 
 # Cell
-def matching(target_df, pred_df, tolerance=500, print_res=True, eff_const=0.5):
+def matching(target_df, pred_df, tolerance=500, print_res=True, eff_const=0.5, match_genes=False):
     """Matches localizations to ground truth positions and provides assessment metrics used in the SMLM2016 challenge.
     (see http://bigwww.epfl.ch/smlm/challenge2016/index.html?p=methods#6)
     When using default parameters exactly reproduces the procedure used for the challenge (i.e. produces same numbers as the localization tool).
@@ -66,6 +66,10 @@ def matching(target_df, pred_df, tolerance=500, print_res=True, eff_const=0.5):
             tar_xyz = sub_tar[['x','y','z']]
             pred_xyz = sub_pred[['x','y','z']]
 
+            if match_genes:
+                tar_gene = sub_tar['code_inds']
+                pred_gene = sub_pred['code_inds']
+
             u_dists = []
             u_p_inds = []
             u_t_inds = []
@@ -84,6 +88,11 @@ def matching(target_df, pred_df, tolerance=500, print_res=True, eff_const=0.5):
                 for d,p,t in zip(dists, p_inds, t_inds):
 
                     if p not in u_p_inds and t not in u_t_inds:
+
+                        if match_genes:
+                            if pred_gene[p] != tar_gene[t]:
+                                continue
+
                         u_dists.append(d)
                         u_p_inds.append(p)
                         u_t_inds.append(t)

@@ -42,7 +42,7 @@ class PointProcessGaussian(Distribution):
         self.xyzi_sigma = xyzi_sigma
         self.int_logits = int_logits
 
-    def log_prob(self, locations, x_offset, y_offset, z_offset, intensities, n_bits, channels, min_int_sig, int_fac=1):
+    def log_prob(self, locations, x_offset, y_offset, z_offset, intensities, n_bits, channels, min_int_sig, int_fac=1, old_loss=False):
 
         gauss_dim = 3 + channels
         batch_size = self.logits.shape[0]
@@ -66,6 +66,7 @@ class PointProcessGaussian(Distribution):
         xyzi_mu[:,:3] += torch.stack([pix_inds[4],pix_inds[3],pix_inds[2]], 1) + 0.5
         xyzi_mu = xyzi_mu.reshape(batch_size,-1,gauss_dim)
         xyzi_sig = self.xyzi_sigma[pix_inds[0],:,pix_inds[2],pix_inds[3],pix_inds[4]].reshape(batch_size,-1,gauss_dim)
+
         int_P = torch.sigmoid(self.int_logits)[:,:channels]
 
         int_mean = int_P.sum(dim=[1])
@@ -74,66 +75,69 @@ class PointProcessGaussian(Distribution):
 
         int_count_prob = (P[:,0].detach() * int_dist.log_prob(torch.ones_like(int_mean).cuda() * n_bits)).sum(dim=[1,2,3])
 
-        mix_logits = self.logits[pix_inds].reshape(batch_size,-1)
-        int_logits = rearrange(self.int_logits[pix_inds[0],:,pix_inds[2],pix_inds[3],pix_inds[4]], '(b p) ch -> b p ch', b=batch_size)
-
-        '''w4'''
-        comp_xyz = D.Independent(D.Normal(xyzi_mu, xyzi_sig + 0.00001), 1)
-
-        xyzi = xyzi.transpose(0, 1)[:,:,None,:]
-        log_prob_xyzi = comp_xyz.base_dist.log_prob(xyzi)
-
-        log_cat_prob = torch.log_softmax(mix_logits, -1)
-        log_mix_prob_int = torch.log_softmax(int_logits, dim=-1) + torch.log(T(4)).cuda()
-        log_mix_prob_xyzi = torch.cat([torch.zeros_like(log_mix_prob_int[...,:3]),log_mix_prob_int], -1)
-        ''' '''
-
-        int_bin = torch.where(xyzi != 0, torch.ones_like(xyzi), torch.zeros_like(xyzi))
-        log_prob_xyzi[int_bin.expand(-1,-1,log_prob_xyzi.shape[2],-1) == 0] = -10000
-
-        w2_inp = log_prob_xyzi + log_mix_prob_xyzi
-
-        total_prob_int = torch.logsumexp(w2_inp ,-1)
-        total_prob_xyz = torch.logsumexp(total_prob_int + log_cat_prob,-1).transpose(0, 1)
-
-        total_prob = ((total_prob_xyz) * s_mask).sum(-1)
-
         '''split int 2'''
-#         xyz_sl = np.s_[:,:,:3]
-#         int_sl = np.s_[:,:,3:3+channels]
+        # self.logits: probability output. batch_size * 1 * h * w * d
+        # self.int_logits: probability output for the 16 channels. batch_size * n_channels * h * w * d
 
-#         comp_xyz = D.Independent(D.Normal(xyzi_mu[xyz_sl], xyzi_sig[xyz_sl] + 0.00001), 1)
-#         comp_int = D.Independent(D.Normal(xyzi_mu[int_sl], xyzi_sig[int_sl] + min_int_sig), 1)
+        mix_logits = self.logits[pix_inds].reshape(batch_size,-1)                                                                           # batch_size * n_pixels. n_pixels = h * w * d
+        int_logits = rearrange(self.int_logits[pix_inds[0],:,pix_inds[2],pix_inds[3],pix_inds[4]], '(b p) ch -> b p ch', b=batch_size)      # batch_size * n_pixels * n_channels. n_pixels = h * w * d
 
-#         xyz = xyzi[xyz_sl].transpose(0, 1)[:,:,None,:]
-#         log_prob_xyz = comp_xyz.base_dist.log_prob(xyz)
-#         log_prob_xyz = _sum_rightmost(log_prob_xyz, 1)
+        # mix_logits: model output probability. batch_size * n_pixels. n_pixels = h * w * d
+        # int_logits: model output probability for the 16 channels. batch_size * n_pixels * n_channels
+        # xyzi_mu: model output (mean), batch_size * n_pixel * 19 : xyz + 16 intensities
+        # xyzi_sig: model output (sigma), batch_size * n_pixel * 19
 
-#         log_mix_prob_xyz = torch.log_softmax(mix_logits, -1)
+        xyz_sl = np.s_[:,:,:3]           # slice selecting xyz
+        int_sl = np.s_[:,:,3:3+channels] # slice selecting 16 intensities
 
-#         ''' '''
-#         int_ch = xyzi[int_sl].transpose(0, 1)[:,:,None,:]
-#         int_bin = torch.where(int_ch > 0, torch.ones_like(int_ch), torch.zeros_like(int_ch))-
-#         log_prob_int = comp_int.base_dist.log_prob(int_ch)
+        dist_normal_xyz = D.Independent(D.Normal(xyzi_mu[xyz_sl], xyzi_sig[xyz_sl] + 0.00001), 1)
+        dist_normal_int = D.Independent(D.Normal(xyzi_mu[int_sl], xyzi_sig[int_sl] + 0.00001), 1) # remove min_int_sig
+
+        # xyzi: ground truth position. N_gt * batch_size * 19. N_gt = maximum number of GT emitters in a batch.
+
+        xyz_inp = xyzi[xyz_sl].transpose(0, 1)[:,:,None,:]          # reshape for log_prob()
+        log_norm_prob_xyz = dist_normal_xyz.base_dist.log_prob(xyz_inp) # N_gt * batch_size * n_pixel * 3
+
+        log_cat_prob = torch.log_softmax(mix_logits, -1)        # normalized (sum to 1 over pixels) log probs for the categorical dist. of the GMM. batch_size * n_pixels
+
+        int_inp = xyzi[int_sl].transpose(0, 1)[:,:,None,:]                # reshape for log_prob()
+        log_norm_prob_int = dist_normal_int.base_dist.log_prob(int_inp)   # N_gt * batch_size * n_pixel * 16
+
+        if old_loss:
+#             Original loss computing the likelihood of a GMM with 19 dimensional Gaussians. Gives decent results.
+            log_norm_prob_xyz = _sum_rightmost(log_norm_prob_xyz, 1)         # N_gt * batch_size * n_pixel
+            total_prob = torch.logsumexp(log_norm_prob_xyz + log_cat_prob + _sum_rightmost(log_norm_prob_int, 1),-1).transpose(0, 1) # logsumexp over pixels. batch_size * N_gt
 
 #         if int_fac:
+#             # New loss. The idea is that by zeroing out the log probabilities of the empty channels the models learns to assign zero probability to them (because the probabilties are normed over the channels)
+#             # This works but the results are much worse. It seems that the chained logsumexp gives shitty gradients.
+#             log_norm_prob_xyz = _sum_rightmost(log_norm_prob_xyz, 1)         # N_gt * batch_size * n_pixel
+#             log_mix_prob_int = torch.log_softmax(int_logits, dim=-1)                             # normalized (sum to 1 over channels) log probs.  batch_size * n_pixels * n_channels
+#             log_norm_prob_int[int_inp.expand(-1,-1,log_norm_prob_int.shape[2],-1) == 0] = -1000  # Only 4 out of 16 channels contain signal. We zero out the remaining entries.
+#             total_prob_int = torch.logsumexp(log_norm_prob_int + log_mix_prob_int ,-1)           # logsumexp over pixels. N_gt * batch_size * n_pixels
+#             total_prob = torch.logsumexp(log_norm_prob_xyz + total_prob_int + log_cat_prob,-1).transpose(0, 1)
 
-#             log_mix_prob_int = torch.log_softmax(int_logits, dim=-1) # + torch.log(4*torch.ones(1)).cuda()
+#         if int_fac:
+#             log_mix_prob_int = torch.log(torch.sigmoid(int_logits))
 
-#     #         w1_inp = torch.gather((log_prob_int + log_mix_prob_int), -1, int_bin.argsort(-1, descending=True).expand(-1,-1,log_prob_int.shape[2],-1))[...,:4]
+        else:
+            log_mix_prob_int = torch.log_softmax(int_logits, dim=-1)
+    #             log_norm_prob_int[int_inp.expand(-1,-1,log_norm_prob_int.shape[2],-1) == 0] = 0
 
-#             log_prob_int[int_bin.expand(-1,-1,log_prob_int.shape[2],-1) == 0] = -100
-#             w2_inp = log_prob_int + log_mix_prob_int
+            rep_log_prob = torch.cat([log_norm_prob_xyz[...,None].expand(-1,-1,-1,-1,16), log_norm_prob_int[:,:,:,None]], 3) # batch_size * n_pixels  * 4 (xyzi) * n_channels
+            rep_log_prob = rep_log_prob.sum(3)
 
-#             total_prob_int = torch.logsumexp(w2_inp ,-1)
-#             total_prob_xyz = torch.logsumexp(log_prob_xyz + log_mix_prob_xyz + total_prob_int,-1).transpose(0, 1)
-#         else:
-#             total_prob_xyz = torch.logsumexp(log_prob_xyz + log_mix_prob_xyz + _sum_rightmost(log_prob_int, 1),-1).transpose(0, 1) # old loss new format
-#             int_count_prob = 0
+    #             rep_log_prob[int_inp.expand(-1,-1,log_norm_prob_int.shape[2],-1) == 0] = -10000
 
-#         total_prob = ((total_prob_xyz) * s_mask).sum(-1)
+            total_prob = torch.logsumexp(rep_log_prob + log_cat_prob[...,None].expand(-1,-1,channels) + log_mix_prob_int,2).transpose(0, 1)
+            total_prob = torch.gather(total_prob, -1, int_inp.argsort(-1, descending=True)[:,:,0].transpose(0, 1))[...,:4]
 
-        return count_prob + 0.0*int_count_prob, total_prob
+            total_prob = total_prob.sum(-1)
+
+        # s_mask: batch_size * N_gt. Binary mask to remove entries in all samples that have less then N_gt GT emitters.
+        total_prob = (total_prob * s_mask).sum(-1)
+
+        return count_prob + int_fac*int_count_prob, total_prob
 
     def log_prob_old(self, locations, x_offset, y_offset, z_offset, intensities, n_bits, channels, min_int_sig, int_fac=1):
         """ Creates the distributions for the count and localization loss and evaluates the log probability for the given set of localizations under those distriubtions.
@@ -198,9 +202,8 @@ class PointProcessGaussian(Distribution):
         spatial_prob, log_mix_prob = ext_log_prob(spatial_gmm, xyzi[xyz_sl].transpose(0, 1))
         int_prob, _                = ext_log_prob(int_gmm, xyzi[int_sl].transpose(0, 1))
 
-        total_prob = torch.logsumexp(spatial_prob + 0*int_prob + log_mix_prob,-1).transpose(0, 1)
+        total_prob = torch.logsumexp(spatial_prob + int_prob + log_mix_prob,-1).transpose(0, 1)
         total_prob = (total_prob * s_mask).sum(-1)
-
         return count_prob, total_prob
 
 def get_sample_mask(bs, locations):

@@ -49,7 +49,7 @@ from .merfish_eval import *
 
 def input_from_df(df):
 
-    input_keys = ['prob','x_sig','y_sig'] #, 'code_err'] #+ ['rec_rmses'] + [f'int_sig_{i}' for i in range(16)]
+    input_keys = ['prob','x_sig','y_sig','p_code_err'] #+ ['rec_rmses'] + [f'int_sig_{i}' for i in range(16)]
     inp_arr = df[input_keys].values
     int_sum = df[[f'int_{i}' for i in range(16)]].values.sum(-1)[:,None]
     ints_sum = df[[f'int_sig_{i}' for i in range(16)]].values.sum(-1)[:,None]
@@ -90,7 +90,7 @@ def extract_rmses(vol, ixy_coords, size_xy = 10, px_size=100):
 # Cell
 class code_net(nn.Module):
 
-    def __init__(self, n_inputs=5, n_outputs=1):
+    def __init__(self, n_inputs=6, n_outputs=1):
         super(code_net, self).__init__()
 
         self.fc1 = nn.Linear(n_inputs, 128)

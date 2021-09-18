@@ -1,16 +1,15 @@
-name: decode_fish_dev
+name: decode_fish_dev2
 
 channels:
   - pytorch
-  - conda-forge
   - defaults
   
 dependencies:
 
-  - python=3.9
+  - python=3.7
   - pip
   - pytorch=1.7.1
-  - cudatoolkit=10.2
+  - cudatoolkit=10.1
   - torchvision
   - h5py
   - matplotlib
@@ -21,11 +20,16 @@ dependencies:
   - seaborn=0.10
   - tifffile>=2020.2
   - tqdm
-  - hydra-core
+#   - hydra-core
   - pip:
       - nbdev
       - monai
       - wandb
+      - hydra-core
+      - numba
+      - sklearn
 
   # add kernel to jupyter
   - ipykernel
+  
+ # conda install tensorflow-gpu=2.4.1=h30adc30_0

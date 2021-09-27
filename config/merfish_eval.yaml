@@ -1,4 +1,4 @@
-sweep_name: sweep_sl_2
+sweep_name: sweep_sl_13
 run_name: 'psf_noise:0.1'
 
 out_file: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/decode_fish/data/results/MERFISH/merfish_${sweep_name}_${run_name}.csv
@@ -6,8 +6,8 @@ out_file: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/decode_fi
 model_cfg: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/models/fishcod/MERFISH_starfish/${sweep_name}/${run_name}/train.yaml
         
 training:
-    enabled: False
-    num_iters: 100
+    enabled: True
+    num_iters: 200
     rate_fac: 2.
     crop_sz: 64
     opt:

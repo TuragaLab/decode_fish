@@ -66,7 +66,7 @@ def my_app(cfg):
                 x, local_rate, background = next(iter(decode_dl))
                 sim_vars = PointProcessUniform(local_rate*cfg.training.rate_fac,model.int_dist.int_conc, model.int_dist.int_rate, 
                                                model.int_dist.int_loc, channels=16, n_bits=4, sim_z=model_cfg.exp_type.pred_z, 
-                                               codebook=torch.tensor(code_inds)).sample(from_code_book=True, phasing=model_cfg.exp_type.phasing)
+                                               codebook=torch.tensor(code_inds), int_option=model_cfg.training.int_option).sample(from_code_book=True, phasing=model_cfg.exp_type.phasing)
                 xsim = micro(*sim_vars, add_noise=True)
                 xsimn = micro.noise(xsim, background, const_theta_sim=False).sample()
 
@@ -77,22 +77,22 @@ def my_app(cfg):
                 res_dict = model.tensor_to_dict(res_dict)
                 pred_df = post_proc.get_df(res_dict)
                 
-                perf, matches, _ = matching(px_to_nm(gt_df), pred_df, tolerance=500, print_res=False)
-                
-                pred_df = get_code_from_ints(pred_df, code_ref, targets, int_str='')
+                perf, matches, _ = matching(px_to_nm(gt_df), pred_df, tolerance=200, print_res=False)
+
+                pred_df = get_code_from_ints(pred_df, code_ref, targets, int_str='', p_str='')
                 pred_df = pred_df.set_index('loc_idx')
                 matches = get_code_from_ints(matches, code_ref, targets, int_str='_tar')
                 pred_df.loc[matches['loc_idx_pred'],'matched_code'] = matches['code_inds'].values
                 pred_df['gt_match'] = np.zeros(len(pred_df))
                 pred_df.loc[pred_df['code_inds']==pred_df['matched_code'], 'gt_match'] += 1
 
-            matches = matches.sample(frac=1).reset_index(drop=True)
+            pred_df = pred_df.sample(frac=1).reset_index(drop=True)
 
-            for b in range(len(matches)//batch_size):
+            for b in range(len(pred_df)//batch_size):
 
                 opt.zero_grad()
                 
-                net_inp = T(input_from_df(pred_df[b*batch_size:(b+1)*batch_size]), dtype=torch.float32).cuda()
+                net_inp = T(input_from_df(pred_df[b*batch_size:(b+1)*batch_size], code_ref), dtype=torch.float32).cuda()
                 net_out = net(net_inp)
 
                 net_tar = T(pred_df[b*batch_size:(b+1)*batch_size]['gt_match'].values, dtype=torch.float32).cuda()
@@ -109,7 +109,7 @@ def my_app(cfg):
         for b in tqdm(range(len(res_df)//100 + 1)):
 
             if len(res_df[b*100:(b+1)*100]):
-                net_inp = T(input_from_df(res_df[b*100:(b+1)*100]), dtype=torch.float32).cuda()
+                net_inp = T(input_from_df(res_df[b*100:(b+1)*100], code_ref), dtype=torch.float32).cuda()
                 net_out = torch.sigmoid(net(net_inp))
                 out_vals.append(np.array(cpu(net_out)))    
 

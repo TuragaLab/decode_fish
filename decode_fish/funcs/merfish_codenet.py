@@ -47,14 +47,20 @@ from .merfish_eval import *
 
 #     return np.concatenate([inp_arr, int_sum, ints_sum], 1)
 
-def input_from_df(df):
+def input_from_df(df, code_ref):
 
-    input_keys = ['prob','x_sig','y_sig','p_code_err'] #+ ['rec_rmses'] + [f'int_sig_{i}' for i in range(16)]
+    input_keys = ['prob','x_sig','y_sig','code_err', 'prob'] + [f'int_sig_{i}' for i in range(16)]  + [f'int_{i}' for i in range(16)] + [f'int_p_{i}' for i in range(16)]
     inp_arr = df[input_keys].values
-    int_sum = df[[f'int_{i}' for i in range(16)]].values.sum(-1)[:,None]
-    ints_sum = df[[f'int_sig_{i}' for i in range(16)]].values.sum(-1)[:,None]
 
-    return np.concatenate([inp_arr, int_sum, ints_sum], 1)
+    codes = code_ref[df['code_inds'].values]
+
+    return np.concatenate([inp_arr, codes], 1)
+#     int_sum = df[[f'int_{i}' for i in range(16)]].values.sum(-1)[:,None]
+#     ints_sum = df[[f'int_sig_{i}' for i in range(16)]].values.sum(-1)[:,None]
+
+#     return np.concatenate([inp_arr, int_sum, ints_sum], 1)
+
+
 
 # def target_from_matches(matches_df, code_ref, targets):
 
@@ -90,7 +96,7 @@ def extract_rmses(vol, ixy_coords, size_xy = 10, px_size=100):
 # Cell
 class code_net(nn.Module):
 
-    def __init__(self, n_inputs=6, n_outputs=1):
+    def __init__(self, n_inputs=69, n_outputs=1):
         super(code_net, self).__init__()
 
         self.fc1 = nn.Linear(n_inputs, 128)

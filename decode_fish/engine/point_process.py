@@ -23,7 +23,7 @@ class PointProcessUniform(Distribution):
             This results in the same average number of sampled emitters but allows us to sample multiple emitters within one voxel.
 
     """
-    def __init__(self, local_rate: torch.tensor, int_conc=0., int_rate=1., int_loc=1., sim_iters: int = 5, channels=1, n_bits=1, sim_z=True, codebook=None, phase_fac=0.2):
+    def __init__(self, local_rate: torch.tensor, int_conc=0., int_rate=1., int_loc=1., sim_iters: int = 5, channels=1, n_bits=1, sim_z=True, codebook=None, phase_fac=0.2, int_option=1):
 
         assert sim_iters >= 1
         self.local_rate = local_rate
@@ -37,6 +37,7 @@ class PointProcessUniform(Distribution):
         self.sim_z=sim_z
         self.codebook=codebook
         self.phase_fac=phase_fac
+        self.int_option = int_option
 
     def sample(self, from_code_book=False, phasing=False):
 
@@ -55,11 +56,19 @@ class PointProcessUniform(Distribution):
         local_rate = torch.clamp(local_rate,0.,1.)
         locations = D.Bernoulli(local_rate).sample()
         n_emitter = int(locations.sum().item())
-        zero_point_five = torch.tensor(0.5, device=self.device)
-        x_offset = D.Uniform(low=0 - zero_point_five, high=0 + zero_point_five).sample(sample_shape=[n_emitter])
-        y_offset = D.Uniform(low=0 - zero_point_five, high=0 + zero_point_five).sample(sample_shape=[n_emitter])
-        z_offset = D.Uniform(low=0 - zero_point_five, high=0 + zero_point_five).sample(sample_shape=[n_emitter])
-        intensities = D.Gamma(self.int_conc, self.int_rate).sample(sample_shape=[n_emitter*self.n_bits]).to(self.device) + self.int_loc
+        x_offset = D.Uniform(low=-0.5, high=0.5).sample(sample_shape=[n_emitter]).to(self.device)
+        y_offset = D.Uniform(low=-0.5, high=0.5).sample(sample_shape=[n_emitter]).to(self.device)
+        z_offset = D.Uniform(low=-0.5, high=0.5).sample(sample_shape=[n_emitter]).to(self.device)
+        if self.int_option == 1:
+            intensities = D.Gamma(self.int_conc, self.int_rate).sample(sample_shape=[n_emitter*self.n_bits]).to(self.device) + self.int_loc
+        elif self.int_option == 2:
+            intensities = D.Gamma(self.int_conc, self.int_rate).sample(sample_shape=[n_emitter]).to(self.device) + self.int_loc
+            intensities = intensities.repeat_interleave(self.n_bits, 0)
+        elif self.int_option == 3:
+            intensities = D.Gamma(self.int_conc, self.int_rate).sample(sample_shape=[n_emitter]).to(self.device) + self.int_loc
+            intensities = intensities.repeat_interleave(self.n_bits, 0)
+            int_noise = D.Uniform(low=.7, high=1.5).sample(sample_shape=[n_emitter*self.n_bits]).to(self.device)
+            intensities *= int_noise
 
         # If 2D data z-offset is 0
         if not self.sim_z:

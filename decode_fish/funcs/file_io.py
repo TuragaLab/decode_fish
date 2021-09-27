@@ -2,7 +2,7 @@
 
 __all__ = ['load_model_state', 'simfish_to_df', 'matlab_fq_to_df', 'load_sim_fish', 'big_fishq_to_df', 'rsfish_to_df',
            'swap_psf_vol', 'get_gaussian_psf', 'get_vol_psf', 'load_psf', 'load_psf_noise_micro', 'load_post_proc',
-           'get_dataloader', 'load_all', 'psf']
+           'get_dataloader', 'load_all']
 
 # Cell
 from ..imports import *
@@ -188,8 +188,6 @@ def get_gaussian_psf(size_zyx, radii, pred_z, n_cols=1):
     psf = swap_psf_vol(psf, gauss_vol)
     return psf
 
-psf = get_gaussian_psf([11,21,21], 0.2, True, 2)
-
 def get_vol_psf(filename, device='cuda', psf_extent_zyx=None):
 
     if 'tif' in filename:
@@ -246,8 +244,6 @@ def get_dataloader(cfg):
             imgs_3d       = [load_tiff_image(f) for f in sorted(glob.glob(cfg.data_path.image_path))]
 
         roi_masks     = [get_roi_mask(img, tuple(cfg.roi_mask.pool_size), percentile= cfg.roi_mask.percentile) for img in imgs_3d]
-        gen_bg        = [hydra.utils.instantiate(cfg.bg_estimation.smoothing, z_size=crop_zyx[0])]
-        dataset_tfms  = [rand_crop]
     else:
         imgs_3d = [torch.empty(list(cfg.data_path.image_shape))]
         roi_masks     = None
@@ -260,10 +256,13 @@ def get_dataloader(cfg):
         crop_zyx = tuple(np.stack([min_shape, crop_zyx]).min(0))
         print('Crop size larger than volume in at least one dimension. Crop size changed to', crop_zyx)
 
+    if cfg.data_path.image_path is not None:
+        gen_bg        = [hydra.utils.instantiate(cfg.bg_estimation.smoothing, z_size=crop_zyx[0])]
+        rand_crop = RandomCrop3D(crop_zyx, roi_masks)
+        dataset_tfms  = [rand_crop]
+
     if cfg.bg_estimation.fractal.scale:
         gen_bg.append(hydra.utils.instantiate(cfg.bg_estimation.fractal))
-
-    rand_crop = RandomCrop3D(crop_zyx, roi_masks)
 
     probmap_generator = UniformValue(cfg.prob_generator.low, cfg.prob_generator.high)
     rate_tfms = [probmap_generator]

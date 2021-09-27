@@ -5,7 +5,7 @@ __all__ = ['get_istdeco_df', 'get_bardensr_tensor', 'get_bardensr_df']
 # Cell
 from ..imports import *
 
-os.environ["CUDA_VISIBLE_DEVICES"] = '1'
+# os.environ["CUDA_VISIBLE_DEVICES"] = '1'
 
 from .file_io import *
 from .emitter_io import *
@@ -48,7 +48,7 @@ def get_istdeco_df(sim_data, codebook, psf_sig=(1.7, 1.7), n_iter=100, bg=100.):
 
     for i in range(len(sim_data)):
 
-        image_data = sim_data[i,:,0]
+        image_data = np.array(sim_data)[i,:,0]
         image_data = image_data.reshape([n_rounds,n_cols,image_data.shape[-2],image_data.shape[-1]], order='F')
 
         init_th = np.percentile(image_data,50)
@@ -80,7 +80,7 @@ def get_istdeco_df(sim_data, codebook, psf_sig=(1.7, 1.7), n_iter=100, bg=100.):
     return istd_results
 
 # Cell
-def get_bardensr_tensor(sim_data, codebook, bg=100., n_iter=400, l1_pen=0.):
+def get_bardensr_tensor(sim_data, codebook, bg=100., n_iter=400, l1_pen=0., psf_r=0):
 
     bard_results = pd.DataFrame()
     evd_tensors = []
@@ -89,28 +89,31 @@ def get_bardensr_tensor(sim_data, codebook, bg=100., n_iter=400, l1_pen=0.):
     for i in range(len(sim_data)):
 
         image_data = sim_data[i]
-        Xnorm = bardensr.preprocessing.minmax(image_data - bg)
+        Xnorm = image_data - bg
+#         Xnorm /= Xnorm.max()
 
-    #     Xnorm = bardensr.preprocessing.minmax(image_data)
-    #     Xnorm = bardensr.preprocessing.background_subtraction(Xnorm,[0,10,10])
-    #     Xnorm = bardensr.preprocessing.minmax(Xnorm)
+#         Xnorm = bardensr.preprocessing.minmax(image_data - bg)
+
+#         Xnorm = bardensr.preprocessing.minmax(image_data)
+#         Xnorm = bardensr.preprocessing.background_subtraction(Xnorm,[0,10,10])
+        Xnorm = bardensr.preprocessing.minmax(Xnorm)
 
         evidence_tensor_iterative,extra_learned_params=\
-            bardensr.spot_calling.estimate_density_iterative(Xnorm.astype('float64'),codeflat,l1_penalty=l1_pen,use_tqdm_notebook=False,iterations=n_iter)
+            bardensr.spot_calling.estimate_density_iterative(Xnorm.astype('float64'),codeflat,l1_penalty=l1_pen,use_tqdm_notebook=True,iterations=n_iter, estimate_codebook_gain=True, psf_radius=(psf_r, psf_r, psf_r))
 
-    #     evidence_tensor_iterative= bardensr.spot_calling.estimate_density_singleshot(Xnorm.astype('float64'), codeflat, noisefloor=0.05)
+#         evidence_tensor_iterative= bardensr.spot_calling.estimate_density_singleshot(Xnorm.astype('float64'), codeflat, noisefloor=0.05)
 
         evd_tensors.append(evidence_tensor_iterative)
 
     return evd_tensors
 
-def get_bardensr_df(evd_tensors, th):
+def get_bardensr_df(evd_tensors, th, ps=1.0):
 
     bard_results = pd.DataFrame()
 
     for i in range(len(evd_tensors)):
     #     thresh_iterative=evd_tensors[i].max()*.1
-        result_iterative=bardensr.spot_calling.find_peaks(evd_tensors[i],th, poolsize=(1.0,1.0,1.0))
+        result_iterative=bardensr.spot_calling.find_peaks(evd_tensors[i],th, poolsize=(ps,ps,ps))
 
         code_inds = np.array(result_iterative.j.values, dtype=np.int16)
         df = pd.DataFrame(data={

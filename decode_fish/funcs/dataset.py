@@ -74,7 +74,7 @@ class DecodeDataset:
             return x
         for func in list_func:
             x = func(x, **kwargs)
-            return x
+        return x
 
 # Cell
 def print_class_signature(self, nms):

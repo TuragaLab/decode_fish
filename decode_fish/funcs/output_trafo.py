@@ -121,7 +121,7 @@ class SIPostProcess(torch.nn.Module):
 
         return res_dict
 
-    def get_df(self, res_dict, p_si=None):
+    def get_df(self, res_dict, p_si=None, softmax=False):
 
         res_dict = self.get_si_resdict(res_dict, p_si)
 
@@ -155,7 +155,10 @@ class SIPostProcess(torch.nn.Module):
             df[f'int_{i}'] = res_dict['xyzi_mu'][:,[3+i]][locations]
             df[f'int_sig_{i}'] = res_dict['xyzi_sigma'][:,[3+i]][locations]
             if 'int_logits' in res_dict:
-                df[f'int_p_{i}'] = torch.sigmoid(res_dict['int_logits'][:,[i]][locations])
+                if softmax:
+                    df[f'int_p_{i}'] = torch.exp(torch.log_softmax(res_dict['int_logits'], dim=1) + torch.log(torch.tensor(4.)))[:,[i]][locations]
+                else:
+                    df[f'int_p_{i}'] = torch.sigmoid(res_dict['int_logits'][:,[i]][locations])
 
         return df
 

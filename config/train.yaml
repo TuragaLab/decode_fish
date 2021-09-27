@@ -125,6 +125,7 @@ training:
     start_mic: 0 
     shuffle_ch: False
     old_loss: False
+    int_option: 1
     net:
         bl_loss_scale: 0.01
         cnt_loss_scale: 1

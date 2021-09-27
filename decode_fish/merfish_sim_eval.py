@@ -15,8 +15,6 @@ import shutil
 from decode_fish.engine.point_process import PointProcessUniform
 from decode_fish.engine.gmm_loss import PointProcessGaussian
 
-from decode_fish.funcs.fit_psf import get_peaks_3d
-
 from decode_fish.funcs.train_funcs import *
 from decode_fish.funcs.routines import *
 import wandb

@@ -120,7 +120,7 @@ def train(cfg,
         sim_vars = PointProcessUniform(local_rate, int_conc=model.int_dist.int_conc.detach(),
                                        int_rate=model.int_dist.int_rate.detach(), int_loc=model.int_dist.int_loc.detach(),
                                        sim_iters=5, channels=cfg.exp_type.channels, n_bits=cfg.exp_type.n_bits,
-                                       sim_z=cfg.exp_type.pred_z, codebook=torch.tensor(code_inds)).sample(from_code_book=cfg.exp_type.sample_from_codebook,
+                                       sim_z=cfg.exp_type.pred_z, codebook=torch.tensor(code_inds), int_option=cfg.training.int_option).sample(from_code_book=cfg.exp_type.sample_from_codebook,
                                                                                                            phasing=cfg.exp_type.phasing)
 
         # sim_vars = locs_sl, x_os_sl, y_os_sl, z_os_sl, ints_sl, output_shape
@@ -131,9 +131,10 @@ def train(cfg,
 
         ppg = PointProcessGaussian(**out_sim)
         if not cfg.training.old_loss:
-            count_prob, spatial_prob = ppg.log_prob(*sim_vars[:5], n_bits=cfg.exp_type.n_bits, channels=cfg.exp_type.channels, min_int_sig=cfg.training.net.min_int_sig, int_fac=cfg.training.net.int_fac)
+            count_prob, spatial_prob = ppg.log_prob(*sim_vars[:5], n_bits=cfg.exp_type.n_bits, channels=cfg.exp_type.channels, min_int_sig=0., int_fac=cfg.training.net.int_fac)
         else:
-            count_prob, spatial_prob = ppg.log_prob_old(*sim_vars[:5], n_bits=cfg.exp_type.n_bits, channels=cfg.exp_type.channels, min_int_sig=cfg.training.net.min_int_sig, int_fac=cfg.training.net.int_fac)
+            count_prob, spatial_prob = ppg.log_prob(*sim_vars[:5], n_bits=cfg.exp_type.n_bits, channels=cfg.exp_type.channels,
+                                                    min_int_sig=cfg.training.net.min_int_sig, int_fac=cfg.training.net.int_fac, old_loss=True)
 
         gmm_loss = -(spatial_prob + cfg.training.net.cnt_loss_scale*count_prob).mean()
 

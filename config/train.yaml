@@ -99,6 +99,7 @@ model:
     depth: 2
     ch_in: ${exp_type.channels} 
     f_maps: 32
+    n_p_layers: 1
     is_2D: ${exp_type.is_2D}
     pred_z: ${exp_type.pred_z}
     code_inf: False

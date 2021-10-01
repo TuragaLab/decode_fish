@@ -47,8 +47,9 @@ class PointProcessUniform(Distribution):
         y_offset = torch.cat([i[2] for i in res_], dim=0)
         z_offset = torch.cat([i[3] for i in res_], dim=0)
         intensities = torch.cat([i[4] for i in res_], dim=0)
+        codes = torch.cat([i[6] for i in res_], dim=0)
 
-        return list(locations.T), x_offset, y_offset, z_offset, intensities, res_[0][5]
+        return list(locations.T), x_offset, y_offset, z_offset, intensities, res_[0][5], codes
 
     def _sample(self, local_rate, from_code_book, phasing):
 
@@ -77,9 +78,10 @@ class PointProcessUniform(Distribution):
         locations = locations.nonzero(as_tuple=False)
 
         if self.channels > 1:
+            code_draw = None
             if from_code_book:
-                ch_draw = torch.randint(0, len(self.codebook),size=[n_emitter])
-                ch_draw = self.codebook[ch_draw]
+                code_draw = torch.randint(0, len(self.codebook),size=[n_emitter])
+                ch_draw = self.codebook[code_draw]
             else:
                 ch_draw = torch.multinomial(torch.ones([n_emitter,self.channels])/self.channels, self.n_bits, replacement=False)
             locations = locations.repeat_interleave(self.n_bits, 0)
@@ -108,7 +110,7 @@ class PointProcessUniform(Distribution):
                 intensities = intensities[inds]
                 locations = locations[inds]
 
-        return locations, x_offset, y_offset, z_offset, intensities, tuple(output_shape)
+        return locations, x_offset, y_offset, z_offset, intensities, tuple(output_shape), code_draw
 
 
     def log_prob(self, locations, x_offset=None, y_offset=None, z_offset=None, intensities=None, output_shape=None):

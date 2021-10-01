@@ -78,21 +78,14 @@ def my_app(cfg):
 
                     res_dict = model.tensor_to_dict(model(torch.tensor(xsimn).cuda()))
                     dec_df = post_proc.get_df(res_dict)
-                    dec_df_int = get_code_from_ints(dec_df, code_ref, targets, func=bce_code, int_str='', p_str='')
-                    dec_df_p = get_code_from_ints(dec_df, code_ref, targets, func=bce_code, int_str='', p_str='p_')
                     free_mem()
 
-                    dec_df_int = crop_f(dec_df_int)
-                    dec_df_p = crop_f(dec_df_p)
+                    dec_df = crop_f(dec_df)
 
-                    perf_int, _, _  = matching(gt_df, dec_df_int, match_genes=True, print_res=False)
-                    perf_p, _, _  = matching(gt_df, dec_df_p, match_genes=True, print_res=False)
+                    perf, _, _  = matching(gt_df, dec_df, match_genes=True, print_res=False)
 
-                    add_df_to_hdf5(g, 'locations_int', dec_df_int.drop('gene', 1))   
-                    add_df_to_hdf5(g, 'locations_p', dec_df_p.drop('gene', 1))
-
-                    add_df_to_hdf5(g, 'perf_int', DF.from_records([perf_int]))   
-                    add_df_to_hdf5(g, 'perf_p', DF.from_records([perf_p]))
+                    add_df_to_hdf5(g, 'locations', dec_df)   
+                    add_df_to_hdf5(g, 'perf', DF.from_records([perf]))
                     
         """Evaluate ISTDECO"""
         if cfg.eval_istdeco:

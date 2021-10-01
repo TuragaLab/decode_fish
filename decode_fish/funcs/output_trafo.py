@@ -10,7 +10,41 @@ from .plotting import *
 from .emitter_io import *
 
 # Cell
-def sample_to_df(locs, x_os, y_os, z_os, ints, px_size_zyx=[100,100,100], channels=16, n_bits=4):
+# def sample_to_df(locs, x_os, y_os, z_os, ints, px_size_zyx=[100,100,100], channels=16, n_bits=4):
+
+#     x = locs[-1] + x_os + 0.5
+#     y = locs[-2] + y_os + 0.5
+#     z = locs[-3] + z_os + 0.5
+
+#     b_inds = torch.cat([torch.tensor([0], device=x_os.device),((x_os[1:] - x_os[:-1]).nonzero() + 1)[:,0],
+#                         torch.tensor([len(x_os)], device=x_os.device)])
+#     n_gt = len(b_inds) - 1
+
+#     frame_idx = locs[0]
+#     ch_idx = locs[1]
+
+#     loc_idx = []
+#     for i in range(n_gt):
+#         loc_idx += [i] * (b_inds[i+1] - b_inds[i])
+
+#     df = DF({'loc_idx': loc_idx,
+#              'frame_idx': frame_idx.cpu(),
+#              'ch_idx': ch_idx.cpu(),
+#              'x': x.cpu()*px_size_zyx[2],
+#              'y': y.cpu()*px_size_zyx[1],
+#              'z': z.cpu()*px_size_zyx[0],
+#              'int': ints.cpu()})
+
+#     int_arr = np.zeros([n_gt, channels])
+#     int_arr[df['loc_idx'], df['ch_idx']] = ints.cpu()
+
+#     df = df.iloc[cpu(b_inds[:-1])]
+#     for i in range(16):
+#         df[f'int_{i}'] = int_arr[:,i]
+
+#     return df
+
+def sample_to_df(locs, x_os, y_os, z_os, ints, codes, px_size_zyx=[100,100,100], channels=16, n_bits=4):
 
     x = locs[-1] + x_os + 0.5
     y = locs[-2] + y_os + 0.5
@@ -29,18 +63,19 @@ def sample_to_df(locs, x_os, y_os, z_os, ints, px_size_zyx=[100,100,100], channe
 
     df = DF({'loc_idx': loc_idx,
              'frame_idx': frame_idx.cpu(),
-             'ch_idx': ch_idx.cpu(),
              'x': x.cpu()*px_size_zyx[2],
              'y': y.cpu()*px_size_zyx[1],
-             'z': z.cpu()*px_size_zyx[0],
-             'int': ints.cpu()})
+             'z': z.cpu()*px_size_zyx[0]})
 
     int_arr = np.zeros([n_gt, channels])
-    int_arr[df['loc_idx'], df['ch_idx']] = ints.cpu()
+    int_arr[df['loc_idx'], ch_idx.cpu()] = ints.cpu()
 
-    df = df.iloc[cpu(b_inds[:-1])]
+    df = df.iloc[cpu(b_inds)[:-1]]
     for i in range(16):
         df[f'int_{i}'] = int_arr[:,i]
+
+    df['code_inds'] = codes
+    df['ints'] = int_arr.sum(-1)
 
     return df
 
@@ -127,38 +162,32 @@ class SIPostProcess(torch.nn.Module):
 
         res_dict = {k:v.cpu() for (k,v) in res_dict.items()}
         locations = res_dict['Samples_si'].nonzero(as_tuple=True)
+        ch0_locs = locations[0], locations[1]*0, locations[2] ,locations[3], locations[4]
 
         pos_x, pos_y, pos_z = locations[-1] ,locations[-2], locations[-3]
-        x = pos_x + res_dict['xyzi_mu'][:,[0]][locations] + 0.5
-        y = pos_y + res_dict['xyzi_mu'][:,[1]][locations] + 0.5
-        z = pos_z + res_dict['xyzi_mu'][:,[2]][locations] + 0.5
+
+        x = pos_x + res_dict['xyzi_mu'][:,[0]][ch0_locs] + 0.5
+        y = pos_y + res_dict['xyzi_mu'][:,[1]][ch0_locs] + 0.5
+        z = pos_z + res_dict['xyzi_mu'][:,[2]][ch0_locs] + 0.5
 
         loc_idx = torch.arange(len(x))
         frame_idx = locations[0]
 
         df = DF({'loc_idx': loc_idx,
                  'frame_idx': frame_idx,
+                 'code_inds': locations[1],
                  'x': x*self.px_size_zyx[2],
                  'y': y*self.px_size_zyx[1],
                  'z': z*self.px_size_zyx[0],
                  'prob': res_dict['Probs_si'][locations],
-                 'int': res_dict['xyzi_mu'][:,[3]][locations],
-                 'int_sig': res_dict['xyzi_sigma'][:,[3]][locations],
-                 'x_sig': res_dict['xyzi_sigma'][:,[0]][locations]*self.px_size_zyx[0],
-                 'y_sig': res_dict['xyzi_sigma'][:,[1]][locations]*self.px_size_zyx[1],
-                 'z_sig': res_dict['xyzi_sigma'][:,[2]][locations]*self.px_size_zyx[2],
-                 'comb_sig': torch.sqrt(res_dict['xyzi_sigma'][:,[0]][locations]**2
-                                       +res_dict['xyzi_sigma'][:,[1]][locations]**2
-                                       +res_dict['xyzi_sigma'][:,[2]][locations]**2)})
-
-        for i in range(16):
-            df[f'int_{i}'] = res_dict['xyzi_mu'][:,[3+i]][locations]
-            df[f'int_sig_{i}'] = res_dict['xyzi_sigma'][:,[3+i]][locations]
-            if 'int_logits' in res_dict:
-                if softmax:
-                    df[f'int_p_{i}'] = torch.exp(torch.log_softmax(res_dict['int_logits'], dim=1) + torch.log(torch.tensor(4.)))[:,[i]][locations]
-                else:
-                    df[f'int_p_{i}'] = torch.sigmoid(res_dict['int_logits'][:,[i]][locations])
+                 'int': res_dict['xyzi_mu'][:,[3]][ch0_locs],
+                 'int_sig': res_dict['xyzi_sigma'][:,[3]][ch0_locs],
+                 'x_sig': res_dict['xyzi_sigma'][:,[0]][ch0_locs]*self.px_size_zyx[0],
+                 'y_sig': res_dict['xyzi_sigma'][:,[1]][ch0_locs]*self.px_size_zyx[1],
+                 'z_sig': res_dict['xyzi_sigma'][:,[2]][ch0_locs]*self.px_size_zyx[2],
+                 'comb_sig': torch.sqrt(res_dict['xyzi_sigma'][:,[0]][ch0_locs]**2
+                                       +res_dict['xyzi_sigma'][:,[1]][ch0_locs]**2
+                                       +res_dict['xyzi_sigma'][:,[2]][ch0_locs]**2)})
 
         return df
 
@@ -196,38 +225,41 @@ class ISIPostProcess(SIPostProcess):
     def forward(self, logits):
 
         device = logits.device
-        count = 0
         p = torch.sigmoid(logits)
+
+        batch_size = p.shape[0]
+        n_codes = p.shape[1]
+
+        p = p.reshape(batch_size*n_codes,1,*p.shape[-3:])
 
         with torch.no_grad():
 
-            p_ret = 0
+            p_SI = 0
             tot_mask = torch.ones_like(p)
-#             count_arr = torch.zeros_like(p)
+            max_mask = torch.ones_like(p)
 
-            while True:
+            while max_mask.sum():
 
-                count += 1
+                # voxels with probability values > threshold,
+                # and which where not previously counted as locations, are canditates
+                p_cand = torch.where(p>self.m1_threshold, p, torch.zeros_like(p)) * tot_mask
 
-                # probability values > threshold are regarded as possible locations
-                p_clip = torch.where(p>self.m1_threshold,p,torch.zeros_like(p))*tot_mask
+                # localize maximum (nonzero) values within a 3x3x3 volume
+                p_cand = F.max_pool3d(p_cand,3,1,padding=1)
+                max_mask = torch.eq(p, p_cand).float()
+                max_mask[p==0] = 0
 
-                # localize maximum values within a 3x3 patch
-                pool = F.max_pool3d(p_clip,3,1,padding=1)
-                max_mask1 = torch.eq(p, pool).float()
-                max_mask1[p==0] = 0
+                # Add up probability values from the adjacent pixels
+                conv = F.conv3d(p, self.filt.to(device), padding=1)
+                p_sum = max_mask * conv
 
-#                 count_arr += max_mask1*count
+                # Add the integrated probabilities to the return tensor.
+                p_SI += torch.clamp_max(p_sum, 1)
+                # Voxels that where added can not be added again
+                tot_mask *= (torch.ones_like(max_mask) - max_mask)
 
-                tot_mask *= (torch.ones_like(max_mask1) - max_mask1)
-
-                # Add probability values from the adjacent pixels
-                conv = F.conv3d(p, self.filt.to(device) ,padding=1)
-                p_ps = max_mask1 * conv
-
-                p_ret += torch.clamp_max(p_ps, 1)
-
-                p_fac = 1/p_ps
+                # The probability mass that contributed to p_sum is removed.
+                p_fac = 1/p_sum
                 p_fac[torch.isinf(p_fac)] = 0
                 p_fac = torch.clamp_max(p_fac, 1)
                 p_proc = F.conv3d(p_fac, self.filt.to(device),padding=1)*p
@@ -235,20 +267,4 @@ class ISIPostProcess(SIPostProcess):
                 p = p - p_proc
                 torch.clamp_min_(p, 0)
 
-                if not max_mask1.sum():
-                    break
-
-            return p_ret #, count_arr
-
-#                 plt.figure(figsize=(20,5))
-#                 plt.subplot(141)
-#                 plt.imshow(cpu(p[0,0][sl[1:]]).sum(0))
-#                 plt.subplot(142)
-#                 plt.imshow(cpu(p_ps[0,0][sl[1:]]).sum(0))
-#                 plt.title(cpu(p_ps[0,0][sl[1:]]).sum())
-#                 plt.colorbar()
-#                 plt.subplot(143)
-#                 plt.imshow(cpu(p_proc[0,0][sl[1:]]).sum(0))
-#                 plt.title(cpu(p_proc[0,0][sl[1:]]).sum())
-#                 plt.colorbar()
-#                 plt.show()
+            return p_SI.reshape(batch_size,n_codes,*p.shape[-3:])

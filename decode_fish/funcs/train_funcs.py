@@ -29,10 +29,10 @@ from .merfish_eval import *
 # Cell
 def eval_logger(pred_df, target_df, iteration, data_str='Sim. '):
 
-    perf_dict,matches,shift = matching(target_df, pred_df, print_res=False)
+    perf_dict,matches,shift = matching(target_df, pred_df, print_res=False,  match_genes=True)
     if 'Inp' in data_str:
         pred_corr = shift_df(pred_df, shift)
-        perf_dict, _, _ = matching(target_df, pred_corr, print_res=False)
+        perf_dict, _, _ = matching(target_df, pred_corr, print_res=False,  match_genes=True)
 
     wandb.log({data_str +'Metrics/eff_3d': perf_dict['eff_3d']}, step=iteration)
     wandb.log({data_str +'Metrics/jaccard': perf_dict['jaccard']}, step=iteration)
@@ -120,27 +120,23 @@ def train(cfg,
         sim_vars = PointProcessUniform(local_rate, int_conc=model.int_dist.int_conc.detach(),
                                        int_rate=model.int_dist.int_rate.detach(), int_loc=model.int_dist.int_loc.detach(),
                                        sim_iters=5, channels=cfg.exp_type.channels, n_bits=cfg.exp_type.n_bits,
-                                       sim_z=cfg.exp_type.pred_z, codebook=torch.tensor(code_inds), int_option=cfg.training.int_option).sample(from_code_book=cfg.exp_type.sample_from_codebook,
+                                       sim_z=cfg.exp_type.pred_z, codebook=torch.tensor(code_inds), int_option=cfg.training.int_option).sample(from_code_book=True,
                                                                                                            phasing=cfg.exp_type.phasing)
 
-        # sim_vars = locs_sl, x_os_sl, y_os_sl, z_os_sl, ints_sl, output_shape
-        xsim = microscope(*sim_vars, add_noise=True)
+        # sim_vars = locs_sl, x_os_sl, y_os_sl, z_os_sl, ints_sl, output_shape, codes
+        xsim = microscope(*sim_vars[:-1], add_noise=True)
         xsim_noise = microscope.noise(xsim, background, const_theta_sim=cfg.exp_type.const_theta_sim).sample()
 
         out_sim = model.tensor_to_dict(model(xsim_noise, shuffle_ch=cfg.training.shuffle_ch))
 
         ppg = PointProcessGaussian(**out_sim)
-        if not cfg.training.old_loss:
-            count_prob, spatial_prob = ppg.log_prob(*sim_vars[:5], n_bits=cfg.exp_type.n_bits, channels=cfg.exp_type.channels, min_int_sig=0., int_fac=cfg.training.net.int_fac)
-        else:
-            count_prob, spatial_prob = ppg.log_prob(*sim_vars[:5], n_bits=cfg.exp_type.n_bits, channels=cfg.exp_type.channels,
-                                                    min_int_sig=cfg.training.net.min_int_sig, int_fac=cfg.training.net.int_fac, old_loss=True)
+        count_prob, spatial_prob = ppg.log_prob(*sim_vars[:5], codes=sim_vars[-1], n_bits=cfg.exp_type.n_bits, channels=cfg.exp_type.channels)
 
         gmm_loss = -(spatial_prob + cfg.training.net.cnt_loss_scale*count_prob).mean()
 
-        background_loss = F.mse_loss(out_sim['background'], background) * cfg.training.net.bl_loss_scale
+#         background_loss = F.mse_loss(out_sim['background'], background) * cfg.training.net.bl_loss_scale
 
-        loss = gmm_loss + background_loss
+        loss = gmm_loss # + background_loss
 
         # Update network parameters
         loss.backward()
@@ -207,7 +203,7 @@ def train(cfg,
             wandb.log({'SL Losses/xyz_loss': spatial_prob.mean().detach().cpu().item()}, step=batch_idx)
 #             wandb.log({'SL Losses/ints_loss': int_prob.mean().detach().cpu().item()}, step=batch_idx)
             wandb.log({'SL Losses/count_loss': (-count_prob.mean()).detach().cpu()}, step=batch_idx)
-            wandb.log({'SL Losses/bg_loss': background_loss.detach().cpu()}, step=batch_idx)
+#             wandb.log({'SL Losses/bg_loss': background_loss.detach().cpu()}, step=batch_idx)
             wandb.log({'AE Losses/int_mu': model.int_dist.int_conc.item()/model.int_dist.int_rate.item() + model.int_dist.int_loc.item()}, step=batch_idx)
             wandb.log({'AE Losses/int_rate': model.int_dist.int_rate.item()}, step=batch_idx)
             wandb.log({'AE Losses/int_loc': model.int_dist.int_loc.item()}, step=batch_idx)
@@ -226,19 +222,19 @@ def train(cfg,
 
                 pred_df = post_proc.get_df(out_sim)
                 px_size = cfg.evaluation.px_size_zyx
-                target_df = sample_to_df(*sim_vars[:5], px_size_zyx=px_size)
+                target_df = sample_to_df(*sim_vars[:5], sim_vars[-1], px_size_zyx=px_size)
                 matches = eval_logger(pred_df, target_df, batch_idx, data_str='Sim. ')
 
-                try:
-                    int_corrs = [np.corrcoef(matches[f'int_{i}_pred'],matches[f'int_{i}_tar'])[0,1] for i in range(16)]
-                    int_p_corrs = [np.corrcoef(matches[f'int_p_{i}_pred'],np.where(matches[f'int_{i}_tar'].values,1,0))[0,1] for i in range(16)]
-                except ZeroDivisionError:
-                    int_corrs = [0]
-                    int_p_corrs = [0]
+#                 try:
+#                     int_corrs = [np.corrcoef(matches[f'int_{i}_pred'],matches[f'int_{i}_tar'])[0,1] for i in range(16)]
+#                     int_p_corrs = [np.corrcoef(matches[f'int_p_{i}_pred'],np.where(matches[f'int_{i}_tar'].values,1,0))[0,1] for i in range(16)]
+#                 except ZeroDivisionError:
+#                     int_corrs = [0]
+#                     int_p_corrs = [0]
 
 
-                wandb.log({'Sim. Metrics/int_corrs': np.mean(int_corrs)}, step=batch_idx)
-                wandb.log({'Sim. Metrics/int_p_corrs': np.mean(int_p_corrs)}, step=batch_idx)
+#                 wandb.log({'Sim. Metrics/int_corrs': np.mean(int_corrs)}, step=batch_idx)
+#                 wandb.log({'Sim. Metrics/int_p_corrs': np.mean(int_p_corrs)}, step=batch_idx)
 
                 wandb.log({'Sim. Metrics/prob_fac': torch.sigmoid(out_sim['logits']).sum().item()/(len(target_df)+0.1)}, step=batch_idx)
                 wandb.log({'Sim. Metrics/n_em_fac': len(pred_df)/(len(target_df)+0.1)}, step=batch_idx)
@@ -253,7 +249,7 @@ def train(cfg,
                 if eval_dict is not None:
 
                     res_eval = model.tensor_to_dict(model(eval_img[None].cuda()))
-                    ae_img = microscope(*post_proc.get_micro_inp(res_eval)[:6])
+                    ae_img = 0. #microscope(*post_proc.get_micro_inp(res_eval)[:6])
                     pred_eval_df = post_proc.get_df(res_eval)
                     wandb.log({'AE Losses/N preds(eval)': len(pred_eval_df)}, step=batch_idx)
 
@@ -265,7 +261,7 @@ def train(cfg,
                         wandb.log({'AE Losses/RMSE(psf)': np.sqrt(np.mean((cpu(eval_psf/eval_psf.max())-cpu(microscope.psf.psf_volume/microscope.psf.psf_volume.max()))**2))}, step=batch_idx)
 
                     if cfg.output.log_figs:
-                        eval_fig = gt_plot(eval_img, nm_to_px(pred_eval_df, px_size), nm_to_px(eval_df, px_size), px_size,ae_img[0]+res_eval['background'][0], microscope.psf)
+                        eval_fig = gt_plot(eval_img, nm_to_px(pred_eval_df, px_size), nm_to_px(eval_df, px_size), px_size, ae_img[0]+res_eval['background'][0], microscope.psf)
                         plt.show()
                         wandb.log({'GT': eval_fig}, step=batch_idx)
 

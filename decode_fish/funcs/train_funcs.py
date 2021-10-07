@@ -130,13 +130,14 @@ def train(cfg,
         out_sim = model.tensor_to_dict(model(xsim_noise, shuffle_ch=cfg.training.shuffle_ch))
 
         ppg = PointProcessGaussian(**out_sim)
-        count_prob, spatial_prob = ppg.log_prob(*sim_vars[:5], codes=sim_vars[-1], n_bits=cfg.exp_type.n_bits, channels=cfg.exp_type.channels)
+        count_prob, spatial_prob = ppg.log_prob(*sim_vars[:5], codes=sim_vars[-1], n_bits=cfg.exp_type.n_bits, channels=cfg.exp_type.channels,
+                                                loss_option=cfg.training.loss_option, count_mult=cfg.training.count_mult, cat_logits=cfg.training.cat_logits)
 
         gmm_loss = -(spatial_prob + cfg.training.net.cnt_loss_scale*count_prob).mean()
 
-#         background_loss = F.mse_loss(out_sim['background'], background) * cfg.training.net.bl_loss_scale
+        background_loss = F.mse_loss(out_sim['background'], background) * cfg.training.net.bl_loss_scale
 
-        loss = gmm_loss # + background_loss
+        loss = gmm_loss + background_loss
 
         # Update network parameters
         loss.backward()
@@ -151,22 +152,22 @@ def train(cfg,
         if batch_idx > min(cfg.training.start_mic,cfg.training.start_int):
 
             out_inp = model.tensor_to_dict(model(x, shuffle_ch=cfg.training.shuffle_ch))
-            rand_ch = torch.randint(0,cfg.exp_type.channels, size=[1])[0]
-            locations, x_os_3d, y_os_3d, z_os_3d, ints_3d, output_shape = post_proc.get_micro_inp(out_inp, channel=rand_ch)
+#             rand_ch = torch.randint(0,cfg.exp_type.channels, size=[1])[0]
+            proc_out_inp = post_proc.get_micro_inp(out_inp, torch.tensor(code_inds))
             # locations, x_os_3d, y_os_3d, z_os_3d, ints_3d, output_shape
-            filt_inds = [ints_3d >  0]
-            locations = [l[filt_inds] for l in locations]
-            x_os_3d, y_os_3d, z_os_3d, ints_3d = x_os_3d[filt_inds], y_os_3d[filt_inds], z_os_3d[filt_inds], ints_3d[filt_inds]
-            proc_out_inp = locations, x_os_3d, y_os_3d, z_os_3d, ints_3d, output_shape
+#             filt_inds = [ints_3d >  0]
+#             locations = [l[filt_inds] for l in locations]
+#             x_os_3d, y_os_3d, z_os_3d, ints_3d = x_os_3d[filt_inds], y_os_3d[filt_inds], z_os_3d[filt_inds], ints_3d[filt_inds]
+#             proc_out_inp = locations, x_os_3d, y_os_3d, z_os_3d, ints_3d, output_shape
 
             if cfg.training.mic.enabled and batch_idx > cfg.training.start_mic:
 
                 optim_dict['optim_mic'].zero_grad()
 
                 # Get autoencoder loss
-                ae_img = microscope(*proc_out_inp, add_noise=False, rec_ch=rand_ch)
+                ae_img = microscope(*proc_out_inp, add_noise=False)
 
-                log_p_x_given_z = -microscope.noise(ae_img,out_inp['background'], rec_ch=rand_ch, const_theta_sim=False).log_prob(x[:,rand_ch:rand_ch+1]).mean()
+                log_p_x_given_z = -microscope.noise(ae_img,out_inp['background'], const_theta_sim=False).log_prob(x).mean()
                 if cfg.training.mic.norm_reg:
                     log_p_x_given_z += cfg.training.mic.norm_reg * (microscope.psf.com_loss())
 
@@ -212,7 +213,7 @@ def train(cfg,
             if batch_idx > cfg.training.start_mic:
                 if cfg.training.mic.enabled:
                     wandb.log({'AE Losses/p_x_given_z': log_p_x_given_z.detach().cpu()}, step=batch_idx)
-                    wandb.log({'AE Losses/RMSE(rec)': torch.sqrt(((x[:,:1]-(ae_img+out_inp['background']))**2).mean()).detach().cpu()}, step=batch_idx)
+                    wandb.log({'AE Losses/RMSE(rec)': torch.sqrt(((x[:,:1]-(ae_img[:,:1]+out_inp['background'][:,:1]))**2).mean()).detach().cpu()}, step=batch_idx)
                     wandb.log({'AE Losses/sum(psf)': F.relu(microscope.psf.psf_volume/microscope.psf.psf_volume.max())[0].sum().detach().cpu()}, step=batch_idx)
 #                     wandb.log({'AE Losses/theta': microscope.theta.item()}, step=batch_idx)
 
@@ -249,7 +250,7 @@ def train(cfg,
                 if eval_dict is not None:
 
                     res_eval = model.tensor_to_dict(model(eval_img[None].cuda()))
-                    ae_img = 0. #microscope(*post_proc.get_micro_inp(res_eval)[:6])
+                    ae_img = microscope(*post_proc.get_micro_inp(res_eval, torch.tensor(code_inds)))
                     pred_eval_df = post_proc.get_df(res_eval)
                     wandb.log({'AE Losses/N preds(eval)': len(pred_eval_df)}, step=batch_idx)
 

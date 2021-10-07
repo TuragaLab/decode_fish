@@ -58,6 +58,7 @@ class Microscope(nn.Module):
         self.n_cols = self.psf.n_cols
 
         self.channel_shifts = self.noise.channel_shifts
+        self.channel_facs = torch.nn.Parameter(torch.ones(16))
 
     def add_psf_noise(self, psf_stack):
 
@@ -65,7 +66,6 @@ class Microscope(nn.Module):
         noise = torch.distributions.Normal(loc=0, scale=self.psf_noise).sample(psf_stack.shape).to(psf_stack.device)
         noise *= torch.sqrt(psf_stack)
 #         noise *= torch.rand(len(psf_stack), device='cuda')[:,None,None,None,None]
-
         return psf_stack + noise
 
         '''Individual elastic deformation for each PSF (to slow)'''
@@ -96,11 +96,11 @@ class Microscope(nn.Module):
                 psf_norm = 1
             # Apply continuous shift
             if self.pred_z and self.psf_z_size > 1:
-                z_os_val = torch.clamp(z_os_val,-0.4999,0.4999)
-                z_scaled = (z_os_val + 0.5) * self.psf_z_size
-                psf = self.psf(x_os_val, y_os_val, z_scaled%1.)
+                z_os_val = 0.5*(torch.clamp(z_os_val,-0.9999,0.9999) + 1.) # transform to [0,1]
+                z_scaled = z_os_val * (self.psf_z_size - 2) # [0, z_size]
                 z_inds = (z_scaled//1).type(torch.cuda.LongTensor)
-                psf = psf[torch.arange(len(z_os_val)),:,z_inds][:,:,None]
+                psf = self.psf(x_os_val, y_os_val, -(z_scaled%1.)-0.5, z_inds)
+#                 psf = psf[torch.arange(len(z_os_val)),:,z_inds][:,:,None]
             else:
                 psf = self.psf(x_os_val, y_os_val, z_os_val)
 
@@ -111,7 +111,7 @@ class Microscope(nn.Module):
                 psf = self.add_psf_noise(psf)
 
             # applying intenseties
-            tot_intensity = torch.clamp_min(i_val, 0)
+            tot_intensity = torch.clamp_min(i_val, 0)  * self.channel_facs[ch_inds]
             psf = psf * tot_intensity[:,None,None,None,None]
             # place psf according to locations
             locations[1] = ch_inds

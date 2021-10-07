@@ -168,7 +168,7 @@ class SIPostProcess(torch.nn.Module):
 
         x = pos_x + res_dict['xyzi_mu'][:,[0]][ch0_locs] + 0.5
         y = pos_y + res_dict['xyzi_mu'][:,[1]][ch0_locs] + 0.5
-        z = pos_z + res_dict['xyzi_mu'][:,[2]][ch0_locs] + 0.5
+        z = pos_z + res_dict['xyzi_mu'][:,[2]][ch0_locs]
 
         loc_idx = torch.arange(len(x))
         frame_idx = locations[0]
@@ -191,27 +191,32 @@ class SIPostProcess(torch.nn.Module):
 
         return df
 
-    def get_micro_inp(self, res_dict, p_si=None, channel=0):
+    def get_micro_inp(self, res_dict, code_inds, p_si=None, n_bits = 4, channel=0):
 
         res_dict = self.get_si_resdict(res_dict, p_si)
-
         locations = res_dict['Samples_si'].nonzero(as_tuple=True)
-        locations = [l for l in locations]
-        x_os_3d = res_dict['xyzi_mu'][:,[0]][locations]
-        y_os_3d = res_dict['xyzi_mu'][:,[1]][locations]
-        z_os_3d = res_dict['xyzi_mu'][:,[2]][locations]
+
+        xyzi_ix = [locations[0],locations[2],locations[3], locations[4]]
+        x_os_3d = res_dict['xyzi_mu'][:,0][xyzi_ix]
+        y_os_3d = res_dict['xyzi_mu'][:,1][xyzi_ix]
+        z_os_3d = res_dict['xyzi_mu'][:,2][xyzi_ix]
+        ints_3d = res_dict['xyzi_mu'][:,3][xyzi_ix]
+        # output_shape  = res_dict['Samples_si'].shape
+        x_os_3d = x_os_3d.repeat_interleave(n_bits)
+        y_os_3d = y_os_3d.repeat_interleave(n_bits)
+        z_os_3d = z_os_3d.repeat_interleave(n_bits)
+        ints_3d = ints_3d.repeat_interleave(n_bits)/n_bits
+
+        locations = [locations[0].repeat_interleave(n_bits),
+                     torch.tensor(code_inds)[locations[1]].reshape(-1),
+                     locations[2].repeat_interleave(n_bits),
+                     locations[3].repeat_interleave(n_bits),
+                     locations[4].repeat_interleave(n_bits)]
+
         output_shape  = res_dict['Samples_si'].shape
-
-        int_p_mask = torch.where(torch.sigmoid(res_dict['int_logits']) > 0.8, torch.ones_like(res_dict['int_logits']), torch.zeros_like(res_dict['int_logits']))
-        ints_3d = (int_p_mask * res_dict['xyzi_mu'][:,3:])[:,[channel]][locations]
-
-#         int_p_mask = torch.where(res_dict['int_logits'] >= res_dict['int_logits'].sort(1, descending=True).values[:,3:4], torch.ones_like(res_dict['int_logits']), torch.zeros_like(res_dict['int_logits']))
-#         ints_3d = (int_p_mask * res_dict['xyzi_mu'][:,3:])[:,[channel]][locations]
-
-#         ints_3d = res_dict['xyzi_mu'][:,[3+channel]][locations]
+        output_shape  = torch.Size([output_shape[0],code_inds.max()+1,output_shape[2],output_shape[3],output_shape[4]])
 
         return locations, x_os_3d, y_os_3d, z_os_3d, ints_3d, output_shape
-
 # p_col = []
 
 # Cell

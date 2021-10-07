@@ -42,7 +42,7 @@ class PointProcessGaussian(Distribution):
         self.xyzi_mu = xyzi_mu.cuda()
         self.xyzi_sigma = xyzi_sigma.cuda()
 
-    def log_prob(self, locations, x_offset, y_offset, z_offset, intensities, codes, n_bits, channels):
+    def log_prob(self, locations, x_offset, y_offset, z_offset, intensities, codes, n_bits, channels, loss_option=0, count_mult=0, cat_logits=0):
 
         gauss_dim = 3 + 1
         batch_size = self.logits.shape[0]
@@ -50,19 +50,35 @@ class PointProcessGaussian(Distribution):
         xyzi, gt_codes, s_mask = get_true_labels_mf(batch_size, n_bits, channels, locations, x_offset, y_offset, z_offset, intensities, codes.cuda())
 
         P = torch.sigmoid(self.logits)
-        count_mean = P.sum(dim=[2, 3, 4]).squeeze(-1)
-        count_var = (P - P ** 2).sum(dim=[2, 3, 4]).squeeze(-1)
-        count_dist = D.Normal(count_mean, torch.sqrt(count_var))
 
-        counts = torch.zeros(count_mean.shape).cuda()
-        unique_col = [gtc.unique(return_counts=True) for gtc in gt_codes]
-        for i, ind_c in enumerate(unique_col):
-            inds, c = ind_c
-            counts[i, inds[inds>=0]] = c[inds>=0].type(torch.cuda.FloatTensor)
+        if loss_option == 0:
 
-        count_prob =  count_dist.log_prob(counts).sum(-1) # * counts
+            count_mean = P.sum(dim=[2, 3, 4]).squeeze(-1)
+            count_var = (P - P ** 2).sum(dim=[2, 3, 4]).squeeze(-1)
+            count_dist = D.Normal(count_mean, torch.sqrt(count_var))
 
-        mixture_probs = P / P.sum(dim=[2, 3, 4], keepdim=True)
+            counts = torch.zeros(count_mean.shape).cuda()
+            unique_col = [gtc.unique(return_counts=True) for gtc in gt_codes]
+            for i, ind_c in enumerate(unique_col):
+                inds, c = ind_c
+                counts[i, inds[inds>=0]] = c[inds>=0].type(torch.cuda.FloatTensor)
+
+            count_prob =  count_dist.log_prob(counts)
+            if count_mult:
+                count_prob = count_prob * counts
+
+            count_prob = count_prob.sum(-1)
+
+        if loss_option == 1:
+
+            count_mean = P.sum(dim=[1, 2, 3, 4]).squeeze(-1)
+            count_var = (P - P ** 2).sum(dim=[1, 2, 3, 4]).squeeze(-1)
+            count_dist = D.Normal(count_mean, torch.sqrt(count_var))
+
+            counts = s_mask.sum(-1)
+            count_prob =  count_dist.log_prob(counts)
+            if count_mult:
+                count_prob = count_prob * counts
 
         pix_inds = torch.nonzero(P[:,:1],as_tuple=True)
 
@@ -71,17 +87,22 @@ class PointProcessGaussian(Distribution):
         xyzi_mu = xyzi_mu.reshape(batch_size,-1,gauss_dim)
         xyzi_sig = self.xyzi_sigma[pix_inds[0],:,pix_inds[2],pix_inds[3],pix_inds[4]].reshape(batch_size,-1,gauss_dim)
 
-
-        mix = D.Categorical(mixture_probs[torch.nonzero(P,as_tuple=True)].reshape(batch_size, 140, -1))
-        mix_logits = mix.logits
-
+        if cat_logits:
+            mixture_probs = P / P.sum(dim=[2, 3, 4], keepdim=True)
+            mix = D.Categorical(mixture_probs[torch.nonzero(P,as_tuple=True)].reshape(batch_size, 140, -1))
+            mix_logits = mix.logits
+        else:
+            mix_logits = self.logits[torch.nonzero(P,as_tuple=True)].reshape(batch_size, 140, -1)
 
         dist_normal_xyzi = D.Independent(D.Normal(xyzi_mu, xyzi_sig + 0.00001), 1)
 
         xyzi_inp = xyzi.transpose(0, 1)[:,:,None,:]          # reshape for log_prob()
         log_norm_prob_xyzi = dist_normal_xyzi.base_dist.log_prob(xyzi_inp) # N_gt * batch_size * n_pixel * 3
 
-        log_cat_prob = torch.log_softmax(mix_logits, -1) # + torch.log(counts+1e-6)[:, None]       # normalized (sum to 1 over pixels) log probs for the categorical dist. of the GMM. batch_size * n_pixels
+        if loss_option == 0:
+            log_cat_prob = torch.log_softmax(mix_logits, -1) # + torch.log(counts+1e-6)[:, None]       # normalized (sum to 1 over pixels) log probs for the categorical dist. of the GMM. batch_size * n_pixels
+        else:
+            log_cat_prob = torch.log_softmax(mix_logits.view(batch_size, -1), -1).view(mix_logits.shape)
 
         gt_codes[gt_codes<0] = 0
         log_norm_prob_xyzi = _sum_rightmost(log_norm_prob_xyzi, 1)         # N_gt * batch_size * n_pixel

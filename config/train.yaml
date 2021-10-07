@@ -127,6 +127,11 @@ training:
     shuffle_ch: False
     old_loss: False
     int_option: 1
+    
+    loss_option: 1
+    count_mult: 0
+    cat_logits: 0
+    
     net:
         bl_loss_scale: 0.01
         cnt_loss_scale: 1

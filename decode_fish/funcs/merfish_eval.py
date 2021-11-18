@@ -69,11 +69,12 @@ def get_benchmark(magnitude_threshold=10**0.75*4):
     targets = np.load(base_path + '/decode_fish/data/merfish_targets.npz', allow_pickle=True)['arr_0']
 
     bench_df.loc[:,'frame_idx'] = 0
+    bench_df.loc[:,'code_inds'] = bench_df['barcode_id'].values - 1
     bench_df.loc[:,'loc_idx'] = np.arange(len(bench_df))
     bench_df.loc[:,'int'] = bench_df['total_magnitude']
     bench_df.loc[:,'z'] = 50/100
     bench_df = px_to_nm(bench_df)
-
+    bench_df = bench_df.drop('barcode_id', axis=1)
     return bench_df, code_ref, targets
 
 def get_istdeco():
@@ -83,10 +84,12 @@ def get_istdeco():
     istdeco_df = istdeco_df[ (istdeco_df['x'] >= fov[0]) & (istdeco_df['x'] <= fov[2])  & (istdeco_df['y'] >= fov[1]) & (istdeco_df['y'] <= fov[3])]
 
     istdeco_df.loc[:,'frame_idx'] = 0
+    istdeco_df.loc[:,'code_inds'] = istdeco_df['target_id'].values - 1
     istdeco_df.loc[:,'loc_idx'] = np.arange(len(istdeco_df))
     istdeco_df.loc[:,'int'] = istdeco_df['intensity']
     istdeco_df.loc[:,'z'] = 50/100
     istdeco_df = px_to_nm(istdeco_df)
+    istdeco_df = istdeco_df.drop('target_id', axis=1)
 
     print(len(istdeco_df))
     return istdeco_df
@@ -190,18 +193,20 @@ def plot_gene_numbers(bench_counts, res_counts, title='', log=True, corr=True):
     plt.title(f'{title} r = {r}');
 
 # Cell
-def plot_gene_panels(res_df, bench_df, matches, targets):
+def plot_gene_panels(res_df, bench_df, targets, matches=None):
 
     bench_counts = DF(data=None, index=targets)
     bench_counts['Res_all'] = res_df.groupby('gene')['gene'].count()
     bench_counts['Bench_all'] = bench_df.groupby('gene')['gene'].count()
     bench_counts = bench_counts.fillna(0)
 
-    fps = res_df.loc[~res_df['loc_idx'].isin(matches['loc_idx_pred'])]
-    fns = bench_df.loc[~bench_df['loc_idx'].isin(matches['loc_idx_tar'])]
+    if matches is not None:
+        fps = res_df.loc[~res_df['loc_idx'].isin(matches['loc_idx_pred'])]
+        fns = bench_df.loc[~bench_df['loc_idx'].isin(matches['loc_idx_tar'])]
 
-    bench_counts['Res_fp'] = fps.groupby('gene')['gene'].count()
-    bench_counts['Res_fns'] = fns.groupby('gene')['gene'].count()
+        bench_counts['Res_fp'] = fps.groupby('gene')['gene'].count()
+        bench_counts['Res_fns'] = fns.groupby('gene')['gene'].count()
+
     bench_counts=bench_counts.fillna(0)
 
     print(len(bench_df), len(res_df))
@@ -218,8 +223,9 @@ def plot_gene_panels(res_df, bench_df, matches, targets):
     plt.subplot(132)
     plot_gene_numbers(bench_counts.loc[binds, 'Bench_all'].values, bench_counts.loc[binds,'Res_all'].values, 'Blanks', log=False, corr=False)
 
-    plt.subplot(133)
-    plot_gene_numbers(bench_counts['Bench_all'].values, bench_counts['Res_fp'].values, 'False Pos.', log=False)
+    if 'Res_fp' in bench_counts:
+        plt.subplot(133)
+        plot_gene_numbers(bench_counts['Bench_all'].values, bench_counts['Res_fp'].values, 'False Pos.', log=False)
 
 # Cell
 def make_roc(df, var='code_err', ascending=True, n_max=30000):

@@ -26,17 +26,28 @@ data_path:
     model_init: 
     
 evaluation:
-    image_path: ${data_path.image_path}
-    sm_fish_ch: ${exp_type.sm_fish_ch}
-    txt_path: 
-    psf_path: 
-    crop_sl: s_[:,:,:,:]
-    img_ind: 0
     px_size_zyx: [100,100,100]
-    
+    reconstruction:
+        enabled: False
+        image_path: ${data_path.image_path}
+        sm_fish_ch: ${exp_type.sm_fish_ch}
+        txt_path: 
+        psf_path: 
+        crop_sl: s_[:,:,:,:]
+        img_ind: 0
+    code_stats: 
+        enabled: False
+        image_path: ${data_path.image_path}
+        top_n: 15000
+        
+emitter_noise:
+    rate_fac: 2.
+    int_fac: 0.25
+
 prob_generator:
     low: 1e-8
     high: 0.005
+        
     
 random_crop: 
     crop_sz: 48
@@ -150,6 +161,11 @@ training:
         enabled: True
         grad_clip: 0.1
         norm_reg: 0.5
+        par_grads:
+            channel_facs: True
+            channel_shifts: True
+            theta_par: True
+            psf_vol: False
         opt:
             _target_: torch_optimizer.QHAdam
             lr: 0.00025

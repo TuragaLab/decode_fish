@@ -11,6 +11,7 @@ from .utils import *
 from .dataset import *
 from .output_trafo import *
 from .plotting import *
+from .predict import *
 import torch.nn.functional as F
 from torch import distributions as D
 from torch.utils.data import DataLoader
@@ -48,19 +49,25 @@ def eval_logger(pred_df, target_df, iteration, data_str='Sim. '):
 
 def load_from_eval_dict(eval_dict):
 
-    eval_img = load_tiff_image(sorted(glob.glob(eval_dict['image_path']))[eval_dict['img_ind']])#[eval_dict['sm_fish_ch']][None]
-    eval_img = eval_img[eval_dict['crop_sl']]
-    eval_df = None
-    eval_psf = None
-    if eval_dict['txt_path'] is not None:
-        txt_path = sorted(glob.glob(eval_dict['txt_path']))[eval_dict['img_ind']]
-        eval_df = simfish_to_df(txt_path)
-        eval_df = crop_df(eval_df, eval_dict['crop_sl'], px_size_zyx=eval_dict['px_size_zyx'])
+    if eval_dict.reconstruction.enabled:
 
-    if eval_dict['psf_path'] is not None:
-        eval_psf = load_tiff_image(eval_dict['psf_path'])
+        eval_img = load_tiff_image(sorted(glob.glob(eval_dict['image_path']))[eval_dict['img_ind']])
+        eval_img = eval_img[eval_dict['crop_sl']]
+        eval_df = None
+        eval_psf = None
+        if eval_dict['txt_path'] is not None:
+            txt_path = sorted(glob.glob(eval_dict['txt_path']))[eval_dict['img_ind']]
+            eval_df = simfish_to_df(txt_path)
+            eval_df = crop_df(eval_df, eval_dict['crop_sl'], px_size_zyx=eval_dict['px_size_zyx'])
 
-    return eval_img, eval_df, eval_psf
+        if eval_dict['psf_path'] is not None:
+            eval_psf = load_tiff_image(eval_dict['psf_path'])
+
+        return eval_img, eval_df, eval_psf
+
+    if eval_dict.code_stats.enabled:
+
+        return None
 
 def save_train_state(save_dir, model, microscope, optim_dict, train_iter):
 
@@ -100,13 +107,18 @@ def train(cfg,
     save_dir = Path(cfg.output.save_dir)
 
     if eval_dict is not None:
-        eval_img, eval_df, eval_psf = load_from_eval_dict(eval_dict)
+
+        eval_vars = load_from_eval_dict(eval_dict)
 
     model.cuda().train()
     torch.save(microscope.psf.state_dict(), str(save_dir) + '/psf_init.pkl' )
 
-    _, code_ref, _ = get_benchmark()
+    bench_df, code_ref, targets = get_benchmark()
+    bench_df = exclude_borders(bench_df, border_size_zyx=[0,4000,4000], img_size=[2048*100,2048*100,2048*100])
     code_inds = np.stack([np.nonzero(c)[0] for c in code_ref])
+
+    for name, p in microscope.named_parameters():
+        p.requires_grad = cfg.training.mic.par_grads[name]
 
     for batch_idx in range(cfg.training.start_iter, cfg.training.num_iters):
 
@@ -120,11 +132,21 @@ def train(cfg,
         sim_vars = PointProcessUniform(local_rate, int_conc=model.int_dist.int_conc.detach(),
                                        int_rate=model.int_dist.int_rate.detach(), int_loc=model.int_dist.int_loc.detach(),
                                        sim_iters=5, channels=cfg.exp_type.channels, n_bits=cfg.exp_type.n_bits,
-                                       sim_z=cfg.exp_type.pred_z, codebook=torch.tensor(code_inds), int_option=cfg.training.int_option).sample(from_code_book=True,
-                                                                                                           phasing=cfg.exp_type.phasing)
+                                       sim_z=cfg.exp_type.pred_z, codebook=torch.tensor(code_inds), int_option=cfg.training.int_option).sample(from_code_book=True)
 
         # sim_vars = locs_sl, x_os_sl, y_os_sl, z_os_sl, ints_sl, output_shape, codes
         xsim = microscope(*sim_vars[:-1], add_noise=True)
+
+        if cfg.emitter_noise.rate_fac:
+
+            noise_vars = PointProcessUniform(local_rate * cfg.emitter_noise.rate_fac, int_conc=model.int_dist.int_conc.detach() * cfg.emitter_noise.int_fac,
+                                           int_rate=model.int_dist.int_rate.detach(), int_loc=model.int_dist.int_loc.detach(),
+                                           sim_iters=5, channels=cfg.exp_type.channels, n_bits=1,
+                                           sim_z=cfg.exp_type.pred_z, codebook=None, int_option=cfg.training.int_option).sample(from_code_book=False)
+
+            xsim += microscope(*noise_vars[:-1], add_noise=True)
+
+
         xsim_noise = microscope.noise(xsim, background, const_theta_sim=cfg.exp_type.const_theta_sim).sample()
 
         out_sim = model.tensor_to_dict(model(xsim_noise, shuffle_ch=cfg.training.shuffle_ch))
@@ -217,7 +239,7 @@ def train(cfg,
                     wandb.log({'AE Losses/sum(psf)': F.relu(microscope.psf.psf_volume/microscope.psf.psf_volume.max())[0].sum().detach().cpu()}, step=batch_idx)
 #                     wandb.log({'AE Losses/theta': microscope.theta.item()}, step=batch_idx)
 
-        if batch_idx % cfg.output.log_interval == 0:
+        if batch_idx % cfg.output.log_interval == 0 and batch_idx > 0:
             print(batch_idx)
             with torch.no_grad():
 
@@ -226,20 +248,8 @@ def train(cfg,
                 target_df = sample_to_df(*sim_vars[:5], sim_vars[-1], px_size_zyx=px_size)
                 matches = eval_logger(pred_df, target_df, batch_idx, data_str='Sim. ')
 
-#                 try:
-#                     int_corrs = [np.corrcoef(matches[f'int_{i}_pred'],matches[f'int_{i}_tar'])[0,1] for i in range(16)]
-#                     int_p_corrs = [np.corrcoef(matches[f'int_p_{i}_pred'],np.where(matches[f'int_{i}_tar'].values,1,0))[0,1] for i in range(16)]
-#                 except ZeroDivisionError:
-#                     int_corrs = [0]
-#                     int_p_corrs = [0]
-
-
-#                 wandb.log({'Sim. Metrics/int_corrs': np.mean(int_corrs)}, step=batch_idx)
-#                 wandb.log({'Sim. Metrics/int_p_corrs': np.mean(int_p_corrs)}, step=batch_idx)
-
                 wandb.log({'Sim. Metrics/prob_fac': torch.sigmoid(out_sim['logits']).sum().item()/(len(target_df)+0.1)}, step=batch_idx)
                 wandb.log({'Sim. Metrics/n_em_fac': len(pred_df)/(len(target_df)+0.1)}, step=batch_idx)
-#                 wandb.log({'Prob hist': wandb.Image(plot_prob_hist(out_sim))}, step=batch_idx)
 
                 if cfg.output.log_figs:
 
@@ -247,7 +257,9 @@ def train(cfg,
                     plt.show()
                     wandb.log({'SL summary': sl_fig}, step=batch_idx)
 
-                if eval_dict is not None:
+                if cfg.evaluation.reconstruction.enabled:
+
+                    eval_img, eval_df, eval_psf = eval_vars
 
                     res_eval = model.tensor_to_dict(model(eval_img[None].cuda()))
                     ae_img = microscope(*post_proc.get_micro_inp(res_eval, torch.tensor(code_inds)))
@@ -265,6 +277,37 @@ def train(cfg,
                         eval_fig = gt_plot(eval_img, nm_to_px(pred_eval_df, px_size), nm_to_px(eval_df, px_size), px_size, ae_img[0]+res_eval['background'][0], microscope.psf)
                         plt.show()
                         wandb.log({'GT': eval_fig}, step=batch_idx)
+
+                if cfg.evaluation.code_stats.enabled:
+
+                    res_df = merfish_predict(model, post_proc, [cfg.evaluation.code_stats.image_path], window_size=[None, 256, 256], device='cuda')
+                    res_df = exclude_borders(res_df, border_size_zyx=[0,4000,4000], img_size=[2048*100,2048*100,2048*100])
+
+                    if len(res_df):
+
+                        res_df['gene'] = targets[res_df['code_inds']]
+                        res_df = res_df[res_df['gene'] != 'MALAT1']
+                        bench_df = bench_df[bench_df['gene'] != 'MALAT1']
+
+                        res_sub = res_df.nsmallest(cfg.evaluation.code_stats.top_n, 'comb_sig')
+
+                        bench_counts = DF(data=None, index=targets)
+                        bench_counts['Res_all'] = res_sub.groupby('gene')['gene'].count()
+                        bench_counts['Bench_all'] = bench_df.groupby('gene')['gene'].count()
+                        bench_counts = bench_counts.fillna(0)
+                        r = np.corrcoef(bench_counts['Bench_all'].values, bench_counts['Res_all'].values)[0, 1]
+
+                        blinds = []
+                        for i,g in enumerate(targets):
+                            if 'Blank' in g:
+                                blinds.append(g)
+
+                        bc = bench_counts.loc[blinds,'Res_all'].values.sum()
+
+                        wandb.log({'AE Losses/code_bench_corr': r}, step=batch_idx)
+                        wandb.log({'AE Losses/N_blanks_15k': bc}, step=batch_idx)
+
+                    wandb.log({'AE Losses/N_pred_tot': len(res_df)}, step=batch_idx)
 
             # storing
             save_train_state(save_dir, model, microscope, optim_dict, batch_idx)

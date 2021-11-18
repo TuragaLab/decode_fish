@@ -35,11 +35,11 @@ def merfish_predict(model, post_proc, image_paths, window_size=[None,256,256], d
     pred_df = DF()
     with torch.no_grad():
         for p in image_paths:
-            print(p.split('/')[-1])
+#             print(p.split('/')[-1])
             img = load_tiff_image(p)[None]
 
             n_chans = img.shape[1]
-            print(img.shape)
+#             print(img.shape)
             z, y, x = img.shape[-3:]
 
             inp = img
@@ -47,7 +47,7 @@ def merfish_predict(model, post_proc, image_paths, window_size=[None,256,256], d
             output = model.tensor_to_dict(output)
             p_si = sliding_window_inference(output['logits'], window_size, 1, post_proc, overlap=0.2, sw_device=device, device='cpu', mode='gaussian')
             i_df = post_proc.get_df(output, p_si)
-            print('N. emitters: ', len(i_df))
+#             print('N. emitters: ', len(i_df))
             i_df.loc[:,'frame_idx'] = 0
             pred_df = append_emitter_df(pred_df, i_df)
             free_mem()

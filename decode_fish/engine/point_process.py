@@ -23,7 +23,7 @@ class PointProcessUniform(Distribution):
             This results in the same average number of sampled emitters but allows us to sample multiple emitters within one voxel.
 
     """
-    def __init__(self, local_rate: torch.tensor, int_conc=0., int_rate=1., int_loc=1., sim_iters: int = 5, channels=1, n_bits=1, sim_z=True, codebook=None, phase_fac=0.2, int_option=1):
+    def __init__(self, local_rate: torch.tensor, int_conc=0., int_rate=1., int_loc=1., sim_iters: int = 5, channels=1, n_bits=1, sim_z=True, codebook=None, int_option=1):
 
         assert sim_iters >= 1
         self.local_rate = local_rate
@@ -36,7 +36,6 @@ class PointProcessUniform(Distribution):
         self.n_bits = n_bits
         self.sim_z=sim_z
         self.codebook=codebook
-        self.phase_fac=phase_fac
         self.int_option = int_option
 
     def sample(self, from_code_book=False, phasing=False):
@@ -47,7 +46,7 @@ class PointProcessUniform(Distribution):
         y_offset = torch.cat([i[2] for i in res_], dim=0)
         z_offset = torch.cat([i[3] for i in res_], dim=0)
         intensities = torch.cat([i[4] for i in res_], dim=0)
-        codes = torch.cat([i[6] for i in res_], dim=0)
+        codes = torch.cat([i[6] for i in res_], dim=0) if from_code_book else None
 
         return list(locations.T), x_offset, y_offset, z_offset, intensities, res_[0][5], codes
 
@@ -98,29 +97,7 @@ class PointProcessUniform(Distribution):
 
             output_shape[1] = self.channels
 
-            if phasing:
-                locations = locations.repeat_interleave(2, 0)
-                locations[1::2,1] = locations[1::2,1] + 1
-                x_offset = x_offset.repeat_interleave(2, 0)
-                y_offset = y_offset.repeat_interleave(2, 0)
-                z_offset = z_offset.repeat_interleave(2, 0)
-                intensities = intensities.repeat_interleave(2, 0)
-
-                phase_facs = torch.rand(size=intensities[1::2].shape, device=intensities.device) * self.phase_fac
-                intensities[1::2] = intensities[1::2]*phase_facs
-
-                inds = [locations[:,1] < self.channels][0]
-                x_offset, y_offset, z_offset = x_offset[inds], y_offset[inds], z_offset[inds]
-                intensities = intensities[inds]
-                locations = locations[inds]
-
         return locations, x_offset, y_offset, z_offset, intensities, tuple(output_shape), code_draw
-
-
-    def log_prob(self, locations, x_offset=None, y_offset=None, z_offset=None, intensities=None, output_shape=None):
-        locations = list_to_locations(locations, output_shape)
-        log_prob = D.Bernoulli(self.local_rate).log_prob(locations)
-        return log_prob
 
     @staticmethod
     def _get_device(x):

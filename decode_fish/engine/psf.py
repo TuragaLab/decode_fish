@@ -36,7 +36,7 @@ class LinearInterpolatedPSF(nn.Module):
         self.register_buffer('z', v[0])
         self.register_buffer('z_2d', torch.zeros(1))
         self.device=device
-        self.psf_volume = nn.Parameter(0.01*torch.rand(self.n_cols, *self.psf_size), requires_grad=False)
+        self.psf_volume = nn.Parameter(0.01*torch.rand(self.n_cols, *self.psf_size), requires_grad=True)
         self.forward_nonlin = torch.nn.Identity()
 
     def forward(self, x_offset_val, y_offset_val, z_offset_val, z_inds=None):
@@ -58,14 +58,12 @@ class LinearInterpolatedPSF(nn.Module):
             z_g = self.z.to(self.device)
             vol = self.forward_nonlin(self.psf_volume).expand(N_em, -1, -1, -1, -1).to(self.device)
         else:
-            z_offset = z_offset = 2 * z_offset_val.view(-1) / 5
+            z_offset = z_offset = 2 * z_offset_val.view(-1) / 3
             z_g = self.z_2d.to(self.device)
 
-            vol = torch.cat([self.psf_volume[:,[z-2 for z in z_inds]],
-                             self.psf_volume[:,[z-1 for z in z_inds]],
+            vol = torch.cat([self.psf_volume[:,[z-1 for z in z_inds]],
                              self.psf_volume[:,z_inds],
-                             self.psf_volume[:,[z+1 for z in z_inds]],
-                             self.psf_volume[:,[z+2 for z in z_inds]]], dim=0).transpose(0,1)[:,None].to(self.device)
+                             self.psf_volume[:,[z+1 for z in z_inds]]], dim=0).transpose(0,1)[:,None].to(self.device)
 
         i_img, x_grid, y_grid, z_grid = torch.meshgrid(torch.arange(N_em, dtype=torch.float32).to(self.device), self.x.to(self.device), self.y.to(self.device), z_g)
 

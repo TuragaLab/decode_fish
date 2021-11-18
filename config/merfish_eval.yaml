@@ -1,4 +1,4 @@
-sweep_name: sweep_sl_16b
+sweep_name: sweep_sl_18
 run_name: 'psf_noise:0.1'
 
 out_file: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/decode_fish/data/results/MERFISH/merfish_${sweep_name}_${run_name}.csv

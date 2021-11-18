@@ -57,8 +57,10 @@ class Microscope(nn.Module):
         self.psf_z_size = self.psf.psf_volume.shape[-3]
         self.n_cols = self.psf.n_cols
 
-        self.channel_shifts = self.noise.channel_shifts
-        self.channel_facs = torch.nn.Parameter(torch.ones(16))
+        self.register_parameter(name='channel_facs', param=torch.nn.Parameter(torch.ones(16)))
+        self.register_parameter(name='channel_shifts', param=self.noise.channel_shifts )
+        self.register_parameter(name='theta_par', param=self.noise.theta_par)
+        self.register_parameter(name='psf_vol', param=self.psf.psf_volume)
 
     def add_psf_noise(self, psf_stack):
 
@@ -98,8 +100,9 @@ class Microscope(nn.Module):
             if self.pred_z and self.psf_z_size > 1:
                 z_os_val = 0.5*(torch.clamp(z_os_val,-0.9999,0.9999) + 1.) # transform to [0,1]
                 z_scaled = z_os_val * (self.psf_z_size - 2) # [0, z_size]
-                z_inds = (z_scaled//1).type(torch.cuda.LongTensor)
-                psf = self.psf(x_os_val, y_os_val, -(z_scaled%1.)-0.5, z_inds)
+                z_inds = (z_scaled//1).type(torch.cuda.LongTensor) + 1
+                z_os = -(z_scaled%1.) + 0.5
+                psf = self.psf(x_os_val, y_os_val, z_os, z_inds)
 #                 psf = psf[torch.arange(len(z_os_val)),:,z_inds][:,:,None]
             else:
                 psf = self.psf(x_os_val, y_os_val, z_os_val)

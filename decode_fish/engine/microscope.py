@@ -34,14 +34,14 @@ class Microscope(nn.Module):
                 x_os_val: (N_emitters,)
                 y_os_val: (N_emitters,)
                 z_os_val: (N_emitters,)
-                ints_val: (N_emitters,)
+                ints_val: (N_emitters,C)
                 output_shape: Shape Tuple(BS, C, H, W, D)
 
         -Output: xsim: (BS, C, H, W, D)
     """
 
 
-    def __init__(self, psf: torch.nn.Module=None, noise: Union[torch.nn.Module, None]=None, scale: float = 10000., norm='max', sum_fac=1, psf_noise=0, pred_z=False):
+    def __init__(self, psf: torch.nn.Module=None, noise: Union[torch.nn.Module, None]=None, scale: float = 10000., norm='max', sum_fac=1, psf_noise=0, pred_z=False, ch_facs=None):
 
         super().__init__()
         self.psf = psf
@@ -57,8 +57,11 @@ class Microscope(nn.Module):
         self.psf_z_size = self.psf.psf_volume.shape[-3]
         self.n_cols = self.psf.n_cols
 
-        self.register_parameter(name='channel_facs', param=torch.nn.Parameter(torch.ones(16)))
-        self.register_parameter(name='channel_shifts', param=self.noise.channel_shifts )
+        self.register_parameter(name='channel_shifts', param=self.noise.channel_shifts)
+        if ch_facs is None:
+            self.register_parameter(name='channel_facs', param=torch.nn.Parameter(torch.ones(len(self.channel_shifts))))
+        else:
+            self.register_parameter(name='channel_facs', param=torch.nn.Parameter(torch.tensor(ch_facs)))
         self.register_parameter(name='theta_par', param=self.noise.theta_par)
         self.register_parameter(name='psf_vol', param=self.psf.psf_volume)
 
@@ -77,18 +80,21 @@ class Microscope(nn.Module):
 #         psf_deformed = etorch.deform_grid(psf_stack[:,0], torch.distributions.Normal(loc=0, scale=self.psf_noise).sample([3,3,3,3]).to(psf_stack.device), axis=(1,2,3),order=3)
 #         return psf_deformed[:,None]
 
-    def forward(self, locations, x_os_val, y_os_val, z_os_val, i_val, output_shape, eval_=None, add_noise=False, rec_ch=0):
+    def forward(self, locations, x_os_val, y_os_val, z_os_val, i_val, output_shape, eval_=None, add_noise=False):
 
         if len(locations[0]):
 
             # We get the right channels when simulating, but for reconstruction we use ch = 0 for a single reconstructed image.
-            ch_inds = locations[1] + rec_ch
-            if ch_inds.max() > 0:
+            ch_inds = i_val.nonzero(as_tuple=True)
+            if ch_inds[1].max() > 0:
                 shifts = self.channel_shifts - self.channel_shifts.mean(0)[None]
 
-                x_os_val = x_os_val + shifts[ch_inds, 0]
-                y_os_val = y_os_val + shifts[ch_inds, 1]
-                z_os_val = z_os_val + shifts[ch_inds, 2]
+                x_os_ch = x_os_val[ch_inds[0]] + shifts[ch_inds[1], 0]
+                y_os_ch = y_os_val[ch_inds[0]] + shifts[ch_inds[1], 1]
+                z_os_ch = z_os_val[ch_inds[0]] + shifts[ch_inds[1], 2]
+
+                locations = [l[ch_inds[0]] for l in locations]
+                locations.insert(1,ch_inds[1])
 
             if 'max' in self.norm:
                 psf_norm = self.psf.psf_volume.max()
@@ -97,15 +103,16 @@ class Microscope(nn.Module):
             else:
                 psf_norm = 1
             # Apply continuous shift
-            if self.pred_z and self.psf_z_size > 1:
-                z_os_val = 0.5*(torch.clamp(z_os_val,-0.9999,0.9999) + 1.) # transform to [0,1]
-                z_scaled = z_os_val * (self.psf_z_size - 2) # [0, z_size]
+            if self.pred_z and self.psf_z_size > 1 and output_shape[-3] == 1:
+                z_os_ch = 0.5*(torch.clamp(z_os_ch,-0.9999,0.9999) + 1.) # transform to [0,1]
+                z_scaled = z_os_ch * (self.psf_z_size - 2) # [0, z_size]
                 z_inds = (z_scaled//1).type(torch.cuda.LongTensor) + 1
                 z_os = -(z_scaled%1.) + 0.5
-                psf = self.psf(x_os_val, y_os_val, z_os, z_inds)
-#                 psf = psf[torch.arange(len(z_os_val)),:,z_inds][:,:,None]
+                psf = self.psf(x_os_ch, y_os_ch, z_os, z_inds)
+#                 psf = psf[torch.arange(len(z_os_ch)),:,z_inds][:,:,None]
             else:
-                psf = self.psf(x_os_val, y_os_val, z_os_val)
+                psf = self.psf(x_os_ch, y_os_ch, z_os_ch)
+
 
             torch.clamp_min_(psf,0)
             psf = psf/psf_norm
@@ -114,11 +121,14 @@ class Microscope(nn.Module):
                 psf = self.add_psf_noise(psf)
 
             # applying intenseties
-            tot_intensity = torch.clamp_min(i_val, 0)  * self.channel_facs[ch_inds]
+
+            tot_intensity = torch.clamp_min(i_val[ch_inds], 0)  * self.channel_facs[ch_inds[1]]
+
             psf = psf * tot_intensity[:,None,None,None,None]
             # place psf according to locations
-            locations[1] = ch_inds
+#             return locations, psf, output_shape
             xsim = place_psf(locations, psf, output_shape)
+
             # scale (not learnable)
             xsim = self.scale * xsim
             if eval_:

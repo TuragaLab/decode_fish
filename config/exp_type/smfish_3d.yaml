@@ -1,0 +1,7 @@
+name: smfish
+sm_fish_ch: 0
+ch_to_batch: False
+is_2D: False
+pred_z: True
+channels: 1
+n_bits: 1

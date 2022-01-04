@@ -10,72 +10,28 @@ from .plotting import *
 from .emitter_io import *
 
 # Cell
-# def sample_to_df(locs, x_os, y_os, z_os, ints, px_size_zyx=[100,100,100], channels=16, n_bits=4):
-
-#     x = locs[-1] + x_os + 0.5
-#     y = locs[-2] + y_os + 0.5
-#     z = locs[-3] + z_os + 0.5
-
-#     b_inds = torch.cat([torch.tensor([0], device=x_os.device),((x_os[1:] - x_os[:-1]).nonzero() + 1)[:,0],
-#                         torch.tensor([len(x_os)], device=x_os.device)])
-#     n_gt = len(b_inds) - 1
-
-#     frame_idx = locs[0]
-#     ch_idx = locs[1]
-
-#     loc_idx = []
-#     for i in range(n_gt):
-#         loc_idx += [i] * (b_inds[i+1] - b_inds[i])
-
-#     df = DF({'loc_idx': loc_idx,
-#              'frame_idx': frame_idx.cpu(),
-#              'ch_idx': ch_idx.cpu(),
-#              'x': x.cpu()*px_size_zyx[2],
-#              'y': y.cpu()*px_size_zyx[1],
-#              'z': z.cpu()*px_size_zyx[0],
-#              'int': ints.cpu()})
-
-#     int_arr = np.zeros([n_gt, channels])
-#     int_arr[df['loc_idx'], df['ch_idx']] = ints.cpu()
-
-#     df = df.iloc[cpu(b_inds[:-1])]
-#     for i in range(16):
-#         df[f'int_{i}'] = int_arr[:,i]
-
-#     return df
-
-def sample_to_df(locs, x_os, y_os, z_os, ints, codes, px_size_zyx=[100,100,100], channels=16, n_bits=4):
+def sample_to_df(locs, x_os, y_os, z_os, ints, codes, px_size_zyx=[100,100,100]):
 
     x = locs[-1] + x_os + 0.5
     y = locs[-2] + y_os + 0.5
     z = locs[-3] + z_os + 0.5
 
-    b_inds = torch.cat([torch.tensor([0], device=x_os.device),((x_os[1:] - x_os[:-1]).nonzero() + 1)[:,0],
-                        torch.tensor([len(x_os)], device=x_os.device)])
-    n_gt = len(b_inds) - 1
+    n_gt = len(x)
+    channels = ints.shape[1]
 
     frame_idx = locs[0]
-    ch_idx = locs[1]
 
-    loc_idx = []
-    for i in range(n_gt):
-        loc_idx += [i] * (b_inds[i+1] - b_inds[i])
-
-    df = DF({'loc_idx': loc_idx,
+    df = DF({'loc_idx': torch.arange(n_gt),
              'frame_idx': frame_idx.cpu(),
              'x': x.cpu()*px_size_zyx[2],
              'y': y.cpu()*px_size_zyx[1],
              'z': z.cpu()*px_size_zyx[0]})
 
-    int_arr = np.zeros([n_gt, channels])
-    int_arr[df['loc_idx'], ch_idx.cpu()] = ints.cpu()
-
-    df = df.iloc[cpu(b_inds)[:-1]]
-    for i in range(16):
-        df[f'int_{i}'] = int_arr[:,i]
+    for i in range(channels):
+        df[f'int_{i}'] = ints[:,i].cpu()
 
     df['code_inds'] = codes
-    df['ints'] = int_arr.sum(-1)
+    df['ints'] = ints.sum(-1).cpu()
 
     return df
 
@@ -104,6 +60,7 @@ class SIPostProcess(torch.nn.Module):
         self.samp_threshold = samp_threshold
         self.diag = diag
         self.px_size_zyx = px_size_zyx
+        self.codebook = False
 
         if not diag:
             d1 = 0; d2 = 0
@@ -168,7 +125,7 @@ class SIPostProcess(torch.nn.Module):
 
         x = pos_x + res_dict['xyzi_mu'][:,[0]][ch0_locs] + 0.5
         y = pos_y + res_dict['xyzi_mu'][:,[1]][ch0_locs] + 0.5
-        z = pos_z + res_dict['xyzi_mu'][:,[2]][ch0_locs]
+        z = pos_z + res_dict['xyzi_mu'][:,[2]][ch0_locs] + 0.5
 
         loc_idx = torch.arange(len(x))
         frame_idx = locations[0]
@@ -191,10 +148,13 @@ class SIPostProcess(torch.nn.Module):
 
         return df
 
-    def get_micro_inp(self, res_dict, code_inds, p_si=None, n_bits = 4, channel=0):
+    def get_micro_inp(self, res_dict, p_si=None):
 
+        channels = self.codebook.shape[1]
+        n_bits = (1.*self.codebook.sum(1)).mean()
         res_dict = self.get_si_resdict(res_dict, p_si)
-        locations = res_dict['Samples_si'].nonzero(as_tuple=True)
+        # remove dump inds. Wont get reconstructed.
+        locations = res_dict['Samples_si'][:,:-1].nonzero(as_tuple=True)
 
         xyzi_ix = [locations[0],locations[2],locations[3], locations[4]]
         x_os_3d = res_dict['xyzi_mu'][:,0][xyzi_ix]
@@ -202,21 +162,18 @@ class SIPostProcess(torch.nn.Module):
         z_os_3d = res_dict['xyzi_mu'][:,2][xyzi_ix]
         ints_3d = res_dict['xyzi_mu'][:,3][xyzi_ix]
         # output_shape  = res_dict['Samples_si'].shape
-        x_os_3d = x_os_3d.repeat_interleave(n_bits)
-        y_os_3d = y_os_3d.repeat_interleave(n_bits)
-        z_os_3d = z_os_3d.repeat_interleave(n_bits)
-        ints_3d = ints_3d.repeat_interleave(n_bits)/n_bits
+        ints_3d = ints_3d/n_bits
 
-        locations = [locations[0].repeat_interleave(n_bits),
-                     torch.tensor(code_inds)[locations[1]].reshape(-1),
-                     locations[2].repeat_interleave(n_bits),
-                     locations[3].repeat_interleave(n_bits),
-                     locations[4].repeat_interleave(n_bits)]
+        ints_ret = ints_3d[:,None].repeat_interleave(channels, 1)
+#         ch_bin = torch.zeros(ints_ret.shape).to(ints_ret.device)
+#         ch_bin.scatter_(index=torch.tensor(code_inds).to(ints_ret.device)[locations[1]], dim=1, value=1)
+        ch_bin = self.codebook.to(ints_ret.device)[locations[1]]
+        ints_ret = ints_ret*ch_bin
 
         output_shape  = res_dict['Samples_si'].shape
-        output_shape  = torch.Size([output_shape[0],code_inds.max()+1,output_shape[2],output_shape[3],output_shape[4]])
+        output_shape  = torch.Size([output_shape[0],channels,output_shape[2],output_shape[3],output_shape[4]])
 
-        return locations, x_os_3d, y_os_3d, z_os_3d, ints_3d, output_shape
+        return xyzi_ix, x_os_3d, y_os_3d, z_os_3d, ints_ret, output_shape
 # p_col = []
 
 # Cell

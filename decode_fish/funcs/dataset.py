@@ -155,8 +155,10 @@ class UniformValue(TransformBase):
 
 def get_forward_scaling(img):
 
-    offset = np.median(img)
-    scale = np.max(np.array(img))/3
+#     offset = np.median(img)
+#     scale = np.max(np.array(img))/3
+    offset = np.median(np.array(img), axis=(1,2,3))
+    scale = np.max(np.array(img), axis=(1,2,3))/3
     return offset, scale
 
 # Cell

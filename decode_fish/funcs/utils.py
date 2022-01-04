@@ -77,7 +77,7 @@ def load_tiff_from_list(path_list):
 # Cell
 def gpu(x):
     '''Transforms numpy array or torch tensor torch torch.cuda.FloatTensor'''
-    return FloatTensor(x).cuda()
+    return torch.cuda.FloatTensor(x).cuda()
 
 def cpu(x):
     '''Transforms torch tensor into numpy array'''

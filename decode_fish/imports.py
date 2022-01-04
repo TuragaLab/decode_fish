@@ -19,4 +19,4 @@ default_conf = '../config/train.yaml'
 simfish_dir = '/groups/turaga/home/speisera/share_TUM/FishSIM/'
 temp_dir = '/groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deeppop/temp_save/'
 exp_dir = '/groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deeppop/DiSAE_nbdev/experiments/'
-
+base_path = '/groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/'

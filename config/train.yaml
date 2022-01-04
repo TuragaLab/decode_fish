@@ -1,6 +1,3 @@
-defaults:
-    - exp_type: smfish
-
 base_dir: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/
 run_name: test/test_sub
 sub_name: 
@@ -21,7 +18,11 @@ output:
   
 data_path: 
     image_path:
-    image_shape: 
+    image_proc:
+        swap_dim: [0,1,2,3]
+        crop_sl: s_[:,:,:,:]
+    image_sim:
+        image_shape: 
     psf_path: 
     model_init: 
     
@@ -30,7 +31,7 @@ evaluation:
     reconstruction:
         enabled: False
         image_path: ${data_path.image_path}
-        sm_fish_ch: ${exp_type.sm_fish_ch}
+        sm_fish_ch: ${genm.exp_type.sm_fish_ch}
         txt_path: 
         psf_path: 
         crop_sl: s_[:,:,:,:]
@@ -40,87 +41,91 @@ evaluation:
         image_path: ${data_path.image_path}
         top_n: 15000
         
-emitter_noise:
-    rate_fac: 2.
-    int_fac: 0.25
-
-prob_generator:
-    low: 1e-8
-    high: 0.005
+genm:
+    exp_type:
+        n_channels: 1
+        n_genes: 1
+        n_bits: 1
+        sample_from_codebook: False
+        phasing: False
+        const_theta_sim: True
+        is_2D: False
+        pred_z: True
+        sm_fish_ch: 0
+    PSF:
+        _target_: decode_fish.engine.psf.LinearInterpolatedPSF 
+        device: ${device.gpu_device}
+        gauss_radii: [1.,1.,1.]
+        psf_extent_zyx : [21,21,21]
+        n_cols: 1
+    noise:
+        _target_: decode_fish.engine.noise.sCMOS
+        theta: 2. 
+        baseline: 0.
+        channels: ${genm.exp_type.n_channels} 
+    intensity_dist:
+        int_conc: 3.
+        int_rate: 3.
+        int_loc: 3. 
+    microscope:
+        _target_: decode_fish.engine.microscope.Microscope
+        scale: 100
+        psf_noise: 0.1
+        pred_z: ${genm.exp_type.pred_z} 
+        norm: 'max'    
+        ch_facs: 
+    foci:
+        _target_: decode_fish.funcs.dataset.AddFoci
+        n_foci_avg: 0.
+        rad_range: [100,500]
+        n_mol_range: [5,40]
+        px_size_zyx: ${evaluation.px_size_zyx}
+        mode: 'bin'
+    emitter_noise:
+        rate_fac: 2.
+        int_fac: 0.25
+    prob_generator:
+        low: 1e-8
+        high: 0.005
         
-    
-random_crop: 
-    crop_sz: 48
-    
-bg_estimation:
-    smoothing:
-        _target_: decode_fish.funcs.dataset.GaussianSmoothing
-        smoothing_filter_size: 5
-    uniform:
-        _target_: decode_fish.funcs.dataset.UniformValue
-        min_val: 100.
-        max_val: 100.
-    fractal:
-        _target_: decode_fish.funcs.dataset.AddPerlinNoise
-        shape: ${random_crop.crop_sz}
-        res: [2,4,4]
-        octaves: 3
-        persistence: 0.5
-        scale: 0
-
-roi_mask:
-    pool_size: [10,10,10]
-    percentile: 50 # Percentage of volume that is not sampled from
-               
-PSF:
-    _target_: decode_fish.engine.psf.LinearInterpolatedPSF 
-    device: ${device.gpu_device}
-    gauss_radii: [1.,1.,1.]
-    psf_extent_zyx : [21,21,21]
-    n_cols: 1
-    
-noise:
-    _target_: decode_fish.engine.noise.sCMOS
-    theta: 2. 
-    baseline: 0.
-    channels: ${exp_type.channels} 
-    
-microscope:
-    _target_: decode_fish.engine.microscope.Microscope
-    scale: 100
-    psf_noise: 0.1
-    pred_z: ${exp_type.pred_z} 
-    norm: 'max'
-    
-foci:
-    _target_: decode_fish.funcs.dataset.AddFoci
-    n_foci_avg: 0.
-    rad_range: [100,500]
-    n_mol_range: [5,40]
-    px_size_zyx: ${evaluation.px_size_zyx}
-    mode: 'bin'
-    
-intensity_dist:
-    int_conc: 3.
-    int_rate: 3.
-    int_loc: 3.
-    
-model:
+sim:
+    random_crop: 
+        crop_sz: 48
+    roi_mask:
+        pool_size: [10,10,10]
+        percentile: 50 # Percentage of volume that is not sampled from
+    bg_estimation:
+        smoothing:
+            _target_: decode_fish.funcs.dataset.GaussianSmoothing
+            smoothing_filter_size: 5
+        uniform:
+            _target_: decode_fish.funcs.dataset.UniformValue
+            min_val: 100.
+            max_val: 100.
+        fractal:
+            _target_: decode_fish.funcs.dataset.AddPerlinNoise
+            shape: ${sim.random_crop.crop_sz}
+            res: [2,4,4]
+            octaves: 3
+            persistence: 0.5
+            scale: 0
+ 
+network:
     _target_: decode_fish.engine.model.UnetDecodeNoBn
     depth: 2
-    ch_in: ${exp_type.channels} 
+    ch_in: ${genm.exp_type.n_channels} 
     f_maps: 32
-    n_p_layers: 1
-    is_2D: ${exp_type.is_2D}
-    pred_z: ${exp_type.pred_z}
-    code_inf: False
+    n_p_ch: ${genm.exp_type.n_genes}
+    n_bg_ch: ${genm.exp_type.n_channels}
+    is_2D: ${genm.exp_type.is_2D}
+    pred_z: ${genm.exp_type.pred_z}
     inp_scale: 
     inp_offset: 
     p_offset: -4.0
     order: 'ce'
-    int_conc: ${intensity_dist.int_conc}
-    int_rate: ${intensity_dist.int_rate}
-    int_loc:  ${intensity_dist.int_loc}
+    int_conc: ${genm.intensity_dist.int_conc}
+    int_rate: ${genm.intensity_dist.int_rate}
+    int_loc:  ${genm.intensity_dist.int_loc}
     
 post_proc_isi:
     _target_: decode_fish.funcs.output_trafo.ISIPostProcess
@@ -142,6 +147,7 @@ training:
     loss_option: 1
     count_mult: 0
     cat_logits: 0
+    n_dump_codes: 0
     
     net:
         bl_loss_scale: 0.01
@@ -165,7 +171,7 @@ training:
             channel_facs: True
             channel_shifts: True
             theta_par: True
-            psf_vol: False
+            psf_vol: True
         opt:
             _target_: torch_optimizer.QHAdam
             lr: 0.00025

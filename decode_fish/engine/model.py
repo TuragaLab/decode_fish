@@ -434,40 +434,33 @@ class OutputNet(nn.Module):
         f_maps: number of channels of the U-net output
         p_offset: probability channel bias
     """
-    def __init__(self, f_maps=64, p_offset=-5., is_2D=False, code_inf=False, n_p_layers=1):
+    def __init__(self, f_maps=64, p_offset=-5., is_2D=False, n_p_ch=1, n_bg_ch=1):
         super().__init__()
 
         self.is_2D = is_2D
-        self.code_inf = code_inf
-        self.n_p_layers = n_p_layers
+        self.n_p_ch = n_p_ch
+        self.n_bg_ch = n_bg_ch
 
-        xyzi_dim = 4 #19 if code_inf else 4
-        bg_dim = 16 if code_inf else 1
-        p_dim = 140 if code_inf else 4
+        xyzi_dim = 4
 
         kernel_size = [1,3,3] if is_2D else [3,3,3]
         padding = [0,1,1] if is_2D else [1,1,1]
 
-        self.p_out1 = nn.Conv3d(f_maps, f_maps, kernel_size=kernel_size, padding=padding)
-        self.p_out2 = nn.Conv3d(f_maps, p_dim, kernel_size=1, padding=0)
+        self.p_out1 = nn.Conv3d(f_maps, f_maps, kernel_size=kernel_size, padding=padding, padding_mode='replicate')
+        self.p_out2 = nn.Conv3d(f_maps, n_p_ch, kernel_size=1, padding=0)
         nn.init.constant_(self.p_out2.bias,p_offset)
 
-#         self.int_p_out1 = nn.Conv3d(f_maps, f_maps, kernel_size=kernel_size, padding=padding)
-#         self.int_p_out2 = nn.Conv3d(f_maps, 16, kernel_size=1, padding=0)
-
-        self.xyzi_out1 = nn.Conv3d(f_maps, f_maps, kernel_size=kernel_size, padding=padding)
+        self.xyzi_out1 = nn.Conv3d(f_maps, f_maps, kernel_size=kernel_size, padding=padding, padding_mode='replicate')
         self.xyzi_out2 = nn.Conv3d(f_maps, xyzi_dim, kernel_size=1, padding=0)
 
-        self.xyzis_out1 = nn.Conv3d(f_maps, f_maps, kernel_size=kernel_size, padding=padding)
+        self.xyzis_out1 = nn.Conv3d(f_maps, f_maps, kernel_size=kernel_size, padding=padding, padding_mode='replicate')
         self.xyzis_out2 = nn.Conv3d(f_maps, xyzi_dim, kernel_size=1, padding=0)
 
-        self.bg_out1 = nn.Conv3d(f_maps, f_maps, kernel_size=kernel_size, padding=padding)
-        self.bg_out2 = nn.Conv3d(f_maps, bg_dim, kernel_size=1, padding=0)
+        self.bg_out1 = nn.Conv3d(f_maps, f_maps, kernel_size=kernel_size, padding=padding, padding_mode='replicate')
+        self.bg_out2 = nn.Conv3d(f_maps, n_bg_ch, kernel_size=1, padding=0)
 
         nn.init.kaiming_normal_(self.p_out1.weight, mode='fan_in', nonlinearity='relu')
         nn.init.kaiming_normal_(self.p_out2.weight, mode='fan_in', nonlinearity='linear')
-#         nn.init.kaiming_normal_(self.int_p_out1.weight, mode='fan_in', nonlinearity='relu')
-#         nn.init.kaiming_normal_(self.int_p_out2.weight, mode='fan_in', nonlinearity='linear')
         nn.init.kaiming_normal_(self.xyzi_out1.weight, mode='fan_in', nonlinearity='relu')
         nn.init.kaiming_normal_(self.xyzi_out2.weight, mode='fan_in', nonlinearity='linear')
         nn.init.kaiming_normal_(self.xyzis_out1.weight, mode='fan_in', nonlinearity='relu')
@@ -480,10 +473,6 @@ class OutputNet(nn.Module):
         logit    = F.elu(self.p_out1(x))
         logit    = self.p_out2(logit)
         logit    = torch.clamp(logit, -20., 20)
-
-#         int_logit    = F.elu(self.int_p_out1(x))
-#         int_logit    = self.int_p_out2(int_logit)
-#         int_logit    = torch.clamp(int_logit, -15., 15)
 
         xyzi = F.elu(self.xyzi_out1(x))
         xyzi = self.xyzi_out2(xyzi)
@@ -536,7 +525,7 @@ class UnetDecodeNoBn(nn.Module):
 
     """
     def __init__(self, ch_in=1, depth=3, inp_scale=1., inp_offset=0., order='ce', f_maps=64,
-                 is_2D=False, code_inf=False, pred_z=True, p_offset=-5., int_conc=4., int_rate=1., int_loc=1., n_p_layers=1):
+                 is_2D=False, pred_z=True, p_offset=-5., int_conc=4., int_rate=1., int_loc=1., n_p_ch=1, n_bg_ch=1):
         super().__init__()
 
         self.inp_scale = inp_scale
@@ -544,20 +533,20 @@ class UnetDecodeNoBn(nn.Module):
 
         self.ch_in = ch_in
         self.is_2D = is_2D
-        self.code_inf = code_inf
         self.pred_z = pred_z
-        self.n_p_layers = n_p_layers
+        self.n_p_ch = n_p_ch
+        self.n_bg_ch = n_bg_ch
 
         self.unet = UNet3D(ch_in, final_sigmoid=False, num_levels=depth, is_2D=is_2D,
                            layer_order = order, f_maps=f_maps)
-        self.outnet = OutputNet(f_maps=f_maps, p_offset=p_offset, is_2D=is_2D, code_inf=code_inf, n_p_layers=n_p_layers)
+        self.outnet = OutputNet(f_maps=f_maps, p_offset=p_offset, is_2D=is_2D, n_p_ch=n_p_ch, n_bg_ch=n_bg_ch)
 
         self.network = nn.ModuleList([self.unet, self.outnet])
         self.int_dist = IntensityDist(int_conc, int_rate, int_loc)
 
     def forward(self, x, shuffle_ch=False):
 
-        x = (x-self.inp_offset) / self.inp_scale
+        x = (x-self.inp_offset[None,:,None,None,None]) / self.inp_scale[None,:,None,None,None]
 
         for net in self.network:
             x = net(x)
@@ -566,33 +555,23 @@ class UnetDecodeNoBn(nn.Module):
 
     def tensor_to_dict(self, x):
 
-        # Limit intensity
-#         x[:,4] = x[:,4] + float(self.int_dist.int_loc.detach()) + 0.01
-#         x[:,39:55] = x[:,39:55] * self.inp_scale
-        x[:,-16:] = x[:,-16:] * self.inp_scale
+        logits = x[:, 0:self.n_p_ch]
+        xyzi_mu = x[:, self.n_p_ch:self.n_p_ch+4]
+        xyzi_sig = x[:, self.n_p_ch+4:self.n_p_ch+8]
+        bg = x[:, self.n_p_ch+8:self.n_p_ch+8+self.n_bg_ch]
+
+        # Scale bg output
+        bg = bg * self.inp_scale[None,:,None,None,None].to(bg.device)
 
         if not self.pred_z:
 
-            x[:,139+3] *= 0
-            x[:,139+7] *= 0
-            x[:,139+7] += 1
-#             x[:,7 + 15*self.code_inf] *= 0
-#             x[:,7 + 15*self.code_inf] += 1
+            xyzi_mu[:,3] *= 0
+            xyzi_sig[:,3] *= 0
+            xyzi_sig[:,3] += 1
 
-        if not self.code_inf:
-            ret_dict = {'logits': x[:,0:1],
-                        'xyzi_mu': x[:,1:5],
-                        'xyzi_sigma': x[:,5:9],
-                        'background': x[:,9:]}
-        else:
-            ret_dict = {'logits': x[:,0:140],
-                        'xyzi_mu': x[:,140:144],
-                        'xyzi_sigma': x[:,144:148],
-                        'background': x[:,-16:]}
-#             ret_dict = {'logits': x[:,0:1],
-#                         'xyzi_mu': x[:,1:20],
-#                         'xyzi_sigma': x[:,20:39],
-#                         'background': x[:,39:55],
-#                         'int_logits': x[:,55:]}
+        ret_dict = {'logits': logits,
+                    'xyzi_mu': xyzi_mu,
+                    'xyzi_sigma': xyzi_sig,
+                    'background': bg}
 
         return ret_dict

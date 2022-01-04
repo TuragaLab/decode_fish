@@ -1,0 +1,22 @@
+# @package _global_
+genm:
+    exp_type:
+        n_channels: 22
+        n_genes: 252
+        n_bits: 4
+        is_2D: False
+        pred_z: True
+        sm_fish_ch: 
+        sample_from_codebook: True
+        const_theta_sim: False
+        phasing: False
+        
+data_path:
+    image_proc:
+        crop_sl: s_[:,:,:,:]
+        override:
+            _target_: decode_fish.funcs.exp_specific.read_MOp_tiff 
+    
+codebook:
+    _target_: decode_fish.funcs.exp_specific.get_merfish_mop
+    n_genes: 252

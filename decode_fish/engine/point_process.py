@@ -59,15 +59,17 @@ class PointProcessUniform(Distribution):
         x_offset = D.Uniform(low=-0.5, high=0.5).sample(sample_shape=[n_emitter]).to(self.device)
         y_offset = D.Uniform(low=-0.5, high=0.5).sample(sample_shape=[n_emitter]).to(self.device)
         z_offset = D.Uniform(low=-0.5, high=0.5).sample(sample_shape=[n_emitter]).to(self.device)
+
+#         intensities = torch.zeros([n_emitter, self.channels]).to(self.device)
         if self.int_option == 1:
-            intensities = D.Gamma(self.int_conc, self.int_rate).sample(sample_shape=[n_emitter*self.n_bits]).to(self.device) + self.int_loc
+            intensities = D.Gamma(self.int_conc, self.int_rate).sample(sample_shape=[n_emitter, self.channels]).to(self.device) + self.int_loc
         elif self.int_option == 2:
-            intensities = D.Gamma(self.int_conc, self.int_rate).sample(sample_shape=[n_emitter]).to(self.device) + self.int_loc
-            intensities = intensities.repeat_interleave(self.n_bits, 0)
+            intensities = D.Gamma(self.int_conc, self.int_rate).sample(sample_shape=[n_emitter, 1]).to(self.device) + self.int_loc
+            intensities = intensities.repeat_interleave(self.channels, 1)
         elif self.int_option == 3:
-            intensities = D.Gamma(self.int_conc, self.int_rate).sample(sample_shape=[n_emitter]).to(self.device) + self.int_loc
-            intensities = intensities.repeat_interleave(self.n_bits, 0)
-            int_noise = D.Uniform(low=.7, high=1.5).sample(sample_shape=[n_emitter*self.n_bits]).to(self.device)
+            intensities = D.Gamma(self.int_conc, self.int_rate).sample(sample_shape=[n_emitter, 1]).to(self.device) + self.int_loc
+            intensities = intensities.repeat_interleave(self.channels, 1)
+            int_noise = D.Uniform(low=.7, high=1.5).sample(sample_shape=intensities.shape).to(self.device)
             intensities *= int_noise
 
         # If 2D data z-offset is 0
@@ -83,19 +85,31 @@ class PointProcessUniform(Distribution):
         if self.channels > 1:
             code_draw = None
             if from_code_book:
-                code_draw = torch.randint(0, len(self.codebook),size=[n_emitter])
+                code_draw = torch.randint(0, len(self.codebook), size=[n_emitter])
                 ch_draw = self.codebook[code_draw]
+#                 code_draw = torch.randint(0, len(self.codebook) + self.n_dump_codes,size=[n_emitter])
+
+#                 ch_draw = torch.zeros([n_emitter, self.channels], dtype=torch.bool).to(self.device)
+#                 code_inds = code_draw<len(self.codebook)
+#                 dump_inds = code_draw>=len(self.codebook)
+#                 # All draws lower than the codebook length get a code from it
+#                 ch_draw[code_inds] = self.codebook[code_draw[code_inds]].to(self.device)
+#                 # All draws higher than the codebook length get a random code with an average length of n_bits, but at least 1
+#                 # There is a certain probability that dump codes are in the codebook. We ignore it for now.
+#                 ch_draw[dump_inds, torch.randint(0, self.channels, size=[sum(dump_inds)])] = 1
+#                 ch_draw[dump_inds] += torch.distributions.Binomial(total_count=1, probs=torch.ones([sum(dump_inds),self.channels])/self.channels*(self.n_bits - 1)).sample().type(torch.bool).to(self.device)
+
+#                 # n_dump_codes controsl the rate of out-of-code book codes, but they all get assigned to the code_index len(codebook)+1
+#                 code_draw = torch.clamp_max(code_draw, len(self.codebook))
+
             else:
-                ch_draw = torch.multinomial(torch.ones([n_emitter,self.channels])/self.channels, self.n_bits, replacement=False)
-            locations = locations.repeat_interleave(self.n_bits, 0)
-            locations[:, 1] = ch_draw.reshape(-1)
 
-            # Exact positions are shared, but not intensities. Problems due to drift?
-            x_offset = x_offset.repeat_interleave(self.n_bits, 0)
-            y_offset = y_offset.repeat_interleave(self.n_bits, 0)
-            z_offset = z_offset.repeat_interleave(self.n_bits, 0)
+                m_draw = torch.multinomial(torch.ones([n_emitter,self.channels])/self.channels, self.n_bits, replacement=False)
+                ch_draw = torch.zeros(intensities.shape).to(intensities.device)
+                ch_draw.scatter_(index=m_draw.to(intensities.device), dim=1, value=1)
 
-            output_shape[1] = self.channels
+            intensities = intensities.to(self.device) * ch_draw.to(self.device)
+            output_shape.insert(1, self.channels)
 
         return locations, x_offset, y_offset, z_offset, intensities, tuple(output_shape), code_draw
 

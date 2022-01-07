@@ -49,7 +49,7 @@ genm:
         sample_from_codebook: False
         phasing: False
         const_theta_sim: True
-        is_2D: False
+        slice_rec: False
         pred_z: True
         sm_fish_ch: 0
     PSF:
@@ -71,7 +71,7 @@ genm:
         _target_: decode_fish.engine.microscope.Microscope
         scale: 100
         psf_noise: 0.1
-        pred_z: ${genm.exp_type.pred_z} 
+        slice_rec: ${genm.exp_type.slice_rec} 
         norm: 'max'    
         ch_facs: 
     foci:
@@ -117,7 +117,7 @@ network:
     f_maps: 32
     n_p_ch: ${genm.exp_type.n_genes}
     n_bg_ch: ${genm.exp_type.n_channels}
-    is_2D: ${genm.exp_type.is_2D}
+    is_2D: False
     pred_z: ${genm.exp_type.pred_z}
     inp_scale: 
     inp_offset: 
@@ -163,6 +163,7 @@ training:
         opt:
             _target_: torch_optimizer.QHAdam
             lr: 5e-4
+            
     mic:
         enabled: True
         grad_clip: 0.1
@@ -179,6 +180,7 @@ training:
             _target_: torch.optim.lr_scheduler.StepLR
             gamma: 0.5
             step_size: 5000
+            
     int:
         enabled: True
         grad_clip: 

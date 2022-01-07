@@ -35,7 +35,7 @@ def get_simulation_statistics(decode_dl, micro, int_conc, int_rate, int_loc, int
 
             rand_ch = np.random.randint(0,channels)
 
-            sim_vars = PointProcessUniform(local_rate[:,0],int_conc, int_rate, int_loc, channels=channels, n_bits=n_bits, sim_z=cfg.genm.exp_type.pred_z,
+            sim_vars = PointProcessUniform(local_rate[:,0],int_conc, int_rate, int_loc, channels=channels, n_bits=n_bits, sim_z=True,
                                   codebook=codebook, int_option=3).sample(from_code_book=(codebook is not None), phasing=False)
             xsim = micro(*sim_vars[:-1], add_noise=psf_noise)
             xsim = micro.noise(xsim, background).sample()

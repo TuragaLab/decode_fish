@@ -41,7 +41,7 @@ class Microscope(nn.Module):
     """
 
 
-    def __init__(self, psf: torch.nn.Module=None, noise: Union[torch.nn.Module, None]=None, scale: float = 10000., norm='max', sum_fac=1, psf_noise=0, pred_z=False, ch_facs=None):
+    def __init__(self, psf: torch.nn.Module=None, noise: Union[torch.nn.Module, None]=None, scale: float = 10000., norm='max', sum_fac=1, psf_noise=0, slice_rec=False, ch_facs=None):
 
         super().__init__()
         self.psf = psf
@@ -53,7 +53,7 @@ class Microscope(nn.Module):
         self.sum_fac = sum_fac
 
         self.psf_noise = psf_noise
-        self.pred_z = pred_z
+        self.slice_rec = slice_rec
         self.psf_z_size = self.psf.psf_volume.shape[-3]
         self.n_cols = self.psf.n_cols
 
@@ -103,8 +103,8 @@ class Microscope(nn.Module):
             else:
                 psf_norm = 1
             # Apply continuous shift
-            if self.pred_z and self.psf_z_size > 1 and output_shape[-3] == 1:
-                z_os_ch = 0.5*(torch.clamp(z_os_ch,-0.9999,0.9999) + 1.) # transform to [0,1]
+            if self.slice_rec and self.psf_z_size > 1:
+                z_os_ch = torch.clamp(z_os_ch,-0.49999,0.49999) + 0.5 # transform to [0,1]
                 z_scaled = z_os_ch * (self.psf_z_size - 2) # [0, z_size]
                 z_inds = (z_scaled//1).type(torch.cuda.LongTensor) + 1
                 z_os = -(z_scaled%1.) + 0.5
@@ -213,11 +213,20 @@ def _place_psf(psf_vols, b, ch, z, y, x, output_shape):
 
     psf_vols = psf_vols.reshape(-1, psf_h, psf_w, psf_d)
 
+    # Take limit calculation out of the loop for 30% speed up
+    z_l = z - pad_zyx[0]
+    y_l = y - pad_zyx[1]
+    x_l = x - pad_zyx[2]
+
+    z_h = z + pad_zyx[0] + 1
+    y_h = y + pad_zyx[1] + 1
+    x_h = x + pad_zyx[2] + 1
+
     for idx in range(x.shape[0]):
         loc3d_like[b[idx], ch[idx],
-        z[idx]-pad_zyx[0] : z[idx]+pad_zyx[0] + 1,
-        y[idx]-pad_zyx[1] : y[idx]+pad_zyx[1] + 1,
-        x[idx]-pad_zyx[2] : x[idx]+pad_zyx[2] + 1] += psf_vols[idx]
+        z_l[idx] : z_h[idx],
+        y_l[idx] : y_h[idx],
+        x_l[idx] : x_h[idx]] += psf_vols[idx]
 
     b_sz, ch_sz, h_sz, w_sz, d_sz = loc3d_like.shape
 

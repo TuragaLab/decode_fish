@@ -4,7 +4,7 @@ genm:
         n_channels: 16
         n_bits: 4
         n_genes: 140
-        is_2D: True
+        slice_rec: True
         pred_z: True
         sm_fish_ch: 
         sample_from_codebook: True

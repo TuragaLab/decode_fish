@@ -140,16 +140,16 @@ def train(cfg,
         xsim = microscope(*sim_vars[:-1], add_noise=True)
 #         print('Micro, ', time.time()-t0); t0 = time.time()
 
-#         if cfg.genm.emitter_noise.rate_fac:
+        if cfg.genm.emitter_noise.rate_fac:
 
-#             noise_vars = PointProcessUniform(local_rate[:,0] * cfg.genm.emitter_noise.rate_fac, int_conc=model.int_dist.int_conc.detach() * cfg.genm.emitter_noise.int_fac,
-#                                            int_rate=model.int_dist.int_rate.detach(), int_loc=model.int_dist.int_loc.detach(),
-#                                            sim_iters=5, channels=cfg.genm.exp_type.n_channels, n_bits=1,
-#                                            sim_z=cfg.genm.exp_type.pred_z, codebook=None, int_option=cfg.training.int_option).sample(from_code_book=False)
+            noise_vars = PointProcessUniform(local_rate[:,0] * cfg.genm.emitter_noise.rate_fac, int_conc=model.int_dist.int_conc.detach() * cfg.genm.emitter_noise.int_fac,
+                                           int_rate=model.int_dist.int_rate.detach(), int_loc=model.int_dist.int_loc.detach(),
+                                           sim_iters=5, channels=cfg.genm.exp_type.n_channels, n_bits=1,
+                                           sim_z=cfg.genm.exp_type.pred_z, codebook=None, int_option=cfg.training.int_option).sample(from_code_book=False)
 
-# #             print('Em. sim ', time.time()-t0); t0 = time.time()
-#             xsim += microscope(*noise_vars[:-1], add_noise=True)
-# #             print('Em Micro, ', time.time()-t0); t0 = time.time()
+#             print('Em. sim ', time.time()-t0); t0 = time.time()
+            xsim += microscope(*noise_vars[:-1], add_noise=True)
+#             print('Em Micro, ', time.time()-t0); t0 = time.time()
 
         xsim_noise = microscope.noise(xsim, background, const_theta_sim=cfg.genm.exp_type.const_theta_sim).sample()
 
@@ -158,7 +158,8 @@ def train(cfg,
         ppg = PointProcessGaussian(**out_sim)
 
         count_prob, spatial_prob = ppg.log_prob(*sim_vars[:5], codes=sim_vars[-1], n_bits=cfg.genm.exp_type.n_bits, channels=cfg.genm.exp_type.n_channels,
-                                                loss_option=cfg.training.loss_option, count_mult=cfg.training.count_mult, cat_logits=cfg.training.cat_logits)
+                                                loss_option=cfg.training.loss_option, count_mult=cfg.training.count_mult, cat_logits=cfg.training.cat_logits,
+                                                slice_rec=cfg.genm.exp_type.slice_rec)
 
         gmm_loss = -(spatial_prob + cfg.training.net.cnt_loss_scale*count_prob).mean()
 

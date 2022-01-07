@@ -34,7 +34,7 @@ def my_app(cfg):
     if cfg.network.inp_offset is not None:
         inp_offset = cfg.network.inp_offset
         
-    model = hydra.utils.instantiate(cfg.network, inp_scale=gpu(inp_scale), inp_offset=gpu(inp_offset))
+    model = hydra.utils.instantiate(cfg.network, inp_scale=inp_scale, inp_offset=inp_offset)
     post_proc = hydra.utils.instantiate(cfg.post_proc_isi)
     
     psf  .to(cfg.device.gpu_device)

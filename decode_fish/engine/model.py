@@ -546,7 +546,7 @@ class UnetDecodeNoBn(nn.Module):
 
     def forward(self, x, shuffle_ch=False):
 
-        x = (x-self.inp_offset[None,:,None,None,None]) / self.inp_scale[None,:,None,None,None]
+        x = (x-self.inp_offset) / self.inp_scale
 
         for net in self.network:
             x = net(x)
@@ -561,7 +561,7 @@ class UnetDecodeNoBn(nn.Module):
         bg = x[:, self.n_p_ch+8:self.n_p_ch+8+self.n_bg_ch]
 
         # Scale bg output
-        bg = bg * self.inp_scale[None,:,None,None,None].to(bg.device)
+        bg = bg * self.inp_scale #[None,:,None,None,None].to(bg.device)
 
         if not self.pred_z:
 

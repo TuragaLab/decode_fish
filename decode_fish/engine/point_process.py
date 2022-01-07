@@ -75,10 +75,6 @@ class PointProcessUniform(Distribution):
         # If 2D data z-offset is 0
         if not self.sim_z:
             z_offset *= 0
-        else:
-            # If 2D data and we simulate z we use whole tanh range
-            if output_shape[-3] == 1:
-                 z_offset *= 2.
 
         locations = locations.nonzero(as_tuple=False)
 

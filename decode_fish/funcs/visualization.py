@@ -37,7 +37,8 @@ def get_simulation_statistics(decode_dl, micro, int_conc, int_rate, int_loc, int
 
             sim_vars = PointProcessUniform(local_rate[:,0],int_conc, int_rate, int_loc, channels=channels, n_bits=n_bits, sim_z=True,
                                   codebook=codebook, int_option=3).sample(from_code_book=(codebook is not None), phasing=False)
-            xsim = micro(*sim_vars[:-1], add_noise=psf_noise)
+            ch_inp = micro.get_single_ch_inputs(*sim_vars[:-1])
+            xsim = micro(*ch_inp, add_noise=psf_noise)
             xsim = micro.noise(xsim, background).sample()
 
             sim_df = sample_to_df(*sim_vars[:5], sim_vars[-1], px_size_zyx=[1.,1.,1.])
@@ -84,9 +85,22 @@ def get_prediction(model, post_proc, img, micro=None, cuda=True, return_rec=Fals
         pred_df = post_proc.get_df(res_dict)
 
         if return_rec:
-            locations, x_os_3d, y_os_3d, z_os_3d, ints_3d, output_shape = post_proc.get_micro_inp(res_dict)
-            ae_img_3d = micro(locations, x_os_3d, y_os_3d, z_os_3d, ints_3d, output_shape)
-            return pred_df, ae_img_3d + res_dict['background'], res_dict
+            micro_inp = post_proc.get_micro_inp(res_dict)
+            ch_inp = micro.get_single_ch_inputs(*micro_inp)
+            ae_img_3d = micro(*ch_inp)
+
+            filt_inds = get_roi_filt_inds(*ch_inp[0], micro.psf.psf_volume.shape, img.shape, slice_rec=cfg.genm.exp_type.slice_rec, min_dist=10)
+            ch_inp = mic_inp_apply_inds(*ch_inp, filt_inds)
+            if len(ch_inp[1]):
+                psf_recs = micro(*ch_inp, ret_psfs=True, add_noise=False)
+#                         print('N rec inds ', len(psf_recs))
+
+                rois = extract_psf_roi(ch_inp[0], img, torch.tensor(psf_recs.shape))
+                psf_bgs = extract_psf_roi(ch_inp[0], res_dict['background'], torch.tensor(psf_recs.shape))
+            else:
+                psf_recs = rois = psf_bgs = None
+
+            return pred_df, ae_img_3d + res_dict['background'], res_dict, psf_recs, psf_bgs, rois, ch_inp
 
         return pred_df
 
@@ -108,7 +122,7 @@ def eval_random_crop(decode_dl, model, post_proc, micro, proj_func=np.max, cuda=
 
             rand_ch = np.random.randint(0, x.shape[1])
             print(rand_ch)
-            pred_df, rec, res_dict = get_prediction(model, post_proc, x, micro=micro, cuda=True, return_rec=True, channel=rand_ch)
+            pred_df, rec, res_dict, psf_recs, psf_bgs, rois, ch_inp = get_prediction(model, post_proc, x, micro=micro, cuda=True, return_rec=True, channel=rand_ch)
             pred_df = nm_to_px(pred_df, post_proc.px_size_zyx)
 
             sub_df = pred_df#[code_ref[pred_df['code_inds']][:,rand_ch] > 0]
@@ -139,8 +153,7 @@ def eval_random_crop(decode_dl, model, post_proc, micro, proj_func=np.max, cuda=
 
         if ret_preds:
 
-            return x, pred_df, rec, res_dict
-
+            return x, local_rate, background, pred_df, rec, res_dict, psf_recs, psf_bgs, rois, ch_inp
 
 
 def eval_random_sim(decode_dl, model, post_proc, micro, proj_func=np.max, plot_gt=True, cuda=True, samples=1):

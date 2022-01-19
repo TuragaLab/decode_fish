@@ -37,6 +37,9 @@ def my_app(cfg):
     model = hydra.utils.instantiate(cfg.network, inp_scale=inp_scale, inp_offset=inp_offset)
     post_proc = hydra.utils.instantiate(cfg.post_proc_isi)
     
+    bench_df, code_ref, targets = hydra.utils.instantiate(cfg.codebook)
+    post_proc.codebook = torch.tensor(code_ref)
+    
     psf  .to(cfg.device.gpu_device)
     model.to(cfg.device.gpu_device)
     micro.to(cfg.device.gpu_device)
@@ -69,9 +72,12 @@ def my_app(cfg):
     optim_dict['sched_mic'] = hydra.utils.instantiate(cfg.training.mic.sched, optimizer=optim_dict['optim_mic'])
     optim_dict['sched_int'] = hydra.utils.instantiate(cfg.training.int.sched, optimizer=optim_dict['optim_int'])
 
+    if cfg.training.resume:
+        cfg.data_path.model_init = cfg.output.save_dir
+    
     if cfg.data_path.model_init is not None:
         print('loading')
-        model = load_model_state(model, cfg.data_path.model_init).cuda()
+        model = load_model_state(model, Path(cfg.data_path.model_init)/'model.pkl').cuda()
         micro.load_state_dict(torch.load(Path(cfg.data_path.model_init)/'microscope.pkl'))
 
         train_state_dict = torch.load(Path(cfg.data_path.model_init)/'training_state.pkl')

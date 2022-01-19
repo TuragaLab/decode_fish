@@ -544,7 +544,7 @@ class UnetDecodeNoBn(nn.Module):
         self.network = nn.ModuleList([self.unet, self.outnet])
         self.int_dist = IntensityDist(int_conc, int_rate, int_loc)
 
-    def forward(self, x, shuffle_ch=False):
+    def forward(self, x):
 
         x = (x-self.inp_offset) / self.inp_scale
 

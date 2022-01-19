@@ -38,7 +38,7 @@ evaluation:
         img_ind: 0
     code_stats: 
         enabled: False
-        image_path: ${data_path.image_path}
+        path: ${data_path.image_path}
         top_n: 15000
         
 genm:
@@ -73,7 +73,7 @@ genm:
         psf_noise: 0.1
         slice_rec: ${genm.exp_type.slice_rec} 
         norm: 'max'    
-        ch_facs: 
+        ch_facs:
     foci:
         _target_: decode_fish.funcs.dataset.AddFoci
         n_foci_avg: 0.
@@ -140,7 +140,6 @@ training:
     num_iters: 30000
     start_int: 0
     start_mic: 0 
-    shuffle_ch: False
     old_loss: False
     int_option: 1
     
@@ -148,6 +147,7 @@ training:
     count_mult: 0
     cat_logits: 0
     n_dump_codes: 0
+    resume: False
     
     net:
         bl_loss_scale: 0.01
@@ -166,13 +166,14 @@ training:
             
     mic:
         enabled: True
+        roi_rec: True
         grad_clip: 0.1
         norm_reg: 0.5
         par_grads:
-            channel_facs: True
-            channel_shifts: True
-            theta_par: True
-            psf_vol: True
+            channel_facs: False
+            channel_shifts: False
+            theta_par: False
+            psf_vol: False
         opt:
             _target_: torch_optimizer.QHAdam
             lr: 0.00025

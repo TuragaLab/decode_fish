@@ -19,6 +19,7 @@ def predict(model, post_proc, image_paths, sm_fish_ch=0, window_size=[None,128,1
             img = load_tiff_image(p)[sm_fish_ch]
             z, y, x = img.shape[-3:]
             img = img.reshape(-1,z,y,x)
+
             for i in range(len(img)):
                 print(img[i][None,None].shape)
                 output = sliding_window_inference(img[i][None,None], window_size, 1, model.to(device), overlap=0.2, sw_device=device, device='cpu', mode='gaussian')
@@ -31,18 +32,22 @@ def predict(model, post_proc, image_paths, sm_fish_ch=0, window_size=[None,128,1
                 free_mem()
         return pred_df
 
-def merfish_predict(model, post_proc, image_paths, window_size=[None,256,256], device='cuda'):
+def merfish_predict(model, post_proc, image_paths, window_size=[None,256,256], crop=np.s_[:,:,:,:,:], device='cuda'):
     pred_df = DF()
     with torch.no_grad():
         for p in image_paths:
 #             print(p.split('/')[-1])
-            img = load_tiff_image(p)[None]
+            if 'aligned' in p:
+                from .exp_specific import read_MOp_tiff
+                img = read_MOp_tiff(p, scaled=True)[None]
+            else:
+                img = load_tiff_image(p)[None]
 
             n_chans = img.shape[1]
-#             print(img.shape)
+            print(img.shape)
             z, y, x = img.shape[-3:]
 
-            inp = img
+            inp = img[crop]
             output = sliding_window_inference(inp, window_size, 1, model.to(device), overlap=0.2, sw_device=device, device='cpu', mode='gaussian')
             output = model.tensor_to_dict(output)
             p_si = sliding_window_inference(output['logits'], window_size, 1, post_proc, overlap=0.2, sw_device=device, device='cpu', mode='gaussian')

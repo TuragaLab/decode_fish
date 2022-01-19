@@ -2,8 +2,8 @@
 genm:
     exp_type:
         n_channels: 16
-        n_bits: 4
         n_genes: 140
+        n_bits: 4
         slice_rec: True
         pred_z: True
         sm_fish_ch: 
@@ -11,9 +11,20 @@ genm:
         const_theta_sim: False
         phasing: False
         
+network:
+    is_2D: True
+        
 data_path:
     psf_path: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/decode_fish/figures/MF_psf.tif
     image_path: ${base_dir}/datasets/CodFish/MERFISH/starfish_scaled/img_stack.tiff
 
 codebook:
     _target_: decode_fish.funcs.exp_specific.get_benchmark
+    
+evaluation:
+    code_stats: 
+        enabled: True
+        path: ${data_path.image_path}
+        top_n: 15000
+        eval_func:
+            _target_: decode_fish.funcs.exp_specific.exp_train_eval_starfish

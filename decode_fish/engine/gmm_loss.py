@@ -84,7 +84,7 @@ class PointProcessGaussian(Distribution):
         pix_inds = torch.nonzero(P[:,:1],as_tuple=True)
 
         xyzi_mu = self.xyzi_mu[pix_inds[0],:,pix_inds[2],pix_inds[3],pix_inds[4]]
-        if slice_rec: xyzi_mu[:,2] = 0.25*xyzi_mu[:,2]
+        if slice_rec: xyzi_mu[:,2] = 0.5*xyzi_mu[:,2]
         # We squish the network output range in z to -0.25:0.25 beause for slice rec the true pixel inds are unqiue (i.e. cant point to the same point from different pixels)
         xyzi_mu[:,:3] += torch.stack([pix_inds[4],pix_inds[3],pix_inds[2]], 1) + 0.5
         xyzi_mu = xyzi_mu.reshape(batch_size,-1,gauss_dim)

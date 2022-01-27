@@ -42,13 +42,17 @@ class PointProcessGaussian(Distribution):
         self.xyzi_mu = xyzi_mu.cuda()
         self.xyzi_sigma = xyzi_sigma.cuda()
 
-    def log_prob(self, locations, x_offset, y_offset, z_offset, intensities, codes, n_bits, channels, loss_option=0, count_mult=0, cat_logits=0, slice_rec=False):
+    def log_prob(self, locations, x_offset, y_offset, z_offset, intensities, codes, n_bits, channels, loss_option=0, count_mult=0, cat_logits=0, slice_rec=False, int_inf='sum'):
 
-        gauss_dim = 3 + 1
+        gauss_dim = 3
+        if int_inf == 'sum': gauss_dim += 1
+        if int_inf == 'per_bit': gauss_dim += n_bits
+        if int_inf == 'per_channel': gauss_dim += channels
+
         batch_size = self.logits.shape[0]
         n_codes = self.logits.shape[1]
 
-        xyzi, gt_codes, s_mask = get_true_labels_mf(batch_size, locations, x_offset, y_offset, z_offset, intensities, codes.cuda(), slice_rec)
+        xyzi, gt_codes, s_mask = get_true_labels_mf(batch_size, locations, x_offset, y_offset, z_offset, intensities, codes.cuda(), slice_rec, int_inf)
 
         P = torch.sigmoid(self.logits)
 
@@ -85,7 +89,7 @@ class PointProcessGaussian(Distribution):
 
         xyzi_mu = self.xyzi_mu[pix_inds[0],:,pix_inds[2],pix_inds[3],pix_inds[4]]
         if slice_rec: xyzi_mu[:,2] = 0.5*xyzi_mu[:,2]
-        # We squish the network output range in z to -0.25:0.25 beause for slice rec the true pixel inds are unqiue (i.e. cant point to the same point from different pixels)
+        # We squish the network output range in z to -0.5:0.5 beause for slice rec the true pixel inds are unqiue (i.e. cant point to the same point from different pixels)
         xyzi_mu[:,:3] += torch.stack([pix_inds[4],pix_inds[3],pix_inds[2]], 1) + 0.5
         xyzi_mu = xyzi_mu.reshape(batch_size,-1,gauss_dim)
         xyzi_sig = self.xyzi_sigma[pix_inds[0],:,pix_inds[2],pix_inds[3],pix_inds[4]].reshape(batch_size,-1,gauss_dim)
@@ -100,7 +104,10 @@ class PointProcessGaussian(Distribution):
         dist_normal_xyzi = D.Independent(D.Normal(xyzi_mu, xyzi_sig + 0.00001), 1)
 
         xyzi_inp = xyzi.transpose(0, 1)[:,:,None,:]          # reshape for log_prob()
-        log_norm_prob_xyzi = dist_normal_xyzi.base_dist.log_prob(xyzi_inp) # N_gt * batch_size * n_pixel * 3
+        log_norm_prob_xyzi = dist_normal_xyzi.base_dist.log_prob(xyzi_inp) # N_gt * batch_size * n_pixel * (3 + n_int_ch)
+
+        if int_inf == 'per_channel':
+            log_norm_prob_xyzi[...,3:] *= xyzi_inp[...,3:].ne(0)
 
         if loss_option == 0:
             log_cat_prob = torch.log_softmax(mix_logits, -1) # + torch.log(counts+1e-6)[:, None]       # normalized (sum to 1 over pixels) log probs for the categorical dist. of the GMM. batch_size * n_pixels
@@ -131,7 +138,7 @@ def get_sample_mask(bs, locations):
 
     return s_mask, s_arr
 
-def get_true_labels_mf(bs, locations, x_os, y_os, z_os, int_ch, codes, slice_rec):
+def get_true_labels_mf(bs, locations, x_os, y_os, z_os, int_ch, codes, slice_rec, int_inf='sum'):
 
     n_gt = len(x_os)
 
@@ -144,10 +151,14 @@ def get_true_labels_mf(bs, locations, x_os, y_os, z_os, int_ch, codes, slice_rec
     z =  z_os + locations[-3].type(torch.cuda.FloatTensor) + 0.5
 
     loc_idx = torch.arange(n_gt).repeat_interleave(4)
+    if int_inf == 'sum':
+        intensity = int_ch.sum(-1)[:,None]
+    if int_inf == 'per_bit':
+        intensity = int_ch[int_ch.nonzero(as_tuple=True)].reshape([int_ch.shape[0],-1])
+    if int_inf == 'per_channel':
+        intensity = int_ch
 
-    intensity = int_ch.sum(-1)
-
-    gt_vars = torch.stack([x, y, z, intensity], dim=1)
+    gt_vars = torch.cat([x[:,None], y[:,None], z[:,None], intensity], dim=1)
     gt_list = torch.cuda.FloatTensor(bs,max_counts,gt_vars.shape[1]).fill_(0)
     gt_list[locations[0],s_arr] = gt_vars
 

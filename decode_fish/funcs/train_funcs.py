@@ -131,56 +131,63 @@ def train(cfg,
 
 #         print('Iter ', time.time()-t0); t0 = time.time()
 
-        optim_dict['optim_net'].zero_grad()
+        if cfg.training.net.enabled:
 
-        sim_vars = PointProcessUniform(local_rate[:,0], int_conc=model.int_dist.int_conc.detach(),
-                                       int_rate=model.int_dist.int_rate.detach(), int_loc=model.int_dist.int_loc.detach(),
-                                       sim_iters=5, channels=cfg.genm.exp_type.n_channels, n_bits=cfg.genm.exp_type.n_bits,
-                                       sim_z=cfg.genm.exp_type.pred_z, codebook=torch.tensor(code_ref, dtype=torch.bool), int_option=cfg.training.int_option).sample(from_code_book=True)
+            optim_dict['optim_net'].zero_grad()
 
-        # sim_vars = locs_sl, x_os_sl, y_os_sl, z_os_sl, ints_sl, output_shape, codes
-#         print('Sim, ', time.time()-t0); t0 = time.time()
-        ch_inp = microscope.get_single_ch_inputs(*sim_vars[:-1])
-        xsim = microscope(*ch_inp, add_noise=True)
-#         print('Micro, ', time.time()-t0); t0 = time.time()
-
-        if cfg.genm.emitter_noise.rate_fac:
-
-            noise_vars = PointProcessUniform(local_rate[:,0] * cfg.genm.emitter_noise.rate_fac, int_conc=model.int_dist.int_conc.detach() * cfg.genm.emitter_noise.int_fac,
+            sim_vars = PointProcessUniform(local_rate[:,0], int_conc=model.int_dist.int_conc.detach(),
                                            int_rate=model.int_dist.int_rate.detach(), int_loc=model.int_dist.int_loc.detach(),
-                                           sim_iters=5, channels=cfg.genm.exp_type.n_channels, n_bits=1,
-                                           sim_z=cfg.genm.exp_type.pred_z, codebook=None, int_option=cfg.training.int_option).sample(from_code_book=False)
+                                           sim_iters=5, channels=cfg.genm.exp_type.n_channels, n_bits=cfg.genm.exp_type.n_bits,
+                                           sim_z=cfg.genm.exp_type.pred_z, codebook=torch.tensor(code_ref, dtype=torch.bool), int_option=cfg.training.int_option).sample(from_code_book=True)
 
-#             print('Em. sim ', time.time()-t0); t0 = time.time()
-            noise_inp = microscope.get_single_ch_inputs(*noise_vars[:-1])
-            xsim += microscope(*noise_inp, add_noise=True)
-#             print('Em Micro, ', time.time()-t0); t0 = time.time()
+            # sim_vars = locs_sl, x_os_sl, y_os_sl, z_os_sl, ints_sl, output_shape, codes
+    #         print('Sim, ', time.time()-t0); t0 = time.time()
+            ch_inp = microscope.get_single_ch_inputs(*sim_vars[:-1])
 
-        xsim_noise = microscope.noise(xsim, background, const_theta_sim=cfg.genm.exp_type.const_theta_sim).sample()
+            torch.save(ch_inp, save_dir/'error_ch_inp.pt')
+            torch.save(microscope.state_dict(), save_dir/'err_microscope.pkl')
 
-        out_sim = model.tensor_to_dict(model(xsim_noise))
+            xsim = microscope(*ch_inp, add_noise=True)
 
-        ppg = PointProcessGaussian(**out_sim)
+    #         print('Micro, ', time.time()-t0); t0 = time.time()
 
-        count_prob, spatial_prob = ppg.log_prob(*sim_vars[:5], codes=sim_vars[-1], n_bits=cfg.genm.exp_type.n_bits, channels=cfg.genm.exp_type.n_channels,
-                                                loss_option=cfg.training.loss_option, count_mult=cfg.training.count_mult, cat_logits=cfg.training.cat_logits,
-                                                slice_rec=cfg.genm.exp_type.slice_rec)
+            if cfg.genm.emitter_noise.rate_fac:
 
-        gmm_loss = -(spatial_prob + cfg.training.net.cnt_loss_scale*count_prob).mean()
+                noise_vars = PointProcessUniform(local_rate[:,0] * cfg.genm.emitter_noise.rate_fac, int_conc=model.int_dist.int_conc.detach() * cfg.genm.emitter_noise.int_fac,
+                                               int_rate=model.int_dist.int_rate.detach(), int_loc=model.int_dist.int_loc.detach(),
+                                               sim_iters=5, channels=cfg.genm.exp_type.n_channels, n_bits=1,
+                                               sim_z=cfg.genm.exp_type.pred_z, codebook=None, int_option=cfg.training.int_option).sample(from_code_book=False)
 
-        background_loss = F.mse_loss(out_sim['background'], background) * cfg.training.net.bl_loss_scale
+    #             print('Em. sim ', time.time()-t0); t0 = time.time()
+                noise_inp = microscope.get_single_ch_inputs(*noise_vars[:-1])
+                xsim += microscope(*noise_inp, add_noise=True)
+    #             print('Em Micro, ', time.time()-t0); t0 = time.time()
 
-        loss = gmm_loss + background_loss
+            xsim_noise = microscope.noise(xsim, background, const_theta_sim=cfg.genm.exp_type.const_theta_sim).sample()
 
-        # Update network parameters
-        loss.backward()
+            out_sim = model.tensor_to_dict(model(xsim_noise))
 
-        if cfg.training.net.grad_clip: torch.nn.utils.clip_grad_norm_(model.network.parameters(), max_norm=cfg.training.net.grad_clip, norm_type=2)
+            ppg = PointProcessGaussian(**out_sim)
 
-        optim_dict['optim_net'].step()
-        optim_dict['sched_net'].step()
+            count_prob, spatial_prob = ppg.log_prob(*sim_vars[:5], codes=sim_vars[-1], n_bits=cfg.genm.exp_type.n_bits, channels=cfg.genm.exp_type.n_channels,
+                                                    loss_option=cfg.training.loss_option, count_mult=cfg.training.count_mult, cat_logits=cfg.training.cat_logits,
+                                                    slice_rec=cfg.genm.exp_type.slice_rec, int_inf=cfg.genm.exp_type.int_inf)
 
-#         print('SL ', time.time()-t0); t0 = time.time()
+            gmm_loss = -(spatial_prob + cfg.training.net.cnt_loss_scale*count_prob).mean()
+
+            background_loss = F.mse_loss(out_sim['background'], background) * cfg.training.net.bl_loss_scale
+
+            loss = gmm_loss + background_loss
+
+            # Update network parameters
+            loss.backward()
+
+            if cfg.training.net.grad_clip: torch.nn.utils.clip_grad_norm_(model.network.parameters(), max_norm=cfg.training.net.grad_clip, norm_type=2)
+
+            optim_dict['optim_net'].step()
+            optim_dict['sched_net'].step()
+
+    #         print('SL ', time.time()-t0); t0 = time.time()
 
         if batch_idx > min(cfg.training.start_mic,cfg.training.start_int):
 
@@ -218,6 +225,9 @@ def train(cfg,
                     if cfg.training.mic.norm_reg:
                         log_p_x_given_z += cfg.training.mic.norm_reg * (microscope.psf.com_loss())
 
+                    if cfg.training.mic.l1_reg:
+                        log_p_x_given_z += cfg.training.mic.l1_reg * (microscope.psf.l1_diff_norm(microscope.psf_init_vol))
+
                     log_p_x_given_z.backward()
                     if cfg.training.mic.grad_clip:
                         torch.nn.utils.clip_grad_norm_(microscope.parameters(), max_norm=cfg.training.mic.grad_clip, norm_type=2)
@@ -248,66 +258,71 @@ def train(cfg,
 
         # Logging
         if batch_idx % 10 == 0:
-            wandb.log({'SL Losses/xyz_loss': spatial_prob.mean().detach().cpu().item()}, step=batch_idx)
-#             wandb.log({'SL Losses/ints_loss': int_prob.mean().detach().cpu().item()}, step=batch_idx)
-            wandb.log({'SL Losses/count_loss': (-count_prob.mean()).detach().cpu()}, step=batch_idx)
-#             wandb.log({'SL Losses/bg_loss': background_loss.detach().cpu()}, step=batch_idx)
-            wandb.log({'AE Losses/int_mu': model.int_dist.int_conc.item()/model.int_dist.int_rate.item() + model.int_dist.int_loc.item()}, step=batch_idx)
-            wandb.log({'AE Losses/int_rate': model.int_dist.int_rate.item()}, step=batch_idx)
-            wandb.log({'AE Losses/int_loc': model.int_dist.int_loc.item()}, step=batch_idx)
-            wandb.log({'AE Losses/theta': microscope.noise.theta_par.cpu().detach().mean().item()*microscope.noise.theta_scale}, step=batch_idx)
+
+            if cfg.training.net.enabled:
+
+                wandb.log({'SL Losses/xyz_loss': spatial_prob.mean().detach().cpu().item()}, step=batch_idx)
+    #             wandb.log({'SL Losses/ints_loss': int_prob.mean().detach().cpu().item()}, step=batch_idx)
+                wandb.log({'SL Losses/count_loss': (-count_prob.mean()).detach().cpu()}, step=batch_idx)
+    #             wandb.log({'SL Losses/bg_loss': background_loss.detach().cpu()}, step=batch_idx)
+
+                wandb.log({'AE Losses/int_mu': model.int_dist.int_conc.item()/model.int_dist.int_rate.item() + model.int_dist.int_loc.item()}, step=batch_idx)
+                wandb.log({'AE Losses/int_rate': model.int_dist.int_rate.item()}, step=batch_idx)
+                wandb.log({'AE Losses/int_loc': model.int_dist.int_loc.item()}, step=batch_idx)
+                wandb.log({'AE Losses/theta': microscope.noise.theta_par.cpu().detach().mean().item()*microscope.noise.theta_scale}, step=batch_idx)
 
             if batch_idx > cfg.training.start_mic:
                 if cfg.training.mic.enabled and calc_log_p_x:
                     wandb.log({'AE Losses/p_x_given_z': log_p_x_given_z.detach().cpu()}, step=batch_idx)
-#                     wandb.log({'AE Losses/RMSE(rec)': torch.sqrt(((x[:,:1]-(ae_img[:,:1]+out_inp['background'][:,:1]))**2).m   ean()).detach().cpu()}, step=batch_idx)
+                    wandb.log({'AE Losses/RMSE(rec)': torch.sqrt(((rois-(psf_recs+bgs))**2).mean()).detach().cpu()}, step=batch_idx)
+#                     wandb.log({'AE Losses/RMSE(rec)': torch.sqrt(((x[:,:1]-(ae_img[:,:1]+out_inp['background'][:,:1]))**2).mean()).detach().cpu()}, step=batch_idx)
                     wandb.log({'AE Losses/sum(psf)': F.relu(microscope.psf.psf_volume/microscope.psf.psf_volume.max())[0].sum().detach().cpu()}, step=batch_idx)
 #                     wandb.log({'AE Losses/theta': microscope.theta.item()}, step=batch_idx)
 
         if batch_idx % cfg.output.log_interval == 0:
             print(batch_idx)
-            with torch.no_grad():
+            if cfg.training.net.enabled:
+                with torch.no_grad():
 
-                pred_df = post_proc.get_df(out_sim)
-                px_size = cfg.evaluation.px_size_zyx
-                target_df = sample_to_df(*sim_vars[:5], sim_vars[-1], px_size_zyx=px_size)
-#                 print(len(pred_df), len(target_df))
-                matches = eval_logger(pred_df, target_df, batch_idx, data_str='Sim. ')
+                    pred_df = post_proc.get_df(out_sim)
+                    px_size = cfg.evaluation.px_size_zyx
+                    target_df = sample_to_df(*sim_vars[:5], sim_vars[-1], px_size_zyx=px_size)
+    #                 print(len(pred_df), len(target_df))
+                    matches = eval_logger(pred_df, target_df, batch_idx, data_str='Sim. ')
 
-                wandb.log({'Sim. Metrics/prob_fac': torch.sigmoid(out_sim['logits']).sum().item()/(len(target_df)+0.1)}, step=batch_idx)
-                wandb.log({'Sim. Metrics/n_em_fac': len(pred_df)/(len(target_df)+0.1)}, step=batch_idx)
-
-                if cfg.output.log_figs:
-
-                    sl_fig = sl_plot(x, xsim_noise, nm_to_px(pred_df, px_size), nm_to_px(target_df, px_size), background, out_sim)
-                    plt.show()
-                    wandb.log({'SL summary': sl_fig}, step=batch_idx)
-
-                if cfg.evaluation.reconstruction.enabled:
-
-                    eval_img, eval_df, eval_psf = eval_vars
-
-                    res_eval = model.tensor_to_dict(model(eval_img[None].cuda()))
-                    ae_img = microscope(*post_proc.get_micro_inp(res_eval))
-                    pred_eval_df = post_proc.get_df(res_eval)
-                    wandb.log({'AE Losses/N preds(eval)': len(pred_eval_df)}, step=batch_idx)
-
-                    if eval_df is not None:
-                        eval_logger(pred_eval_df, eval_df, batch_idx, data_str='Inp. ')
-
-                    if eval_psf is not None:
-                        wandb.log({'AE Losses/Corr(psf)': np.corrcoef(cpu(eval_psf).reshape(-1), cpu(microscope.psf.psf_volume).reshape(-1))[0,1]}, step=batch_idx)
-                        wandb.log({'AE Losses/RMSE(psf)': np.sqrt(np.mean((cpu(eval_psf/eval_psf.max())-cpu(microscope.psf.psf_volume/microscope.psf.psf_volume.max()))**2))}, step=batch_idx)
+                    wandb.log({'Sim. Metrics/prob_fac': torch.sigmoid(out_sim['logits']).sum().item()/(len(target_df)+0.1)}, step=batch_idx)
+                    wandb.log({'Sim. Metrics/n_em_fac': len(pred_df)/(len(target_df)+0.1)}, step=batch_idx)
 
                     if cfg.output.log_figs:
-                        eval_fig = gt_plot(eval_img, nm_to_px(pred_eval_df, px_size), nm_to_px(eval_df, px_size), px_size, ae_img[0]+res_eval['background'][0], microscope.psf)
+
+                        sl_fig = sl_plot(x, xsim_noise, nm_to_px(pred_df, px_size), nm_to_px(target_df, px_size), background, out_sim)
                         plt.show()
-                        wandb.log({'GT': eval_fig}, step=batch_idx)
+                        wandb.log({'SL summary': sl_fig}, step=batch_idx)
 
-                if cfg.evaluation.code_stats.enabled:
+                    if cfg.evaluation.reconstruction.enabled:
 
-                    hydra.utils.call(cfg.evaluation.code_stats.eval_func, model=model, post_proc=post_proc, targets=targets, path=cfg.evaluation.code_stats.path, top_n=cfg.evaluation.code_stats.top_n, wandb=wandb, batch_idx=batch_idx)
-#                     exp_train_eval_MOp(model=model, post_proc=post_proc, targets=targets, cfg=cfg, wandb=wandb, batch_idx=batch_idx)
+                        eval_img, eval_df, eval_psf = eval_vars
+
+                        res_eval = model.tensor_to_dict(model(eval_img[None].cuda()))
+                        ae_img = microscope(*post_proc.get_micro_inp(res_eval))
+                        pred_eval_df = post_proc.get_df(res_eval)
+                        wandb.log({'AE Losses/N preds(eval)': len(pred_eval_df)}, step=batch_idx)
+
+                        if eval_df is not None:
+                            eval_logger(pred_eval_df, eval_df, batch_idx, data_str='Inp. ')
+
+                        if eval_psf is not None:
+                            wandb.log({'AE Losses/Corr(psf)': np.corrcoef(cpu(eval_psf).reshape(-1), cpu(microscope.psf.psf_volume).reshape(-1))[0,1]}, step=batch_idx)
+                            wandb.log({'AE Losses/RMSE(psf)': np.sqrt(np.mean((cpu(eval_psf/eval_psf.max())-cpu(microscope.psf.psf_volume/microscope.psf.psf_volume.max()))**2))}, step=batch_idx)
+
+                        if cfg.output.log_figs:
+                            eval_fig = gt_plot(eval_img, nm_to_px(pred_eval_df, px_size), nm_to_px(eval_df, px_size), px_size, ae_img[0]+res_eval['background'][0], microscope.psf)
+                            plt.show()
+                            wandb.log({'GT': eval_fig}, step=batch_idx)
+
+                    if cfg.evaluation.code_stats.enabled:
+
+                        hydra.utils.call(cfg.evaluation.code_stats.eval_func, model=model, post_proc=post_proc, targets=targets, path=cfg.evaluation.code_stats.path, top_n=cfg.evaluation.code_stats.top_n, wandb=wandb, batch_idx=batch_idx)
 
             # storing
             save_train_state(save_dir, model, microscope, optim_dict, batch_idx)

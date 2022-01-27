@@ -29,8 +29,11 @@ def load_model_state(model, path):
 # Cell
 def swap_psf_vol(psf, vol):
     state_dict = psf.state_dict()
-    for i in range(len(state_dict['psf_volume'])):
-        state_dict['psf_volume'][i] = torch.cuda.FloatTensor(torch.Tensor(vol).cuda())
+    if len(vol) == 1:
+        for i in range(len(state_dict['psf_volume'])):
+            state_dict['psf_volume'][i] = torch.cuda.FloatTensor(torch.Tensor(vol).cuda())
+    else:
+        state_dict['psf_volume'] = torch.cuda.FloatTensor(torch.Tensor(vol).cuda())
     psf.load_state_dict(state_dict)
     return psf
 
@@ -80,10 +83,8 @@ def load_psf_noise_micro(cfg):
 
     psf = load_psf(cfg)
     noise = hydra.utils.instantiate(cfg.genm.noise)
-    if 'max' in cfg.genm.microscope.norm:
-        micro = hydra.utils.instantiate(cfg.genm.microscope, psf=psf, noise=noise).cuda()
-    else:
-        micro = hydra.utils.instantiate(cfg.genm.microscope, psf=psf, noise=noise, sum_fac=psf.psf_volume.sum().item()).cuda()
+    micro = hydra.utils.instantiate(cfg.genm.microscope, psf=psf, noise=noise).cuda()
+
     return psf, noise, micro
 
 def load_post_proc(cfg):

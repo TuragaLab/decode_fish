@@ -137,14 +137,18 @@ class SIPostProcess(torch.nn.Module):
                  'y': y*self.px_size_zyx[1],
                  'z': z*self.px_size_zyx[0],
                  'prob': res_dict['Probs_si'][locations],
-                 'int': res_dict['xyzi_mu'][:,[3]][ch0_locs],
-                 'int_sig': res_dict['xyzi_sigma'][:,[3]][ch0_locs],
+#                  'int': res_dict['xyzi_mu'][:,[3]][ch0_locs],
+#                  'int_sig': res_dict['xyzi_sigma'][:,[3]][ch0_locs],
                  'x_sig': res_dict['xyzi_sigma'][:,[0]][ch0_locs]*self.px_size_zyx[0],
                  'y_sig': res_dict['xyzi_sigma'][:,[1]][ch0_locs]*self.px_size_zyx[1],
                  'z_sig': res_dict['xyzi_sigma'][:,[2]][ch0_locs]*self.px_size_zyx[2],
                  'comb_sig': torch.sqrt(res_dict['xyzi_sigma'][:,[0]][ch0_locs]**2
                                        +res_dict['xyzi_sigma'][:,[1]][ch0_locs]**2
                                        +res_dict['xyzi_sigma'][:,[2]][ch0_locs]**2)})
+
+        for i in range(res_dict['xyzi_mu'].shape[1]-3):
+            df[f'int_{i}'] = res_dict['xyzi_mu'][:,[3+i]][ch0_locs]
+            df[f'int_sig_{i}'] = res_dict['xyzi_sigma'][:,[3+i]][ch0_locs]
 
         return df
 
@@ -153,22 +157,31 @@ class SIPostProcess(torch.nn.Module):
         channels = self.codebook.shape[1]
         n_bits = (1.*self.codebook.sum(1)).mean()
         res_dict = self.get_si_resdict(res_dict, p_si)
-        # remove dump inds. Wont get reconstructed.
-        locations = res_dict['Samples_si'][:,:-1].nonzero(as_tuple=True)
+        locations = res_dict['Samples_si'].nonzero(as_tuple=True)
+
+        n_int = res_dict['xyzi_mu'].shape[1] - 3
 
         xyzi_ix = [locations[0],locations[2],locations[3], locations[4]]
         x_os_3d = res_dict['xyzi_mu'][:,0][xyzi_ix]
         y_os_3d = res_dict['xyzi_mu'][:,1][xyzi_ix]
         z_os_3d = res_dict['xyzi_mu'][:,2][xyzi_ix]
-        ints_3d = res_dict['xyzi_mu'][:,3][xyzi_ix]
-        # output_shape  = res_dict['Samples_si'].shape
-        ints_3d = ints_3d/n_bits
 
-        ints_ret = ints_3d[:,None].repeat_interleave(channels, 1)
-#         ch_bin = torch.zeros(ints_ret.shape).to(ints_ret.device)
-#         ch_bin.scatter_(index=torch.tensor(code_inds).to(ints_ret.device)[locations[1]], dim=1, value=1)
-        ch_bin = self.codebook.to(ints_ret.device)[locations[1]]
-        ints_ret = ints_ret*ch_bin
+        if n_int == 1:
+            ints_3d = res_dict['xyzi_mu'][:,3][xyzi_ix]
+            ints_3d = ints_3d/n_bits
+            ints_ret = ints_3d[:,None].repeat_interleave(channels, 1)
+            ch_bin = self.codebook.to(ints_ret.device)[locations[1]]
+            ints_ret = ints_ret*ch_bin
+
+        if n_int == n_bits:
+            code_inds = self.codebook.nonzero(as_tuple=True)[1].reshape([self.codebook.shape[0], -1])
+            ints_3d = res_dict['xyzi_mu'][:,3:][locations[0],:,locations[2],locations[3], locations[4]]
+            ints_ret = torch.zeros(ints_3d.shape[0], channels).to(ints_3d.device)
+            ints_ret.scatter_(index=code_inds.to(ints_ret.device)[locations[1]], dim=1, src=ints_3d)
+
+        if n_int == channels:
+            ints_ret = res_dict['xyzi_mu'][:,3:][locations[0],:,locations[2],locations[3], locations[4]]
+            ints_ret *= self.codebook.to(ints_ret.device)[locations[1]].ne(0)
 
         output_shape  = res_dict['Samples_si'].shape
         output_shape  = torch.Size([output_shape[0],channels,output_shape[2],output_shape[3],output_shape[4]])

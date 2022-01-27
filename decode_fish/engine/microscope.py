@@ -42,16 +42,28 @@ class Microscope(nn.Module):
     """
 
 
-    def __init__(self, psf: torch.nn.Module=None, noise: Union[torch.nn.Module, None]=None, scale: float = 10000., norm='max', sum_fac=1, psf_noise=0, slice_rec=False, ch_facs=None, ch_cols=None):
+    def __init__(self, psf: torch.nn.Module=None, noise: Union[torch.nn.Module, None]=None, scale: float = 10000., norm='max', psf_noise=0, slice_rec=False, ch_facs=None, ch_cols=None):
 
         super().__init__()
         self.psf = psf
+        self.psf_init_vol = psf.psf_volume.detach().to('cuda')
         self.scale = scale
         self.noise = noise
         self.norm = norm
 
+        self.psf_norm_init = 1.
+        if slice_rec:
+            if norm == 'sum':
+                self.psf_norm_init = self.psf.psf_volume.detach().sum(2, keepdim=True).sum(3, keepdim=True).to('cuda')
+            if norm == 'max':
+                self.psf_norm_init = self.psf.psf_volume.detach().amax(2, keepdim=True).amax(3, keepdim=True).to('cuda')
+        else:
+            if norm == 'sum':
+                self.psf_norm_init = self.psf.psf_volume.detach().sum().to('cuda')
+            if norm == 'max':
+                self.psf_norm_init = self.psf.psf_volume.detach().amax().to('cuda')
+
         self.theta = self.noise.theta_scale * self.noise.theta_par
-        self.sum_fac = sum_fac
 
         self.psf_noise = psf_noise
         self.slice_rec = slice_rec
@@ -98,16 +110,33 @@ class Microscope(nn.Module):
 
         return locations, x_os_ch, y_os_ch, z_os_ch, i_val, output_shape
 
+    def get_psf_norm(self, c_inds = None, z_inds=None):
+
+        if self.norm != 'max' and self.norm != 'sum':
+            return 1.
+        if not self.slice_rec:
+            if self.norm == 'max': psf_norm = self.psf.psf_volume.max()
+            if self.norm == 'sum': psf_norm = torch.clamp_min(self.psf.psf_volume, 0).sum()
+            init = self.psf_norm_init
+        else:
+            if self.norm == 'max':
+                psf_norm = self.psf.psf_volume.amax(2, keepdim=True).amax(3, keepdim=True)
+            if self.norm == 'sum':
+                psf_norm = torch.clamp_min(self.psf.psf_volume, 0).sum(2, keepdim=True).sum(3, keepdim=True)
+            if c_inds is not None:
+                psf_norm = psf_norm[c_inds, z_inds][:,:,None,None]
+                init = self.psf_norm_init[c_inds, z_inds][:,:,None,None]
+            else:
+                psf_norm = psf_norm[0,z_inds][:,None,None]
+                init = self.psf_norm_init[0,z_inds][:,None,None]
+
+        return psf_norm/init
+
     def forward(self, locations, x_os_ch, y_os_ch, z_os_ch, i_val, output_shape, ret_psfs=False, add_noise=False):
 
         if len(locations[0]):
             c_inds=torch.tensor(self.ch_cols)[locations[1]] if self.ch_cols is not None else None
-            if 'max' in self.norm:
-                psf_norm = self.psf.psf_volume.max()
-            elif 'sum' in self.norm:
-                psf_norm = torch.clamp_min(self.psf.psf_volume, 0).sum()/self.sum_fac
-            else:
-                psf_norm = 1
+
             # Apply continuous shift
             if self.slice_rec and self.psf_z_size > 1:
                 z_os_ch = torch.clamp(z_os_ch,-0.49999,0.49999) + 0.5 # transform to [0,1]
@@ -118,10 +147,10 @@ class Microscope(nn.Module):
 #                 psf = psf[torch.arange(len(z_os_ch)),:,z_inds][:,:,None]
             else:
                 psf = self.psf(x_os_ch, y_os_ch, z_os_ch, c_inds=c_inds)
-
+                z_inds = None
 
             torch.clamp_min_(psf,0)
-            psf = psf/psf_norm
+            psf = psf/self.get_psf_norm(c_inds, z_inds)
 
             if self.psf_noise and add_noise:
                 psf = self.add_psf_noise(psf)

@@ -110,6 +110,10 @@ class LinearInterpolatedPSF(nn.Module):
         """ Returns the 1 norm of the PSF volume. """
         return torch.norm(self.forward_nonlin(self.psf_volume).sum(), 1)
 
+    def l1_diff_norm(self, init_vol):
+        """ Returns the 1 norm of the difference to the initial volume. """
+        return torch.linalg.norm((self.psf_volume - init_vol).reshape(-1), 1)
+
 # Cell
 def crop_psf(psf, extent_zyx):
     """Returns a cropped version of a PSF"""

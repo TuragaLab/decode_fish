@@ -12,7 +12,7 @@ from .output_trafo import *
 from .evaluation import *
 from .plotting import *
 from torch.utils.data import DataLoader
-from ..engine.microscope import Microscope
+from ..engine.microscope import Microscope, get_roi_filt_inds, mic_inp_apply_inds, extract_psf_roi
 from ..engine.point_process import PointProcessUniform
 from matplotlib.backends.backend_agg import FigureCanvas
 
@@ -89,7 +89,7 @@ def get_prediction(model, post_proc, img, micro=None, cuda=True, return_rec=Fals
             ch_inp = micro.get_single_ch_inputs(*micro_inp)
             ae_img_3d = micro(*ch_inp)
 
-            filt_inds = get_roi_filt_inds(*ch_inp[0], micro.psf.psf_volume.shape, img.shape, slice_rec=cfg.genm.exp_type.slice_rec, min_dist=10)
+            filt_inds = get_roi_filt_inds(*ch_inp[0], micro.psf.psf_volume.shape, img.shape, slice_rec=micro.slice_rec, min_dist=10)
             ch_inp = mic_inp_apply_inds(*ch_inp, filt_inds)
             if len(ch_inp[1]):
                 psf_recs = micro(*ch_inp, ret_psfs=True, add_noise=False)

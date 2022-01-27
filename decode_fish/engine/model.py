@@ -434,14 +434,15 @@ class OutputNet(nn.Module):
         f_maps: number of channels of the U-net output
         p_offset: probability channel bias
     """
-    def __init__(self, f_maps=64, p_offset=-5., is_2D=False, n_p_ch=1, n_bg_ch=1):
+    def __init__(self, f_maps=64, p_offset=-5., is_2D=False, n_p_ch=1, n_bg_ch=1, n_int_ch=1):
         super().__init__()
 
         self.is_2D = is_2D
         self.n_p_ch = n_p_ch
         self.n_bg_ch = n_bg_ch
+        self.n_int_ch = n_int_ch
 
-        xyzi_dim = 4
+        xyzi_dim = 3 + n_int_ch
 
         kernel_size = [1,3,3] if is_2D else [3,3,3]
         padding = [0,1,1] if is_2D else [1,1,1]
@@ -525,7 +526,7 @@ class UnetDecodeNoBn(nn.Module):
 
     """
     def __init__(self, ch_in=1, depth=3, inp_scale=1., inp_offset=0., order='ce', f_maps=64,
-                 is_2D=False, pred_z=True, p_offset=-5., int_conc=4., int_rate=1., int_loc=1., n_p_ch=1, n_bg_ch=1):
+                 is_2D=False, pred_z=True, p_offset=-5., int_conc=4., int_rate=1., int_loc=1., n_p_ch=1, n_bg_ch=1, n_int_ch=1):
         super().__init__()
 
         self.inp_scale = inp_scale
@@ -536,10 +537,11 @@ class UnetDecodeNoBn(nn.Module):
         self.pred_z = pred_z
         self.n_p_ch = n_p_ch
         self.n_bg_ch = n_bg_ch
+        self.n_int_ch = n_int_ch
 
         self.unet = UNet3D(ch_in, final_sigmoid=False, num_levels=depth, is_2D=is_2D,
                            layer_order = order, f_maps=f_maps)
-        self.outnet = OutputNet(f_maps=f_maps, p_offset=p_offset, is_2D=is_2D, n_p_ch=n_p_ch, n_bg_ch=n_bg_ch)
+        self.outnet = OutputNet(f_maps=f_maps, p_offset=p_offset, is_2D=is_2D, n_p_ch=n_p_ch, n_bg_ch=n_bg_ch, n_int_ch=n_int_ch)
 
         self.network = nn.ModuleList([self.unet, self.outnet])
         self.int_dist = IntensityDist(int_conc, int_rate, int_loc)
@@ -556,9 +558,9 @@ class UnetDecodeNoBn(nn.Module):
     def tensor_to_dict(self, x):
 
         logits = x[:, 0:self.n_p_ch]
-        xyzi_mu = x[:, self.n_p_ch:self.n_p_ch+4]
-        xyzi_sig = x[:, self.n_p_ch+4:self.n_p_ch+8]
-        bg = x[:, self.n_p_ch+8:self.n_p_ch+8+self.n_bg_ch]
+        xyzi_mu = x[:, self.n_p_ch:self.n_p_ch+3+self.n_int_ch]
+        xyzi_sig = x[:, self.n_p_ch+3+self.n_int_ch:self.n_p_ch+2*(3+self.n_int_ch)]
+        bg = x[:, self.n_p_ch+2*(3+self.n_int_ch):self.n_p_ch+2*(3+self.n_int_ch)+self.n_bg_ch]
 
         # Scale bg output
         bg = bg * self.inp_scale #[None,:,None,None,None].to(bg.device)

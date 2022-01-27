@@ -4,6 +4,11 @@ sub_name:
 cfg_path: ${base_dir}/decode_fish/config/train.yaml
 seed: 0
 
+n_int_ref:
+    'sum': 1
+    'per_bit': ${genm.exp_type.n_bits}
+    'per_channel': ${genm.exp_type.n_channels}
+    
 device:
     gpu_device: cuda 
   
@@ -46,6 +51,7 @@ genm:
         n_channels: 1
         n_genes: 1
         n_bits: 1
+        int_inf: 'sum' # 'per_bit', 'per_channel'
         sample_from_codebook: False
         phasing: False
         const_theta_sim: True
@@ -117,6 +123,7 @@ network:
     f_maps: 32
     n_p_ch: ${genm.exp_type.n_genes}
     n_bg_ch: ${genm.exp_type.n_channels}
+    n_int_ch: ${n_int_ref[${genm.exp_type.int_inf}]}
     is_2D: False
     pred_z: ${genm.exp_type.pred_z}
     inp_scale: 
@@ -150,6 +157,7 @@ training:
     resume: False
     
     net:
+        enabled: True
         bl_loss_scale: 0.01
         cnt_loss_scale: 1
         grad_clip: 0.005
@@ -169,6 +177,7 @@ training:
         roi_rec: True
         grad_clip: 0.1
         norm_reg: 0.5
+        l1_reg: 0.
         par_grads:
             channel_facs: False
             channel_shifts: False

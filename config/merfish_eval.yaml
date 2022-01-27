@@ -1,4 +1,4 @@
-sweep_name: sweep_mop_4c
+sweep_name: sweep_mop_5b
 run_name: 
 crop: s_[:,:,:,500:1500,500:1500]
 

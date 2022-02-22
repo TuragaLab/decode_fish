@@ -46,7 +46,7 @@ def my_app(cfg):
     bench_df, code_ref, targets = hydra.utils.instantiate(model_cfg.codebook)
     code_inds = np.stack([np.nonzero(c)[0] for c in code_ref])  
     
-    image_paths = sorted(glob.glob(model_cfg.data_path.image_path))
+    image_paths = sorted(glob.glob(cfg.image_path))
     
     if cfg.crop is not None:
         crop = eval(cfg.crop,{'__builtins__': None},{'s_': np.s_})

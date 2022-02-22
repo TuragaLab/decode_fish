@@ -72,6 +72,7 @@ def my_app(cfg):
     optim_dict['sched_mic'] = hydra.utils.instantiate(cfg.training.mic.sched, optimizer=optim_dict['optim_mic'])
     optim_dict['sched_int'] = hydra.utils.instantiate(cfg.training.int.sched, optimizer=optim_dict['optim_int'])
 
+    
     if cfg.training.resume:
         cfg.data_path.model_init = cfg.output.save_dir
     
@@ -80,11 +81,15 @@ def my_app(cfg):
         model = load_model_state(model, Path(cfg.data_path.model_init)/'model.pkl').cuda()
         micro.load_state_dict(torch.load(Path(cfg.data_path.model_init)/'microscope.pkl'))
 
-        train_state_dict = torch.load(Path(cfg.data_path.model_init)/'training_state.pkl')
-        for k in optim_dict:
-            optim_dict[k].load_state_dict(train_state_dict[k])    
+        if cfg.training.net.enabled:
+            train_state_dict = torch.load(Path(cfg.data_path.model_init)/'training_state.pkl')
+            for k in optim_dict:
+                optim_dict[k].load_state_dict(train_state_dict[k])    
             
-        cfg.training.start_iter = train_state_dict['train_iter']
+            cfg.training.start_iter = train_state_dict['train_iter']
+            
+    if cfg.data_path.micro_init is not None:
+        micro.load_state_dict(torch.load(cfg.data_path.micro_init))
         
     train(cfg=cfg,
          model=model, 

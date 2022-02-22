@@ -42,7 +42,7 @@ class Microscope(nn.Module):
     """
 
 
-    def __init__(self, psf: torch.nn.Module=None, noise: Union[torch.nn.Module, None]=None, scale: float = 10000., norm='max', psf_noise=0, slice_rec=False, ch_facs=None, ch_cols=None):
+    def __init__(self, psf: torch.nn.Module=None, noise: Union[torch.nn.Module, None]=None, scale: float = 10000., norm='max', psf_noise=0, pos_noise_xy=0, pos_noise_z=0, slice_rec=False, ch_facs=None, ch_cols=None):
 
         super().__init__()
         self.psf = psf
@@ -66,6 +66,9 @@ class Microscope(nn.Module):
         self.theta = self.noise.theta_scale * self.noise.theta_par
 
         self.psf_noise = psf_noise
+        self.pos_noise_xy = pos_noise_xy
+        self.pos_noise_z = pos_noise_z
+
         self.slice_rec = slice_rec
         self.psf_z_size = self.psf.psf_volume.shape[-3]
         self.ch_cols = ch_cols
@@ -92,6 +95,21 @@ class Microscope(nn.Module):
         '''Single deformation for all PSF in batch (kinda stupid)'''
 #         psf_deformed = etorch.deform_grid(psf_stack[:,0], torch.distributions.Normal(loc=0, scale=self.psf_noise).sample([3,3,3,3]).to(psf_stack.device), axis=(1,2,3),order=3)
 #         return psf_deformed[:,None]
+
+    def add_pos_noise(self, x_os, y_os, z_os):
+
+        # Hardcoded n_bits for now.
+        x_n = torch.distributions.Normal(loc=0, scale=self.pos_noise_xy).sample(x_os.shape).to(x_os.device).reshape(-1,4)
+        x_n -= x_n.mean(-1, keepdim=True)
+        x_os = x_os + x_n.reshape(-1)
+        y_n = torch.distributions.Normal(loc=0, scale=self.pos_noise_xy).sample(y_os.shape).to(y_os.device).reshape(-1,4)
+        y_n -= y_n.mean(-1, keepdim=True)
+        y_os = y_os + y_n.reshape(-1)
+        z_n = torch.distributions.Normal(loc=0, scale=self.pos_noise_z).sample(z_os.shape).to(z_os.device).reshape(-1,4)
+        z_n -= z_n.mean(-1, keepdim=True)
+        z_os = z_os + z_n.reshape(-1)
+
+        return x_os, y_os, z_os
 
     def get_single_ch_inputs(self, locations, x_os_val, y_os_val, z_os_val, i_val, output_shape=None):
 
@@ -132,7 +150,7 @@ class Microscope(nn.Module):
 
         return psf_norm/init
 
-    def forward(self, locations, x_os_ch, y_os_ch, z_os_ch, i_val, output_shape, ret_psfs=False, add_noise=False):
+    def forward(self, locations, x_os_ch, y_os_ch, z_os_ch, i_val, output_shape, ret_psfs=False, add_noise=False, add_pos_noise=False):
 
         if len(locations[0]):
             c_inds=torch.tensor(self.ch_cols)[locations[1]] if self.ch_cols is not None else None
@@ -143,9 +161,15 @@ class Microscope(nn.Module):
                 z_scaled = z_os_ch * (self.psf_z_size - 2) # [0, z_size]
                 z_inds = (z_scaled//1).type(torch.cuda.LongTensor) + 1
                 z_os = -(z_scaled%1.) + 0.5
+
+                if self.pos_noise_xy and add_pos_noise:
+                    x_os_ch, y_os_ch, z_os = self.add_pos_noise(x_os_ch, y_os_ch, z_os)
+
                 psf = self.psf(x_os_ch, y_os_ch, z_os, z_inds, c_inds=c_inds)
 #                 psf = psf[torch.arange(len(z_os_ch)),:,z_inds][:,:,None]
             else:
+                if self.pos_noise_xy and add_noise:
+                    x_os_ch, y_os_ch, z_os_ch = self.add_pos_noise(x_os_ch, y_os_ch, z_os_ch)
                 psf = self.psf(x_os_ch, y_os_ch, z_os_ch, c_inds=c_inds)
                 z_inds = None
 

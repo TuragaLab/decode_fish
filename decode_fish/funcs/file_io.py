@@ -58,6 +58,7 @@ def get_vol_psf(filename, device='cuda', psf_extent_zyx=None, n_cols=1):
         psf_vol = load_tiff_image(filename)
         psf_vol = psf_vol/psf_vol.max()
         psf = LinearInterpolatedPSF(psf_vol.shape[-3:], device=device, n_cols=n_cols)
+        if psf_vol.ndim == 3: psf_vol = psf_vol[None]
         psf = swap_psf_vol(psf, psf_vol)
 
     else:
@@ -100,18 +101,19 @@ def get_dataloader(cfg):
 
     if not sim:
         if 'override' in cfg.data_path.image_proc:
-            imgs_3d = [hydra.utils.instantiate(cfg.data_path.image_proc.override, image_path=f) for f in sorted(glob.glob(cfg.data_path.image_path))]
+            imgs_5d = torch.cat([hydra.utils.instantiate(cfg.data_path.image_proc.override, image_path=f) for f in sorted(glob.glob(cfg.data_path.image_path))], 0)
         else:
-            imgs_3d   = [load_tiff_image(f) for f in sorted(glob.glob(cfg.data_path.image_path))]
-        imgs_3d       = [img.permute(*cfg.data_path.image_proc.swap_dim)[sl] for img in imgs_3d]
-        roi_masks     = [get_roi_mask(img, tuple(cfg.sim.roi_mask.pool_size), percentile= cfg.sim.roi_mask.percentile) for img in imgs_3d]
+            imgs_5d   = torch.cat([load_tiff_image(f)[None] for f in sorted(glob.glob(cfg.data_path.image_path))], 0)
+
+        imgs_5d       = torch.cat([img.permute(*cfg.data_path.image_proc.swap_dim)[sl][None] for img in imgs_5d], 0)
+        roi_masks     = [get_roi_mask(img, tuple(cfg.sim.roi_mask.pool_size), percentile= cfg.sim.roi_mask.percentile) for img in imgs_5d]
     else:
-        imgs_3d       = [torch.empty(list(cfg.data_path.image_shape))]
+        imgs_5d       = torch.cat([torch.empty(list(cfg.data_path.image_shape))], 0)
         roi_masks     = None
         gen_bg        = [hydra.utils.instantiate(cfg.sim.bg_estimation.uniform)]
         dataset_tfms  = []
 
-    min_shape = tuple(np.stack([v.shape for v in imgs_3d]).min(0)[-3:])
+    min_shape = tuple(np.stack([v.shape for v in imgs_5d]).min(0)[-3:])
     crop_zyx = (cfg.sim.random_crop.crop_sz, cfg.sim.random_crop.crop_sz,cfg.sim.random_crop.crop_sz)
     if crop_zyx > min_shape:
         crop_zyx = tuple(np.stack([min_shape, crop_zyx]).min(0))
@@ -131,7 +133,7 @@ def get_dataloader(cfg):
     if cfg.genm.foci.n_foci_avg > 0:
         rate_tfms.append(hydra.utils.instantiate(cfg.genm.foci))
 
-    ds = DecodeDataset(volumes = imgs_3d,
+    ds = DecodeDataset(volumes = imgs_5d,
                        dataset_tfms =  dataset_tfms,
                        rate_tfms = rate_tfms,
                        bg_tfms = gen_bg,
@@ -140,7 +142,7 @@ def get_dataloader(cfg):
 
     decode_dl = DataLoader(ds, batch_size=cfg.training.bs, num_workers=0)
 
-    return imgs_3d, decode_dl
+    return imgs_5d, decode_dl
 
 def load_all(cfg):
 
@@ -150,6 +152,6 @@ def load_all(cfg):
     post_proc = hydra.utils.instantiate(cfg.post_proc_isi, samp_threshold=0.5)
     _, noise, micro = load_psf_noise_micro(cfg)
     micro.load_state_dict(torch.load(path/'microscope.pkl'))
-    img_3d, decode_dl = get_dataloader(cfg)
+    imgs_5d, decode_dl = get_dataloader(cfg)
 
-    return model, post_proc, micro, img_3d, decode_dl
+    return model, post_proc, micro, imgs_5d, decode_dl

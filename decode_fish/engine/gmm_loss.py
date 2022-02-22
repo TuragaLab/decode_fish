@@ -42,7 +42,7 @@ class PointProcessGaussian(Distribution):
         self.xyzi_mu = xyzi_mu.cuda()
         self.xyzi_sigma = xyzi_sigma.cuda()
 
-    def log_prob(self, locations, x_offset, y_offset, z_offset, intensities, codes, n_bits, channels, loss_option=0, count_mult=0, cat_logits=0, slice_rec=False, int_inf='sum'):
+    def log_prob(self, locations, x_offset, y_offset, z_offset, intensities, codes, n_bits, channels, loss_option=0, count_mult=0, cat_logits=0, slice_rec=False, int_inf='sum', z_sig_fac=0.5):
 
         gauss_dim = 3
         if int_inf == 'sum': gauss_dim += 1
@@ -52,7 +52,7 @@ class PointProcessGaussian(Distribution):
         batch_size = self.logits.shape[0]
         n_codes = self.logits.shape[1]
 
-        xyzi, gt_codes, s_mask = get_true_labels_mf(batch_size, locations, x_offset, y_offset, z_offset, intensities, codes.cuda(), slice_rec, int_inf)
+        xyzi, gt_codes, s_mask = get_true_labels_mf(batch_size, locations, x_offset, y_offset, z_offset, intensities, codes.cuda(), slice_rec, z_sig_fac, int_inf)
 
         P = torch.sigmoid(self.logits)
 
@@ -88,8 +88,9 @@ class PointProcessGaussian(Distribution):
         pix_inds = torch.nonzero(P[:,:1],as_tuple=True)
 
         xyzi_mu = self.xyzi_mu[pix_inds[0],:,pix_inds[2],pix_inds[3],pix_inds[4]]
-        if slice_rec: xyzi_mu[:,2] = 0.5*xyzi_mu[:,2]
+        if slice_rec: xyzi_mu[:,2] = z_sig_fac*xyzi_mu[:,2]
         # We squish the network output range in z to -0.5:0.5 beause for slice rec the true pixel inds are unqiue (i.e. cant point to the same point from different pixels)
+        # Not needed if we turn slices to batches
         xyzi_mu[:,:3] += torch.stack([pix_inds[4],pix_inds[3],pix_inds[2]], 1) + 0.5
         xyzi_mu = xyzi_mu.reshape(batch_size,-1,gauss_dim)
         xyzi_sig = self.xyzi_sigma[pix_inds[0],:,pix_inds[2],pix_inds[3],pix_inds[4]].reshape(batch_size,-1,gauss_dim)
@@ -101,13 +102,21 @@ class PointProcessGaussian(Distribution):
         else:
             mix_logits = self.logits[torch.nonzero(P,as_tuple=True)].reshape(batch_size, n_codes, -1)
 
-        dist_normal_xyzi = D.Independent(D.Normal(xyzi_mu, xyzi_sig + 0.00001), 1)
-
         xyzi_inp = xyzi.transpose(0, 1)[:,:,None,:]          # reshape for log_prob()
-        log_norm_prob_xyzi = dist_normal_xyzi.base_dist.log_prob(xyzi_inp) # N_gt * batch_size * n_pixel * (3 + n_int_ch)
 
-        if int_inf == 'per_channel':
-            log_norm_prob_xyzi[...,3:] *= xyzi_inp[...,3:].ne(0)
+#         dist_normal_xyzi = D.Independent(D.Normal(xyzi_mu, xyzi_sig + 0.00001), 1)
+
+#         log_norm_prob_xyzi = dist_normal_xyzi.base_dist.log_prob(xyzi_inp) # N_gt * batch_size * n_pixel * (3 + n_int_ch)
+#         if int_inf == 'per_channel':
+#             log_norm_prob_xyzi[...,3:] *= xyzi_inp[...,3:].ne(0)
+#         log_norm_prob_xyzi = _sum_rightmost(log_norm_prob_xyzi, 1)         # N_gt * batch_size * n_pixel
+
+        # Iterative loss calc. 15% slower but 3 times less memory!
+
+        log_norm_prob_xyzi = 0
+        for i in range(gauss_dim):
+            dist_normal_xyzi = D.Independent(D.Normal(xyzi_mu[...,i], xyzi_sig[...,i] + 0.00001), 1)
+            log_norm_prob_xyzi += dist_normal_xyzi.base_dist.log_prob(xyzi_inp[...,i]) * xyzi_inp[...,i].ne(0)
 
         if loss_option == 0:
             log_cat_prob = torch.log_softmax(mix_logits, -1) # + torch.log(counts+1e-6)[:, None]       # normalized (sum to 1 over pixels) log probs for the categorical dist. of the GMM. batch_size * n_pixels
@@ -115,7 +124,6 @@ class PointProcessGaussian(Distribution):
             log_cat_prob = torch.log_softmax(mix_logits.view(batch_size, -1), -1).view(mix_logits.shape)
 
         gt_codes[gt_codes<0] = 0
-        log_norm_prob_xyzi = _sum_rightmost(log_norm_prob_xyzi, 1)         # N_gt * batch_size * n_pixel
         total_prob = torch.logsumexp(log_norm_prob_xyzi + torch.gather(log_cat_prob, 1, gt_codes[...,None].expand(-1,-1,log_cat_prob.shape[-1])).transpose(0,1),-1).transpose(0, 1)
 
         total_prob = (total_prob * s_mask).sum(-1)  # s_mask: batch_size * N_gt. Binary mask to remove entries in all samples that have less then N_gt GT emitters.
@@ -138,7 +146,7 @@ def get_sample_mask(bs, locations):
 
     return s_mask, s_arr
 
-def get_true_labels_mf(bs, locations, x_os, y_os, z_os, int_ch, codes, slice_rec, int_inf='sum'):
+def get_true_labels_mf(bs, locations, x_os, y_os, z_os, int_ch, codes, slice_rec, z_sig_fac, int_inf='sum'):
 
     n_gt = len(x_os)
 
@@ -147,7 +155,7 @@ def get_true_labels_mf(bs, locations, x_os, y_os, z_os, int_ch, codes, slice_rec
 
     x =  x_os + locations[-1].type(torch.cuda.FloatTensor) + 0.5
     y =  y_os + locations[-2].type(torch.cuda.FloatTensor) + 0.5
-    if slice_rec: z_os *= 0.5
+    if slice_rec: z_os = z_os * z_sig_fac
     z =  z_os + locations[-3].type(torch.cuda.FloatTensor) + 0.5
 
     loc_idx = torch.arange(n_gt).repeat_interleave(4)

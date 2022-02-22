@@ -141,15 +141,11 @@ def train(cfg,
                                            sim_z=cfg.genm.exp_type.pred_z, codebook=torch.tensor(code_ref, dtype=torch.bool), int_option=cfg.training.int_option).sample(from_code_book=True)
 
             # sim_vars = locs_sl, x_os_sl, y_os_sl, z_os_sl, ints_sl, output_shape, codes
-    #         print('Sim, ', time.time()-t0); t0 = time.time()
+#             print('Sim, ', time.time()-t0); t0 = time.time()
             ch_inp = microscope.get_single_ch_inputs(*sim_vars[:-1])
+            xsim = microscope(*ch_inp, add_noise=True, add_pos_noise=True)
 
-            torch.save(ch_inp, save_dir/'error_ch_inp.pt')
-            torch.save(microscope.state_dict(), save_dir/'err_microscope.pkl')
-
-            xsim = microscope(*ch_inp, add_noise=True)
-
-    #         print('Micro, ', time.time()-t0); t0 = time.time()
+#             print('Micro, ', time.time()-t0); t0 = time.time()
 
             if cfg.genm.emitter_noise.rate_fac:
 
@@ -158,26 +154,35 @@ def train(cfg,
                                                sim_iters=5, channels=cfg.genm.exp_type.n_channels, n_bits=1,
                                                sim_z=cfg.genm.exp_type.pred_z, codebook=None, int_option=cfg.training.int_option).sample(from_code_book=False)
 
-    #             print('Em. sim ', time.time()-t0); t0 = time.time()
+#                 print('Em. sim ', time.time()-t0); t0 = time.time()
                 noise_inp = microscope.get_single_ch_inputs(*noise_vars[:-1])
                 xsim += microscope(*noise_inp, add_noise=True)
-    #             print('Em Micro, ', time.time()-t0); t0 = time.time()
+#                 print('Em Micro, ', time.time()-t0); t0 = time.time()
 
             xsim_noise = microscope.noise(xsim, background, const_theta_sim=cfg.genm.exp_type.const_theta_sim).sample()
 
+#             print('Noise. ', time.time()-t0); t0 = time.time()
+
             out_sim = model.tensor_to_dict(model(xsim_noise))
+
+#             print('Model forw. ', time.time()-t0); t0 = time.time()
 
             ppg = PointProcessGaussian(**out_sim)
 
-            count_prob, spatial_prob = ppg.log_prob(*sim_vars[:5], codes=sim_vars[-1], n_bits=cfg.genm.exp_type.n_bits, channels=cfg.genm.exp_type.n_channels,
-                                                    loss_option=cfg.training.loss_option, count_mult=cfg.training.count_mult, cat_logits=cfg.training.cat_logits,
-                                                    slice_rec=cfg.genm.exp_type.slice_rec, int_inf=cfg.genm.exp_type.int_inf)
+            count_prob, spatial_prob = ppg.log_prob(*sim_vars[:5], codes=sim_vars[-1],
+                                                    n_bits=cfg.genm.exp_type.n_bits, channels=cfg.genm.exp_type.n_channels,
+                                                    loss_option=cfg.training.loss_option,
+                                                    count_mult=cfg.training.count_mult, cat_logits=cfg.training.cat_logits,
+                                                    slice_rec=cfg.genm.exp_type.slice_rec, z_sig_fac=cfg.training.z_sig_fac,
+                                                    int_inf=cfg.genm.exp_type.int_inf)
 
             gmm_loss = -(spatial_prob + cfg.training.net.cnt_loss_scale*count_prob).mean()
 
             background_loss = F.mse_loss(out_sim['background'], background) * cfg.training.net.bl_loss_scale
 
             loss = gmm_loss + background_loss
+
+#             print('Loss calc. ', time.time()-t0); t0 = time.time()
 
             # Update network parameters
             loss.backward()
@@ -186,8 +191,11 @@ def train(cfg,
 
             optim_dict['optim_net'].step()
             optim_dict['sched_net'].step()
+            # Step all the other optimizers too so the lr's dont got out of sync
+            optim_dict['sched_mic'].step()
+            optim_dict['sched_int'].step()
 
-    #         print('SL ', time.time()-t0); t0 = time.time()
+#             print('Grad upd. ', time.time()-t0); t0 = time.time()
 
         if batch_idx > min(cfg.training.start_mic,cfg.training.start_int):
 
@@ -212,12 +220,12 @@ def train(cfg,
                         rois = extract_psf_roi(ch_out_inp[0], x, torch.tensor(psf_recs.shape))
                         bgs = extract_psf_roi(ch_out_inp[0], out_inp['background'], torch.tensor(psf_recs.shape))
 
-                        log_p_x_given_z = -microscope.noise(psf_recs, bgs, const_theta_sim=False).log_prob(rois).mean()
+                        log_p_x_given_z = -microscope.noise(psf_recs, bgs, const_theta_sim=False).log_prob(rois.clamp_min_(1.)).mean()
                         calc_log_p_x = True
 
                 else:
                     ae_img = microscope(*ch_out_inp, add_noise=False)
-                    log_p_x_given_z = -microscope.noise(ae_img, out_inp['background'], const_theta_sim=False).log_prob(x).mean()
+                    log_p_x_given_z = -microscope.noise(ae_img, out_inp['background'], const_theta_sim=False).log_prob(x.clamp_min_(1.)).mean()
                     calc_log_p_x = True
 
                 if calc_log_p_x:
@@ -233,7 +241,6 @@ def train(cfg,
                         torch.nn.utils.clip_grad_norm_(microscope.parameters(), max_norm=cfg.training.mic.grad_clip, norm_type=2)
 
                     optim_dict['optim_mic'].step()
-                    optim_dict['sched_mic'].step()
 
 #                 print('PSF ', time.time()-t0); t0 = time.time()
 
@@ -252,7 +259,6 @@ def train(cfg,
 
                 int_loss.backward()
                 optim_dict['optim_int'].step()
-                optim_dict['sched_int'].step()
 
 #                 print('INT ', time.time()-t0); t0 = time.time()
 

@@ -2,7 +2,8 @@
 
 __all__ = ['seed_everything', 'free_mem', 'center_crop', 'smooth', 'gaussian_sphere', 'tiff_imread', 'load_tiff_image',
            'load_tiff_from_list', 'gpu', 'cpu', 'prepend_line', 'zip_longest_special', 'param_iter',
-           'generate_perlin_noise_3d_torch', 'generate_fractal_noise_3d_torch']
+           'generate_perlin_noise_2d_torch', 'generate_fractal_noise_2d_torch', 'generate_perlin_noise_3d_torch',
+           'generate_fractal_noise_3d_torch']
 
 # Cell
 from ..imports import *
@@ -63,8 +64,8 @@ def load_tiff_image(image_path: str):
     "Given tiff stack path, loads the stack and converts it to a tensor. If necessary adds a dimension for the batch size"
     image_path = Path(image_path)
     image  = torch.tensor(tiff_imread(image_path).astype('float32'))
-    if len(image.shape) == 3: image.unsqueeze_(0)
-    assert len(image.shape) == 4, 'the shape of image must be 4, (1, Z, X, Y)'
+#     if len(image.shape) == 3: image.unsqueeze_(0)
+#     assert len(image.shape) == 4, 'the shape of image must be 4, (1, Z, X, Y)'
     #removing minum values of the image
     return image
 
@@ -144,6 +145,47 @@ class param_iter(object):
             all_params.append(params)
 
         return all_params
+
+# Cell
+def generate_perlin_noise_2d_torch(shape, res, device='cpu'):
+    ''' Adopted from https://pvigier.github.io/2018/11/02/2d-perlin-noise-numpy.html '''
+
+    def f(t):
+        return 6*t**5 - 15*t**4 + 10*t**3
+
+    delta = (res[0] / shape[0], res[1] / shape[1])
+    d = (shape[0] // res[0], shape[1] // res[1])
+    grid = torch.stack(torch.meshgrid(torch.arange(0, res[0], delta[0], device=device),
+                                      torch.arange(0, res[1], delta[1], device=device)), dim = -1) % 1
+    # Gradients
+    angles = 2*np.pi*torch.rand(res[0]+1, res[1]+1).to(device)
+    gradients = torch.stack((torch.cos(angles), torch.sin(angles)),  axis=2).to(device)
+    gradients = gradients.repeat_interleave(d[0], 0).repeat_interleave(d[1], 1)
+    g00 = gradients[    :-d[0],    :-d[1]]
+    g10 = gradients[d[0]:     ,    :-d[1]]
+    g01 = gradients[    :-d[0],d[1]:     ]
+    g11 = gradients[d[0]:     ,d[1]:     ]
+    # Ramps
+    n00 = torch.sum(torch.dstack((grid[:,:,0]  , grid[:,:,1]  )) * g00, 2)
+    n10 = torch.sum(torch.dstack((grid[:,:,0]-1, grid[:,:,1]  )) * g10, 2)
+    n01 = torch.sum(torch.dstack((grid[:,:,0]  , grid[:,:,1]-1)) * g01, 2)
+    n11 = torch.sum(torch.dstack((grid[:,:,0]-1, grid[:,:,1]-1)) * g11, 2)
+    # Interpolation
+    t = f(grid)
+    n0 = n00*(1-t[:,:,0]) + t[:,:,0]*n10
+    n1 = n01*(1-t[:,:,0]) + t[:,:,0]*n11
+    return np.sqrt(2.)*((1-t[:,:,1])*n0 + t[:,:,1]*n1)
+
+
+def generate_fractal_noise_2d_torch(shape, res, octaves=1, persistence=0.5, device='cpu'):
+
+    noise = torch.zeros(shape).to(device)
+    frequency = 1
+    amplitude = 1
+    for _ in range(octaves):
+        noise += amplitude * generate_perlin_noise_2d_torch(shape, (frequency*res[0], frequency*res[1]), device=device)
+        amplitude *= persistence
+    return noise
 
 # Cell
 def generate_perlin_noise_3d_torch(shape, res, device='cpu'):

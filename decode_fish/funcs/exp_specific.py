@@ -155,19 +155,28 @@ def rsfish_to_df(file_str):
     return df
 
 # Cell
-def get_MOp_scale():
-    return np.array([4.560342 , 1.602575 , 1.1682607, 3.5678792, 3.5533457, 1.312987 ,
-       3.4726021, 1.2291945, 1.3063799, 3.1166024, 3.2340987, 1.1336689,
-       3.824306 , 1.       , 1.1696737, 3.9208868, 3.2251415, 1.1484412,
-       3.372565 , 1.3232977, 1.0225794, 3.119445], dtype='float32')
+# np.array([4.560342 , 1.602575 , 1.1682607, 3.5678792, 3.5533457, 1.312987 ,
+#        3.4726021, 1.2291945, 1.3063799, 3.1166024, 3.2340987, 1.1336689,
+#        3.824306 , 1.       , 1.1696737, 3.9208868, 3.2251415, 1.1484412,
+#        3.372565 , 1.3232977, 1.0225794, 3.119445], dtype='float32')
 
-def read_MOp_tiff(image_path, scaled=False):
+def get_MOp_scale():
+    return np.array([6.06987595, 1.82478585, 1.53286355, 4.8872792 , 3.85842224,
+                1.39192186, 3.59428667, 1.14721266, 1.13473409, 2.7379446 ,
+                3.61746085, 1.12158215, 3.86871193, 0.93670706, 1.05856023,
+                3.59824101, 3.1697511 , 0.96464653, 2.96241304, 0.97365983,
+                0.85356345, 2.97999459], dtype='float32')
+
+def read_MOp_tiff(image_path, scaled=False, z_to_batch=False):
     img_stack = imread(image_path, key=range(0,7*22))
     img_stack = img_stack.reshape([22,7,2048,2048])
     img_stack = torch.tensor(img_stack.astype('float32'))
     if scaled:
         img_stack /= get_MOp_scale()[:,None,None,None]
-    return img_stack
+    if z_to_batch:
+        return img_stack[None].permute([2,1,0,3,4])
+    else:
+        return img_stack[None] # Add batch dim.
 
 # Cell
 def get_benchmark_from_starfish(magnitude_threshold=10**0.75*4):
@@ -237,7 +246,7 @@ def get_istdeco():
     print(len(istdeco_df))
     return istdeco_df
 
-def get_merfish_mop(return_bench_df=False, mouse=1, sample=1, n_genes=252):
+def get_merfish_mop(return_bench_df=False, mouse=1, sample=1, n_genes=252, z_to_batch=False):
 
     mop_path = base_path +'/datasets/CodFish/MERFISH/MOp/'
 
@@ -259,6 +268,10 @@ def get_merfish_mop(return_bench_df=False, mouse=1, sample=1, n_genes=252):
 
         code_inds = [t_dict[x] for x in bench_df['gene']]
         bench_df['code_inds'] = code_inds
+
+        if z_to_batch:
+            bench_df['frame_idx'] = np.array(bench_df['z'].values / 1500, dtype='int16')
+            bench_df['z'] *= 0
 
         print(len(bench_df))
     else:

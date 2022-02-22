@@ -23,10 +23,8 @@ class sCMOS(nn.Module):
         baseline (float): baseline
 
     """
-    def __init__(self,
-                 theta: float = 3.,
-                 baseline: float = 0.,
-                 channels: int = 0):
+    def __init__(self, theta = 3., baseline = 0., channels = 0, sim_scale = 1.):
+
         super().__init__()
 
         if channels:
@@ -41,8 +39,9 @@ class sCMOS(nn.Module):
 
         self.register_buffer('baseline', torch.tensor(baseline))
         self.channels = channels
+        self.sim_scale = sim_scale
 
-    def forward(self, x_sim, background, rec_ch=None, const_theta_sim=False):
+    def forward(self, x_sim, background, const_theta_sim=False):
         """ Calculates the concentration (mean / theta) of a Gamma distribution given
         the signal x_sim and background tensors.
         Also applies a shift and returns resulting the Gamma distribution
@@ -50,12 +49,11 @@ class sCMOS(nn.Module):
 
         theta = (self.theta_scale.to(self.theta_par.device) * self.theta_par)
         if const_theta_sim:
-            theta = self.theta_const
-        if rec_ch:
-            theta = theta[rec_ch].reshape([1,1,1,1,1])
-            background = background[:,rec_ch:rec_ch+1]
+            theta = self.theta_const * self.sim_scale
         else:
-            theta = theta[None,:,None,None,None]
+            theta = theta * self.sim_scale
+
+        theta = theta[None,:,None,None,None]
 
         x_sim_background = x_sim + background
         x_sim_background.clamp_(1.0 + self.baseline)
@@ -66,6 +64,7 @@ class sCMOS(nn.Module):
         loc_trafo = [D.AffineTransform(loc=self.baseline, scale=1)]
         xsim_dist = D.TransformedDistribution(xsim_dist, loc_trafo)
         return xsim_dist
+
 
 # Cell
 def estimate_noise_scale(img, bg_est, percentile=99, plot=True):

@@ -32,30 +32,33 @@ def predict(model, post_proc, image_paths, sm_fish_ch=0, window_size=[None,128,1
                 free_mem()
         return pred_df
 
-def merfish_predict(model, post_proc, image_paths, window_size=[None,256,256], crop=np.s_[:,:,:,:,:], device='cuda'):
+def merfish_predict(model, post_proc, image_paths, window_size=[None,256,256], crop=np.s_[:,:,:,:,:], bs=1, device='cuda'):
     pred_df = DF()
     with torch.no_grad():
         for p in image_paths:
 #             print(p.split('/')[-1])
             if 'aligned' in p:
                 from .exp_specific import read_MOp_tiff
-                img = read_MOp_tiff(p, scaled=True)[None]
+                img = read_MOp_tiff(p, scaled=True, z_to_batch=True)
             else:
-                img = load_tiff_image(p)[None]
+                img = load_tiff_image(p)
 
-            n_chans = img.shape[1]
             print(img.shape)
-            z, y, x = img.shape[-3:]
+            if img.ndim == 4:
+                img = img[None]
 
-            inp = img[crop]
-            output = sliding_window_inference(inp, window_size, 1, model.to(device), overlap=0.2, sw_device=device, device='cpu', mode='gaussian')
-            output = model.tensor_to_dict(output)
-            p_si = sliding_window_inference(output['logits'], window_size, 1, post_proc, overlap=0.2, sw_device=device, device='cpu', mode='gaussian')
-            i_df = post_proc.get_df(output, p_si)
-#             print('N. emitters: ', len(i_df))
-            i_df.loc[:,'frame_idx'] = 0
-            pred_df = append_emitter_df(pred_df, i_df)
-            free_mem()
+            n_batches = int(np.ceil(len(img)/bs))
+
+            for i in tqdm(range(n_batches)):
+
+                inp = img[i*bs:(i+1)*bs][crop]
+                output = sliding_window_inference(inp, window_size, 1, model.to(device), overlap=0.2, sw_device=device, device='cpu', mode='gaussian')
+                output = model.tensor_to_dict(output)
+                p_si = sliding_window_inference(output['logits'], window_size, 1, post_proc, overlap=0.2, sw_device=device, device='cpu', mode='gaussian')
+                i_df = post_proc.get_df(output, p_si)
+#                 i_df.loc[:,'frame_idx'] += i*bs
+                pred_df = append_emitter_df(pred_df, i_df)
+                free_mem()
         return pred_df
 
 # Cell

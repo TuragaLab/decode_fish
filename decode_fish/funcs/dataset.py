@@ -340,6 +340,7 @@ class GaussianSmoothing(TransformBase):
 
 class AddPerlinNoise(TransformBase):
     def __init__(self, shape, res, octaves, scale=1, persistence=0.5, lacunarity=2):
+
         self.shape = shape
         self.res = res
         self.scale = scale
@@ -350,17 +351,25 @@ class AddPerlinNoise(TransformBase):
     def __call__(self, image, **kwargs):
 
         assert all(i <= self.shape for i in image.shape[-3:])
-        shape = [self.shape,self.shape,self.shape]
-        res = self.res
-        if image.shape[-3] == 1:
-            shape[0] = 4
-            res[0] = 1
 
-        bs = len(image)
-        fractal_noise = [generate_fractal_noise_3d_torch(shape=shape,
-                                                  res=res, octaves=self.octaves, persistence=self.persistence, device=image.device) for _ in range(bs)]
-        fractal_noise = torch.stack(fractal_noise)
-        fractal_noise = fractal_noise[:,:image.shape[-3],:image.shape[-2],:image.shape[-1]]
+        res = self.res
+        bs_x_ch = image.shape[0] * image.shape[1]
+
+        color_chs = torch.tensor([0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0]).to(image.device)
+
+        if image.shape[-3] > 1:
+            fractal_noise = [generate_fractal_noise_3d_torch([self.shape,self.shape,self.shape], res, self.octaves, self.persistence, device=image.device) for _ in range(bs_x_ch)]
+            fractal_noise = torch.stack(fractal_noise)
+            fractal_noise = fractal_noise[:,:image.shape[-3],:image.shape[-2],:image.shape[-1]]
+
+        else:
+            fractal_noise = [generate_fractal_noise_2d_torch([self.shape,self.shape], res, self.octaves, self.persistence, device=image.device) for _ in range(bs_x_ch)]
+            fractal_noise = torch.stack(fractal_noise)
+            fractal_noise = fractal_noise[:,:image.shape[-2],:image.shape[-1]]
+
+        # Hardcoded MOp color channels
+        fractal_noise = fractal_noise.reshape(image.shape) * color_chs[:,None,None,None]
+
         return image + self.scale*fractal_noise
 
 

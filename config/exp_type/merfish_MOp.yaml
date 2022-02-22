@@ -15,6 +15,9 @@ genm:
     PSF:
         n_cols: 2
         
+network:
+    is_2D: False
+        
 data_path:
     psf_path: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/decode_fish/figures/MF_psf2.tif
     image_proc:
@@ -22,15 +25,17 @@ data_path:
         override:
             _target_: decode_fish.funcs.exp_specific.read_MOp_tiff 
             scaled: True
+            z_to_batch: ${network.is_2D}
             
 codebook:
     _target_: decode_fish.funcs.exp_specific.get_merfish_mop
     n_genes: 252
+    z_to_batch: ${network.is_2D}
     
 evaluation:
     code_stats: 
         enabled: True
-        path: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/decode_fish/data/MOp_eval/
+        path: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/decode_fish/data/MOp_eval_ztb/
         top_n: 4000
         eval_func:
             _target_: decode_fish.funcs.exp_specific.exp_train_eval_MOp 

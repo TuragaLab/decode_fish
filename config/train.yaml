@@ -30,6 +30,7 @@ data_path:
         image_shape: 
     psf_path: 
     model_init: 
+    micro_init: 
     
 evaluation:
     px_size_zyx: [100,100,100]
@@ -57,7 +58,6 @@ genm:
         const_theta_sim: True
         slice_rec: False
         pred_z: True
-        sm_fish_ch: 0
     PSF:
         _target_: decode_fish.engine.psf.LinearInterpolatedPSF 
         device: ${device.gpu_device}
@@ -69,6 +69,7 @@ genm:
         theta: 2. 
         baseline: 0.
         channels: ${genm.exp_type.n_channels} 
+        sim_scale: 1.
     intensity_dist:
         int_conc: 3.
         int_rate: 3.
@@ -77,6 +78,8 @@ genm:
         _target_: decode_fish.engine.microscope.Microscope
         scale: 100
         psf_noise: 0.1
+        pos_noise_xy: 0.5
+        pos_noise_z: 0.1
         slice_rec: ${genm.exp_type.slice_rec} 
         norm: 'max'    
         ch_facs:
@@ -150,10 +153,10 @@ training:
     old_loss: False
     int_option: 1
     
+    z_sig_fac: 0.5
     loss_option: 1
     count_mult: 0
     cat_logits: 0
-    n_dump_codes: 0
     resume: False
     
     net:
@@ -161,9 +164,6 @@ training:
         bl_loss_scale: 0.01
         cnt_loss_scale: 1
         grad_clip: 0.005
-        int_weight: 1
-        min_int_sig: 0.01
-        int_fac: 1.
         sched:   
             _target_: torch.optim.lr_scheduler.StepLR
             gamma: 0.5

@@ -21,8 +21,9 @@ from .evaluation import matching
 
 import io, requests
 from sklearn.neighbors import NearestNeighbors
-from starfish import data
-import torch.tensor as T
+# from starfish import data
+# import torch.tensor as T
+
 import pprint
 
 # Cell

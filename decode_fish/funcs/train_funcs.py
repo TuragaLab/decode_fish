@@ -22,6 +22,7 @@ from ..engine.point_process import PointProcessUniform
 from ..engine.gmm_loss import PointProcessGaussian
 import shutil
 import wandb
+import kornia
 
 from hydra import compose, initialize
 from .merfish_eval import *
@@ -124,12 +125,19 @@ def train(cfg,
 
     calc_log_p_x = False
 
-    for batch_idx in range(cfg.training.start_iter, cfg.training.num_iters):
+    upsamp = torch.nn.UpsamplingBilinear2d(size = [2048,2048])
+    colshift_inp = kornia.filters.gaussian_blur2d(microscope.color_shifts,  (9,9), (3,3))
+    colshift_inp = colshift_inp[0] - colshift_inp[1]
+    colshift_inp = upsamp(colshift_inp[:,None])
+    colshift_inp = (colshift_inp * model.inp_scale) + model.inp_offset
+    colshift_inp = colshift_inp.detach()
+
+    for batch_idx in range(cfg.training.start_iter, cfg.training.num_iters+1):
 
         t0 = time.time()
-        x, local_rate, background = next(iter(dl))
+        x, local_rate, background, zcrop, ycrop, xcrop = next(iter(dl))
 
-#         print('Iter ', time.time()-t0); t0 = time.time()
+        colshift_crop = torch.concat([colshift_inp[:,:,ycrop[i]:ycrop[i]+cfg.sim.random_crop.crop_sz, xcrop[i]:xcrop[i]+cfg.sim.random_crop.crop_sz][None] for i in range(len(ycrop))], 0)
 
         if cfg.training.net.enabled:
 
@@ -142,7 +150,7 @@ def train(cfg,
 
             # sim_vars = locs_sl, x_os_sl, y_os_sl, z_os_sl, ints_sl, output_shape, codes
 #             print('Sim, ', time.time()-t0); t0 = time.time()
-            ch_inp = microscope.get_single_ch_inputs(*sim_vars[:-1])
+            ch_inp = microscope.get_single_ch_inputs(*sim_vars[:-1], ycrop=ycrop.flatten(), xcrop=xcrop.flatten())
             xsim = microscope(*ch_inp, add_noise=True, add_pos_noise=True)
 
 #             print('Micro, ', time.time()-t0); t0 = time.time()
@@ -155,7 +163,7 @@ def train(cfg,
                                                sim_z=cfg.genm.exp_type.pred_z, codebook=None, int_option=cfg.training.int_option).sample(from_code_book=False)
 
 #                 print('Em. sim ', time.time()-t0); t0 = time.time()
-                noise_inp = microscope.get_single_ch_inputs(*noise_vars[:-1])
+                noise_inp = microscope.get_single_ch_inputs(*noise_vars[:-1], ycrop=ycrop.flatten(), xcrop=xcrop.flatten())
                 xsim += microscope(*noise_inp, add_noise=True)
 #                 print('Em Micro, ', time.time()-t0); t0 = time.time()
 
@@ -163,7 +171,8 @@ def train(cfg,
 
 #             print('Noise. ', time.time()-t0); t0 = time.time()
 
-            out_sim = model.tensor_to_dict(model(xsim_noise))
+#             out_sim = model.tensor_to_dict(model(xsim_noise))
+            out_sim = model.tensor_to_dict(model(torch.concat([xsim_noise,colshift_crop], 1)))
 
 #             print('Model forw. ', time.time()-t0); t0 = time.time()
 
@@ -199,13 +208,14 @@ def train(cfg,
 
         if batch_idx > min(cfg.training.start_mic,cfg.training.start_int):
 
-            out_inp = model.tensor_to_dict(model(x))
+#             out_inp = model.tensor_to_dict(model(x))
+            out_inp = model.tensor_to_dict(model(torch.concat([x,colshift_crop], 1)))
             proc_out_inp = post_proc.get_micro_inp(out_inp)
 
             if cfg.training.mic.enabled and batch_idx > cfg.training.start_mic and len(proc_out_inp[1]) > 0 and len(proc_out_inp[1]) < 300:
 
 #                 print('Pre filt ', len(proc_out_inp[1]))
-                ch_out_inp = microscope.get_single_ch_inputs(*proc_out_inp)
+                ch_out_inp = microscope.get_single_ch_inputs(*proc_out_inp, ycrop=ycrop.flatten(), xcrop=xcrop.flatten())
                 optim_dict['optim_mic'].zero_grad()
                 calc_log_p_x = False
 
@@ -284,6 +294,9 @@ def train(cfg,
 #                     wandb.log({'AE Losses/RMSE(rec)': torch.sqrt(((x[:,:1]-(ae_img[:,:1]+out_inp['background'][:,:1]))**2).mean()).detach().cpu()}, step=batch_idx)
                     wandb.log({'AE Losses/sum(psf)': F.relu(microscope.psf.psf_volume/microscope.psf.psf_volume.max())[0].sum().detach().cpu()}, step=batch_idx)
 #                     wandb.log({'AE Losses/theta': microscope.theta.item()}, step=batch_idx)
+
+        if batch_idx > 0 and batch_idx % 1500 == 0:
+            torch.save({'state_dict':model.state_dict(), 'scaling':[model.inp_scale, model.inp_offset]}, save_dir/f'model_{batch_idx}.pkl')
 
         if batch_idx % cfg.output.log_interval == 0:
             print(batch_idx)

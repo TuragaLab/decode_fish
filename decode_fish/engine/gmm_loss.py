@@ -5,11 +5,12 @@ __all__ = ['ext_log_prob', 'PointProcessGaussian', 'get_sample_mask', 'get_true_
 
 # Cell
 from ..imports import *
+import torch
 from torch import distributions as D, Tensor
 from torch.distributions import Distribution
 from torch.distributions.utils import _sum_rightmost
 from einops import rearrange
-import torch.tensor as T
+# import torch.tensor as T
 import torch.nn.functional as F
 
 # Cell

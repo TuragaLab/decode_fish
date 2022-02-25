@@ -14,7 +14,6 @@ from decode_fish.engine.model import UnetDecodeNoBn
 import shutil
 from decode_fish.engine.point_process import PointProcessUniform
 from decode_fish.engine.gmm_loss import PointProcessGaussian
-import torch.tensor as T
 
 from decode_fish.funcs.fit_psf import get_peaks_3d
 
@@ -32,15 +31,10 @@ from decode_fish.funcs.merfish_eval import *
 def my_app(cfg):
 
     model_cfg = OmegaConf.load(cfg.model_cfg)
-    
-#    if 'n_cols' not in model_cfg.PSF:
-#        model_cfg.PSF.n_cols = 1
-#    if 'phasing' not in model_cfg.exp_type:
-#        model_cfg.exp_type.phasing = False
-    
-#    model_cfg.random_crop.crop_sz = cfg.training.crop_sz
 
-    model, post_proc, micro, img_3d, decode_dl = load_all(model_cfg)    
+    model, post_proc, micro, img_3d, decode_dl = load_all(model_cfg)
+    path = Path(model_cfg.output.save_dir)
+    load_model_state(model, path/f'model_{cfg.out_id}.pkl')
     model.eval().cuda()
     
     bench_df, code_ref, targets = hydra.utils.instantiate(model_cfg.codebook)
@@ -57,6 +51,17 @@ def my_app(cfg):
     
     #res_df = exclude_borders(res_df, border_size_zyx=[0,4000,4000], img_size=[2048*100,2048*100,2048*100])
     res_df['gene'] = targets[res_df['code_inds']]
+    
+    
+    ###
+    max_p = cpu(read_MOp_tiff(image_paths[0], scaled=True, z_to_batch=True)).max(0).max(0)[0]
+    fids = get_peaks(max_p, 18000, 20)
+    
+    res_df['zm'] = res_df['z']%100
+    res_df = exclude_borders(res_df, border_size_zyx=[0,15000,15000], img_size=[2048*100,2048*100,2048*100])
+    res_df = remove_fids(res_df, px_to_nm(fids), tolerance=1000)
+    res_df = remove_doublets(res_df, tolerance=200)
+    ###
     
     res_df.to_csv(cfg.out_file, index=False)
     

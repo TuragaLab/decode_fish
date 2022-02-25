@@ -532,6 +532,8 @@ class UnetDecodeNoBn(nn.Module):
         self.inp_scale = inp_scale
         self.inp_offset = inp_offset
 
+        ch_in = ch_in #+ 3
+
         self.ch_in = ch_in
         self.is_2D = is_2D
         self.pred_z = pred_z

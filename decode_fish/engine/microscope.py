@@ -12,6 +12,7 @@ import torch.nn.functional as F
 from ..funcs.plotting import *
 from .place_psfs import _place_psf, CudaPlaceROI
 # import elasticdeform.torch as etorch
+import kornia
 
 # Cell
 class Microscope(nn.Module):
@@ -74,6 +75,11 @@ class Microscope(nn.Module):
         self.ch_cols = ch_cols
 
         self.register_parameter(name='channel_shifts', param=self.noise.channel_shifts)
+
+        ###
+        self.register_parameter(name='color_shifts', param=torch.nn.Parameter(torch.zeros([2, 3, 41, 41])))
+        ###
+
         self.ch_scale = 1. if ch_facs is None else torch.tensor(ch_facs).cuda()
         self.register_parameter(name='channel_facs', param=torch.nn.Parameter(torch.ones(len(self.channel_shifts))))
         self.ch_norm = self.channel_facs.sum().detach().cuda()
@@ -111,20 +117,29 @@ class Microscope(nn.Module):
 
         return x_os, y_os, z_os
 
-    def get_single_ch_inputs(self, locations, x_os_val, y_os_val, z_os_val, i_val, output_shape=None):
+    def get_single_ch_inputs(self, locations, x_os_val, y_os_val, z_os_val, i_val, output_shape=None, ycrop=0, xcrop=0):
 
         ch_inds = i_val.nonzero(as_tuple=True)
+
         if ch_inds[1].max() > 0:
-            shifts = self.channel_shifts - self.channel_shifts.mean(0)[None]
-
-            x_os_ch = x_os_val[ch_inds[0]] + shifts[ch_inds[1], 0]
-            y_os_ch = y_os_val[ch_inds[0]] + shifts[ch_inds[1], 1]
-            z_os_ch = z_os_val[ch_inds[0]] + shifts[ch_inds[1], 2]
-
-            i_val = i_val[ch_inds]
 
             locations = [l[ch_inds[0]] for l in locations]
             locations.insert(1,ch_inds[1])
+
+            shifts = self.channel_shifts - self.channel_shifts.mean(0)[None]
+
+            ###
+            c_inds = torch.tensor(self.ch_cols)[ch_inds[1]]
+            blurred_col_shift = kornia.filters.gaussian_blur2d(self.color_shifts,  (9,9), (3,3))
+            col_shifts = blurred_col_shift[c_inds, :, (locations[2][ch_inds[0]] + ycrop.cuda()[locations[0]])//50, (locations[3][ch_inds[0]] + xcrop.cuda()[locations[0]])//50]
+            ###
+
+            x_os_ch = x_os_val[ch_inds[0]] + shifts[ch_inds[1], 0] + col_shifts[:, 0]
+            y_os_ch = y_os_val[ch_inds[0]] + shifts[ch_inds[1], 1] + col_shifts[:, 1]
+            z_os_ch = z_os_val[ch_inds[0]] + shifts[ch_inds[1], 2] + col_shifts[:, 2]
+
+            i_val = i_val[ch_inds]
+
 
         return locations, x_os_ch, y_os_ch, z_os_ch, i_val, output_shape
 

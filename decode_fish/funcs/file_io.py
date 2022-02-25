@@ -151,7 +151,7 @@ def load_all(cfg):
     model = load_model_state(model, path/'model.pkl')
     post_proc = hydra.utils.instantiate(cfg.post_proc_isi, samp_threshold=0.5)
     _, noise, micro = load_psf_noise_micro(cfg)
-    micro.load_state_dict(torch.load(path/'microscope.pkl'))
+    micro.load_state_dict(torch.load(path/'microscope.pkl'), strict=False)
     imgs_5d, decode_dl = get_dataloader(cfg)
 
     return model, post_proc, micro, imgs_5d, decode_dl

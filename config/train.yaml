@@ -183,6 +183,7 @@ training:
             channel_shifts: False
             theta_par: False
             psf_vol: False
+            color_shifts: False
         opt:
             _target_: torch_optimizer.QHAdam
             lr: 0.00025

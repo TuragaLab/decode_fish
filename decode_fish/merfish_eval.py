@@ -21,6 +21,7 @@ from decode_fish.funcs.routines import *
 from decode_fish.funcs.predict import merfish_predict
 from decode_fish.funcs.exp_specific import *
 import wandb
+import kornia
 
 import h5py
 
@@ -35,6 +36,7 @@ def my_app(cfg):
     model, post_proc, micro, img_3d, decode_dl = load_all(model_cfg)
     path = Path(model_cfg.output.save_dir)
     load_model_state(model, path/f'model_{cfg.out_id}.pkl')
+    #load_model_state(model, path/f'model.pkl')
     model.eval().cuda()
     
     bench_df, code_ref, targets = hydra.utils.instantiate(model_cfg.codebook)
@@ -47,7 +49,13 @@ def my_app(cfg):
     else:
         crop = np.s_[:,:,:,:]
         
-    res_df = merfish_predict(model, post_proc, image_paths, window_size=[None, 128, 128], crop=crop, device='cuda')      
+    upsamp = torch.nn.UpsamplingBilinear2d(size = [2048,2048])
+    colshift_inp = kornia.filters.gaussian_blur2d(micro.color_shifts[None],  (9,9), (3,3))
+    colshift_inp = upsamp(colshift_inp)
+    colshift_inp = (colshift_inp * model.inp_scale) + model.inp_offset
+    colshift_inp = colshift_inp.detach()
+
+    res_df = merfish_predict(model, post_proc, image_paths, window_size=[None, 128, 128], crop=crop, device='cuda', chrom_map=colshift_inp[:,:,None])      
     
     #res_df = exclude_borders(res_df, border_size_zyx=[0,4000,4000], img_size=[2048*100,2048*100,2048*100])
     res_df['gene'] = targets[res_df['code_inds']]

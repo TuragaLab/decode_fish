@@ -339,9 +339,12 @@ def exp_train_eval_starfish(model, post_proc, targets, path, top_n, wandb, batch
 
     wandb.log({'AE Losses/N_pred_tot': len(res_df)}, step=batch_idx)
 
-def exp_train_eval_MOp(model, post_proc, targets, path, top_n, wandb, batch_idx):
+def exp_train_eval_MOp(model, post_proc, targets, path, top_n, wandb, batch_idx, chrom_map=None):
 
-    res_df = merfish_predict(model, post_proc, [path + '/eval_img.tif'], window_size=[None, 64, 64], device='cuda')
+    if chrom_map is not None:
+        chrom_map = chrom_map[...,500:1250,500:1250][:,:,None]
+
+    res_df = merfish_predict(model, post_proc, [path + '/eval_img.tif'], window_size=[None, 64, 64], device='cuda', chrom_map=chrom_map)
     res_df['gene'] = targets[res_df['code_inds']]
 
     if len(res_df):

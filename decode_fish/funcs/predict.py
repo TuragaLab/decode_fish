@@ -32,7 +32,7 @@ def predict(model, post_proc, image_paths, sm_fish_ch=0, window_size=[None,128,1
                 free_mem()
         return pred_df
 
-def merfish_predict(model, post_proc, image_paths, window_size=[None,256,256], crop=np.s_[:,:,:,:,:], bs=1, device='cuda'):
+def merfish_predict(model, post_proc, image_paths, window_size=[None,256,256], crop=np.s_[:,:,:,:,:], bs=1, device='cuda', chrom_map=None):
     pred_df = DF()
     with torch.no_grad():
         for p in image_paths:
@@ -48,6 +48,9 @@ def merfish_predict(model, post_proc, image_paths, window_size=[None,256,256], c
                 img = img[None]
 
             n_batches = int(np.ceil(len(img)/bs))
+
+            if chrom_map is not None:
+                img = torch.concat([img,chrom_map.to(img.device).repeat_interleave(len(img),0)], 1)
 
             for i in tqdm(range(n_batches)):
 

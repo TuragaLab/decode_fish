@@ -526,13 +526,14 @@ class UnetDecodeNoBn(nn.Module):
 
     """
     def __init__(self, ch_in=1, depth=3, inp_scale=1., inp_offset=0., order='ce', f_maps=64,
-                 is_2D=False, pred_z=True, p_offset=-5., int_conc=4., int_rate=1., int_loc=1., n_p_ch=1, n_bg_ch=1, n_int_ch=1):
+                 is_2D=False, pred_z=True, p_offset=-5., int_conc=4., int_rate=1., int_loc=1., n_p_ch=1, n_bg_ch=1, n_int_ch=1, chrom_map=False):
         super().__init__()
 
         self.inp_scale = inp_scale
         self.inp_offset = inp_offset
 
-        ch_in = ch_in #+ 3
+        if chrom_map:
+            ch_in = ch_in + 2
 
         self.ch_in = ch_in
         self.is_2D = is_2D

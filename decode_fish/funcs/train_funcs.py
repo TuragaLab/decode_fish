@@ -126,18 +126,34 @@ def train(cfg,
     calc_log_p_x = False
 
     upsamp = torch.nn.UpsamplingBilinear2d(size = [2048,2048])
-    colshift_inp = kornia.filters.gaussian_blur2d(microscope.color_shifts,  (9,9), (3,3))
-    colshift_inp = colshift_inp[0] - colshift_inp[1]
-    colshift_inp = upsamp(colshift_inp[:,None])
+    colshift_inp = kornia.filters.gaussian_blur2d(microscope.color_shifts[None],  (9,9), (3,3))
+    colshift_inp = upsamp(colshift_inp)
     colshift_inp = (colshift_inp * model.inp_scale) + model.inp_offset
     colshift_inp = colshift_inp.detach()
 
+    if cfg.training.schedule is not None:
+        sched = cfg.training.schedule
+        cfg.training.net.enabled = True
+        cfg.training.mic.enabled = False
+        switch_iter = sched.pop(0)
+
     for batch_idx in range(cfg.training.start_iter, cfg.training.num_iters+1):
+
+        if cfg.training.schedule is not None:
+            if batch_idx == switch_iter:
+                cfg.training.net.enabled = not(cfg.training.net.enabled)
+                cfg.training.mic.enabled = not(cfg.training.mic.enabled)
+                switch_iter += sched.pop(0)
+
+                colshift_inp = kornia.filters.gaussian_blur2d(microscope.color_shifts[None],  (9,9), (3,3))
+                colshift_inp = upsamp(colshift_inp)
+                colshift_inp = (colshift_inp * model.inp_scale) + model.inp_offset
+                colshift_inp = colshift_inp.detach()
 
         t0 = time.time()
         x, local_rate, background, zcrop, ycrop, xcrop = next(iter(dl))
 
-        colshift_crop = torch.concat([colshift_inp[:,:,ycrop[i]:ycrop[i]+cfg.sim.random_crop.crop_sz, xcrop[i]:xcrop[i]+cfg.sim.random_crop.crop_sz][None] for i in range(len(ycrop))], 0)
+        colshift_crop = torch.concat([colshift_inp[:,:,ycrop[i]:ycrop[i]+cfg.sim.random_crop.crop_sz, xcrop[i]:xcrop[i]+cfg.sim.random_crop.crop_sz][:,:,None] for i in range(len(ycrop))], 0)
 
         if cfg.training.net.enabled:
 
@@ -341,7 +357,7 @@ def train(cfg,
 
                     if cfg.evaluation.code_stats.enabled:
 
-                        hydra.utils.call(cfg.evaluation.code_stats.eval_func, model=model, post_proc=post_proc, targets=targets, path=cfg.evaluation.code_stats.path, top_n=cfg.evaluation.code_stats.top_n, wandb=wandb, batch_idx=batch_idx)
+                        hydra.utils.call(cfg.evaluation.code_stats.eval_func, model=model, post_proc=post_proc, targets=targets, path=cfg.evaluation.code_stats.path, top_n=cfg.evaluation.code_stats.top_n, wandb=wandb, batch_idx=batch_idx, chrom_map=colshift_inp)
 
             # storing
             save_train_state(save_dir, model, microscope, optim_dict, batch_idx)

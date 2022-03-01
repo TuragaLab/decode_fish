@@ -77,7 +77,7 @@ class Microscope(nn.Module):
         self.register_parameter(name='channel_shifts', param=self.noise.channel_shifts)
 
         ###
-        self.register_parameter(name='color_shifts', param=torch.nn.Parameter(torch.zeros([2, 3, 41, 41])))
+        self.register_parameter(name='color_shifts', param=torch.nn.Parameter(torch.zeros([2, 41, 41])))
         ###
 
         self.ch_scale = 1. if ch_facs is None else torch.tensor(ch_facs).cuda()
@@ -117,7 +117,7 @@ class Microscope(nn.Module):
 
         return x_os, y_os, z_os
 
-    def get_single_ch_inputs(self, locations, x_os_val, y_os_val, z_os_val, i_val, output_shape=None, ycrop=0, xcrop=0):
+    def get_single_ch_inputs(self, locations, x_os_val, y_os_val, z_os_val, i_val, output_shape=None, ycrop=None, xcrop=None):
 
         ch_inds = i_val.nonzero(as_tuple=True)
 
@@ -128,18 +128,20 @@ class Microscope(nn.Module):
 
             shifts = self.channel_shifts - self.channel_shifts.mean(0)[None]
 
-            ###
-            c_inds = torch.tensor(self.ch_cols)[ch_inds[1]]
-            blurred_col_shift = kornia.filters.gaussian_blur2d(self.color_shifts,  (9,9), (3,3))
-            col_shifts = blurred_col_shift[c_inds, :, (locations[2][ch_inds[0]] + ycrop.cuda()[locations[0]])//50, (locations[3][ch_inds[0]] + xcrop.cuda()[locations[0]])//50]
-            ###
-
-            x_os_ch = x_os_val[ch_inds[0]] + shifts[ch_inds[1], 0] + col_shifts[:, 0]
-            y_os_ch = y_os_val[ch_inds[0]] + shifts[ch_inds[1], 1] + col_shifts[:, 1]
-            z_os_ch = z_os_val[ch_inds[0]] + shifts[ch_inds[1], 2] + col_shifts[:, 2]
-
+            x_os_ch = x_os_val[ch_inds[0]] + shifts[ch_inds[1], 0]
+            y_os_ch = y_os_val[ch_inds[0]] + shifts[ch_inds[1], 1]
+            z_os_ch = z_os_val[ch_inds[0]] + shifts[ch_inds[1], 2]
             i_val = i_val[ch_inds]
 
+            if ycrop is not None:
+                ###
+                c_inds = torch.tensor(self.ch_cols)[ch_inds[1]]
+                blurred_col_shift = kornia.filters.gaussian_blur2d(self.color_shifts[None],  (9,9), (3,3))[0]
+                col_shifts = blurred_col_shift[:, (locations[2][ch_inds[0]] + ycrop.cuda()[locations[0]])//50, (locations[3][ch_inds[0]] + xcrop.cuda()[locations[0]])//50]
+                ###
+
+                x_os_ch[c_inds==1] = x_os_ch[c_inds==1] + col_shifts[0, c_inds==1]
+                y_os_ch[c_inds==1] = y_os_ch[c_inds==1] + col_shifts[1, c_inds==1]
 
         return locations, x_os_ch, y_os_ch, z_os_ch, i_val, output_shape
 

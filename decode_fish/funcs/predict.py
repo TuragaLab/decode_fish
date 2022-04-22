@@ -32,14 +32,14 @@ def predict(model, post_proc, image_paths, sm_fish_ch=0, window_size=[None,128,1
                 free_mem()
         return pred_df
 
-def merfish_predict(model, post_proc, image_paths, window_size=[None,256,256], crop=np.s_[:,:,:,:,:], bs=1, device='cuda', chrom_map=None):
+def merfish_predict(model, post_proc, image_paths, window_size=[None,256,256], crop=np.s_[:,:,:,:,:], bs=1, device='cuda', chrom_map=None, scale=None):
     pred_df = DF()
     with torch.no_grad():
         for p in image_paths:
 #             print(p.split('/')[-1])
             if 'aligned' in p:
                 from .exp_specific import read_MOp_tiff
-                img = read_MOp_tiff(p, scaled=True, z_to_batch=True)
+                img = read_MOp_tiff(p, scaled=False, z_to_batch=True)
             else:
                 img = load_tiff_image(p)
 
@@ -48,6 +48,9 @@ def merfish_predict(model, post_proc, image_paths, window_size=[None,256,256], c
                 img = img[None]
 
             n_batches = int(np.ceil(len(img)/bs))
+
+            if scale is not None:
+                img = img * scale.to(img.device)
 
             if chrom_map is not None:
                 img = torch.concat([img,chrom_map.to(img.device).repeat_interleave(len(img),0)], 1)

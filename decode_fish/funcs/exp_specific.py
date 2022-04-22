@@ -300,7 +300,7 @@ def get_mop_colors():
 # Cell
 from .predict import merfish_predict
 from .evaluation import matching
-def exp_train_eval_starfish(model, post_proc, targets, path, top_n, wandb, batch_idx):
+def exp_train_eval_starfish(model, post_proc, targets, path, wandb, batch_idx):
     '''Not tested'''
 
     res_df = merfish_predict(model, post_proc, [path], window_size=[None, 64, 64], device='cuda')
@@ -314,7 +314,7 @@ def exp_train_eval_starfish(model, post_proc, targets, path, top_n, wandb, batch
         bench_df, _, _ = get_benchmark()
         bench_df = bench_df[bench_df['gene'] != 'MALAT1']
 
-        res_sub = res_df.nsmallest(top_n, 'comb_sig')
+        res_sub = res_df.nsmallest(len(bench_df), 'comb_sig')
 
         bench_counts = DF(data=None, index=targets)
         bench_counts['Res_all'] = res_sub.groupby('gene')['gene'].count()
@@ -339,23 +339,24 @@ def exp_train_eval_starfish(model, post_proc, targets, path, top_n, wandb, batch
 
     wandb.log({'AE Losses/N_pred_tot': len(res_df)}, step=batch_idx)
 
-def exp_train_eval_MOp(model, post_proc, targets, path, top_n, wandb, batch_idx, chrom_map=None):
+def exp_train_eval_MOp(model, post_proc, targets, path, wandb, batch_idx, chrom_map=None, scale=None):
 
     if chrom_map is not None:
         chrom_map = chrom_map[...,500:1250,500:1250][:,:,None]
 
-    res_df = merfish_predict(model, post_proc, [path + '/eval_img.tif'], window_size=[None, 64, 64], device='cuda', chrom_map=chrom_map)
+    res_df = merfish_predict(model, post_proc, [path + '/eval_img.tif'], window_size=[None, 64, 64], device='cuda', chrom_map=chrom_map, scale=scale)
     res_df['gene'] = targets[res_df['code_inds']]
 
     if len(res_df):
 
         bench_df = pd.read_csv(path + '/bench_df.csv')
-        res_sub = res_df.nsmallest(top_n, 'comb_sig')
+        res_sub = res_df.nsmallest(len(bench_df), 'comb_sig')
 
         bench_counts = DF(data=None, index=targets)
         bench_counts['Res_all'] = res_sub.groupby('gene')['gene'].count()
         bench_counts['Bench_all'] = bench_df.groupby('gene')['gene'].count()
         bench_counts = bench_counts.fillna(0)
+
         r = np.corrcoef(bench_counts['Bench_all'].values, bench_counts['Res_all'].values)[0, 1]
 
         blinds = []

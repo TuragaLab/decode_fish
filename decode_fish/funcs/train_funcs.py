@@ -152,6 +152,8 @@ def train(cfg,
 
         t0 = time.time()
         x, local_rate, background, zcrop, ycrop, xcrop = next(iter(dl))
+        background = background * microscope.get_ch_mult().detach()
+        x = x * microscope.get_ch_mult().detach()
 
         colshift_crop = torch.concat([colshift_inp[:,:,ycrop[i]:ycrop[i]+cfg.sim.random_crop.crop_sz, xcrop[i]:xcrop[i]+cfg.sim.random_crop.crop_sz][:,:,None] for i in range(len(ycrop))], 0)
 
@@ -185,6 +187,7 @@ def train(cfg,
 
             xsim_noise = microscope.noise(xsim, background, const_theta_sim=cfg.genm.exp_type.const_theta_sim).sample()
 
+
 #             print('Noise. ', time.time()-t0); t0 = time.time()
 
 #             out_sim = model.tensor_to_dict(model(xsim_noise))
@@ -217,15 +220,15 @@ def train(cfg,
             optim_dict['optim_net'].step()
             optim_dict['sched_net'].step()
             # Step all the other optimizers too so the lr's dont got out of sync
-            optim_dict['sched_mic'].step()
-            optim_dict['sched_int'].step()
+#             optim_dict['sched_mic'].step()
+#             optim_dict['sched_int'].step()
 
 #             print('Grad upd. ', time.time()-t0); t0 = time.time()
 
         if batch_idx > min(cfg.training.start_mic,cfg.training.start_int):
 
 #             out_inp = model.tensor_to_dict(model(x))
-            out_inp = model.tensor_to_dict(model(torch.concat([x,colshift_crop], 1)))
+            out_inp = model.tensor_to_dict(model(torch.concat([x, colshift_crop], 1)))
             proc_out_inp = post_proc.get_micro_inp(out_inp)
 
             if cfg.training.mic.enabled and batch_idx > cfg.training.start_mic and len(proc_out_inp[1]) > 0 and len(proc_out_inp[1]) < 300:
@@ -234,6 +237,18 @@ def train(cfg,
                 ch_out_inp = microscope.get_single_ch_inputs(*proc_out_inp, ycrop=ycrop.flatten(), xcrop=xcrop.flatten())
                 optim_dict['optim_mic'].zero_grad()
                 calc_log_p_x = False
+
+                # Get ch_fac loss
+                ch_inds = ch_out_inp[0][1]
+                int_vals = ch_out_inp[-2]
+
+                int_means = torch.ones(cfg.genm.exp_type.n_channels).cuda() * (model.int_dist.int_loc.detach() + model.int_dist.int_conc.detach())
+                for i in range(cfg.genm.exp_type.n_channels):
+                    if i in ch_inds:
+                        int_means[i] = int_vals[ch_inds == i].mean()
+
+                int_means = (model.int_dist.int_loc.detach() + model.int_dist.int_conc.detach()) / int_means
+                ch_fac_loss = torch.sqrt(torch.mean((microscope.channel_facs - microscope.channel_facs.detach() * int_means)**2))
 
                 # Get autoencoder loss
                 if cfg.training.mic.roi_rec:
@@ -256,6 +271,9 @@ def train(cfg,
 
                 if calc_log_p_x:
 
+#                     print(ch_fac_loss)
+                    log_p_x_given_z += ch_fac_loss
+
                     if cfg.training.mic.norm_reg:
                         log_p_x_given_z += cfg.training.mic.norm_reg * (microscope.psf.com_loss())
 
@@ -267,6 +285,8 @@ def train(cfg,
                         torch.nn.utils.clip_grad_norm_(microscope.parameters(), max_norm=cfg.training.mic.grad_clip, norm_type=2)
 
                     optim_dict['optim_mic'].step()
+
+                optim_dict['sched_mic'].step()
 
 #                 print('PSF ', time.time()-t0); t0 = time.time()
 
@@ -298,9 +318,9 @@ def train(cfg,
                 wandb.log({'SL Losses/count_loss': (-count_prob.mean()).detach().cpu()}, step=batch_idx)
     #             wandb.log({'SL Losses/bg_loss': background_loss.detach().cpu()}, step=batch_idx)
 
-                wandb.log({'AE Losses/int_mu': model.int_dist.int_conc.item()/model.int_dist.int_rate.item() + model.int_dist.int_loc.item()}, step=batch_idx)
-                wandb.log({'AE Losses/int_rate': model.int_dist.int_rate.item()}, step=batch_idx)
-                wandb.log({'AE Losses/int_loc': model.int_dist.int_loc.item()}, step=batch_idx)
+#                 wandb.log({'AE Losses/int_mu': model.int_dist.int_conc.item()/model.int_dist.int_rate.item() + model.int_dist.int_loc.item()}, step=batch_idx)
+#                 wandb.log({'AE Losses/int_rate': model.int_dist.int_rate.item()}, step=batch_idx)
+#                 wandb.log({'AE Losses/int_loc': model.int_dist.int_loc.item()}, step=batch_idx)
                 wandb.log({'AE Losses/theta': microscope.noise.theta_par.cpu().detach().mean().item()*microscope.noise.theta_scale}, step=batch_idx)
 
             if batch_idx > cfg.training.start_mic:
@@ -311,8 +331,8 @@ def train(cfg,
                     wandb.log({'AE Losses/sum(psf)': F.relu(microscope.psf.psf_volume/microscope.psf.psf_volume.max())[0].sum().detach().cpu()}, step=batch_idx)
 #                     wandb.log({'AE Losses/theta': microscope.theta.item()}, step=batch_idx)
 
-        if batch_idx > 0 and batch_idx % 1500 == 0:
-            torch.save({'state_dict':model.state_dict(), 'scaling':[model.inp_scale, model.inp_offset]}, save_dir/f'model_{batch_idx}.pkl')
+#         if batch_idx > 0 and batch_idx % 1500 == 0:
+#             torch.save({'state_dict':model.state_dict(), 'scaling':[model.inp_scale, model.inp_offset]}, save_dir/f'model_{batch_idx}.pkl')
 
         if batch_idx % cfg.output.log_interval == 0:
             print(batch_idx)
@@ -357,7 +377,7 @@ def train(cfg,
 
                     if cfg.evaluation.code_stats.enabled:
 
-                        hydra.utils.call(cfg.evaluation.code_stats.eval_func, model=model, post_proc=post_proc, targets=targets, path=cfg.evaluation.code_stats.path, top_n=cfg.evaluation.code_stats.top_n, wandb=wandb, batch_idx=batch_idx, chrom_map=colshift_inp)
+                        hydra.utils.call(cfg.evaluation.code_stats.eval_func, model=model, post_proc=post_proc, targets=targets, path=cfg.evaluation.code_stats.path, wandb=wandb, batch_idx=batch_idx, chrom_map=colshift_inp, scale = microscope.get_ch_mult().detach())
 
             # storing
             save_train_state(save_dir, model, microscope, optim_dict, batch_idx)

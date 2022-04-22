@@ -81,11 +81,13 @@ class Microscope(nn.Module):
         ###
 
         self.ch_scale = 1. if ch_facs is None else torch.tensor(ch_facs).cuda()
-        self.register_parameter(name='channel_facs', param=torch.nn.Parameter(torch.ones(len(self.channel_shifts))))
-        self.ch_norm = self.channel_facs.sum().detach().cuda()
+        self.register_parameter(name='channel_facs', param=torch.nn.Parameter(torch.ones(len(self.channel_shifts)).cuda()))
 
         self.register_parameter(name='theta_par', param=self.noise.theta_par)
         self.register_parameter(name='psf_vol', param=self.psf.psf_volume)
+
+    def get_ch_mult(self):
+        return (self.channel_facs * self.ch_scale)[None,:,None,None,None]
 
     def add_psf_noise(self, psf_stack):
 
@@ -198,7 +200,7 @@ class Microscope(nn.Module):
 
             # applying intenseties
 #             tot_intensity = torch.clamp_min(i_val, 0)  * self.channel_facs[locations[1]]
-            tot_intensity = torch.clamp_min(i_val, 0)  * (self.ch_scale * self.channel_facs)[locations[1]] * (self.ch_norm/self.channel_facs.sum())
+            tot_intensity = torch.clamp_min(i_val, 0)  #* (self.ch_scale * self.channel_facs)[locations[1]] * (self.ch_norm/self.channel_facs.sum())
 
             psf = psf * tot_intensity[:,None,None,None,None]
 

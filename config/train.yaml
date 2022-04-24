@@ -80,7 +80,7 @@ genm:
         pos_noise_xy: 0.5
         pos_noise_z: 0.1
         slice_rec: ${genm.exp_type.slice_rec} 
-        norm: 'max'    
+        norm: 'none'    
         ch_facs:
     foci:
         _target_: decode_fish.funcs.dataset.AddFoci

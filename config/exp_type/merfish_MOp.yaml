@@ -10,6 +10,7 @@ genm:
         sample_from_codebook: True
         const_theta_sim: False
         phasing: False
+        int_inf: 'per_channel'
     microscope:
         ch_cols: [0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0]
     PSF:

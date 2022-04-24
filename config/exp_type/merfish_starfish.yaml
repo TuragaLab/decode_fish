@@ -10,6 +10,11 @@ genm:
         sample_from_codebook: True
         const_theta_sim: False
         phasing: False
+        int_inf: 'per_channel'
+    microscope:
+        ch_cols: [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1] # Is this true?
+    PSF:
+        n_cols: 2
         
 network:
     is_2D: True
@@ -17,6 +22,10 @@ network:
 data_path:
     psf_path: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/decode_fish/figures/MF_psf.tif
     image_path: ${base_dir}/datasets/CodFish/MERFISH/starfish_scaled/img_stack.tiff
+    image_proc:
+        crop_sl: s_[:,:,:,:]
+        override:
+            _target_: decode_fish.funcs.exp_specific.read_starfish_tiff 
 
 codebook:
     _target_: decode_fish.funcs.exp_specific.get_benchmark

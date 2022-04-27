@@ -52,12 +52,13 @@ def get_gaussian_psf(size_zyx, radii, pred_z, n_cols=1):
     psf = swap_psf_vol(psf, gauss_vol)
     return psf
 
-def get_vol_psf(filename, device='cuda', psf_extent_zyx=None, n_cols=1):
+def get_vol_psf(filename, device='cuda', psf_extent_zyx=None, n_cols=1, fac=1.):
 
     if 'tif' in filename:
         psf_vol = load_tiff_image(filename)
-        psf_vol = psf_vol/psf_vol.max()
+        psf_vol = psf_vol*fac
         psf = LinearInterpolatedPSF(psf_vol.shape[-3:], device=device, n_cols=n_cols)
+        psf.psf_fac = fac
         if psf_vol.ndim == 3: psf_vol = psf_vol[None]
         psf = swap_psf_vol(psf, psf_vol)
 
@@ -74,7 +75,7 @@ def get_vol_psf(filename, device='cuda', psf_extent_zyx=None, n_cols=1):
 def load_psf(cfg):
 
     if cfg.data_path.psf_path:
-        psf = get_vol_psf(cfg.data_path.psf_path,cfg.genm.PSF.device, cfg.genm.PSF.psf_extent_zyx, cfg.genm.PSF.n_cols)
+        psf = get_vol_psf(cfg.data_path.psf_path,cfg.genm.PSF.device, cfg.genm.PSF.psf_extent_zyx, cfg.genm.PSF.n_cols, cfg.genm.PSF.fac)
     else:
         psf = get_gaussian_psf(cfg.genm.PSF.psf_extent_zyx, cfg.genm.PSF.gauss_radii, cfg.genm.exp_type.pred_z, cfg.genm.PSF.n_cols)
 

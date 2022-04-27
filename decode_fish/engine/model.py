@@ -532,6 +532,7 @@ class UnetDecodeNoBn(nn.Module):
         self.inp_scale = inp_scale
         self.inp_offset = inp_offset
 
+        self.chrom_map = chrom_map
         if chrom_map:
             ch_in = ch_in + 2
 
@@ -551,7 +552,11 @@ class UnetDecodeNoBn(nn.Module):
 
     def forward(self, x):
 
-        x = (x-self.inp_offset) / self.inp_scale
+        if self.chrom_map:
+            # Don't scale chrom. map input
+            x[:,:-2] = (x[:,:-2]-self.inp_offset) / self.inp_scale
+        else:
+            x = (x-self.inp_offset) / self.inp_scale
 
         for net in self.network:
             x = net(x)

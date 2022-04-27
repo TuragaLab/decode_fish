@@ -29,10 +29,8 @@ data_path:
             z_to_batch: ${network.is_2D}
             
 codebook:
-    _target_: decode_fish.funcs.exp_specific.get_merfish_mop
-    n_genes: 252
-    z_to_batch: ${network.is_2D}
-    
+    _target_: decode_fish.funcs.exp_specific.get_mop_codebook
+
 evaluation:
     code_stats: 
         enabled: True

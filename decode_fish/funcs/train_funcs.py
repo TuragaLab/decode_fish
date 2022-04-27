@@ -125,12 +125,6 @@ def train(cfg,
 
     calc_log_p_x = False
 
-    upsamp = torch.nn.UpsamplingBilinear2d(size = [2048,2048])
-    colshift_inp = kornia.filters.gaussian_blur2d(microscope.color_shifts[None],  (9,9), (3,3))
-    colshift_inp = upsamp(colshift_inp)
-    colshift_inp = (colshift_inp * model.inp_scale) + model.inp_offset
-    colshift_inp = colshift_inp.detach()
-
     if cfg.training.schedule is not None:
         sched = cfg.training.schedule
         cfg.training.net.enabled = True
@@ -145,17 +139,15 @@ def train(cfg,
                 cfg.training.mic.enabled = not(cfg.training.mic.enabled)
                 switch_iter += sched.pop(0)
 
-                colshift_inp = kornia.filters.gaussian_blur2d(microscope.color_shifts[None],  (9,9), (3,3))
-                colshift_inp = upsamp(colshift_inp)
-                colshift_inp = (colshift_inp * model.inp_scale) + model.inp_offset
-                colshift_inp = colshift_inp.detach()
-
         t0 = time.time()
-        x, local_rate, background, zcrop, ycrop, xcrop = next(iter(dl))
+        ret_dict = next(iter(dl))
+        x, local_rate, background = ret_dict['x'], ret_dict['local_rate'], ret_dict['background']
+        zcrop, ycrop, xcrop = ret_dict['crop_z'], ret_dict['crop_y'], ret_dict['crop_x']
+
         background = background * microscope.get_ch_mult().detach()
         x = x * microscope.get_ch_mult().detach()
 
-        colshift_crop = torch.concat([colshift_inp[:,:,ycrop[i]:ycrop[i]+cfg.sim.random_crop.crop_sz, xcrop[i]:xcrop[i]+cfg.sim.random_crop.crop_sz][:,:,None] for i in range(len(ycrop))], 0)
+        colshift_crop = get_color_shift_inp(micro.color_shifts, micro.col_shifts_yx, ycrop, xcrop, cfg.sim.random_crop.crop_sz)
 
         if cfg.training.net.enabled:
 
@@ -377,7 +369,8 @@ def train(cfg,
 
                     if cfg.evaluation.code_stats.enabled:
 
-                        hydra.utils.call(cfg.evaluation.code_stats.eval_func, model=model, post_proc=post_proc, targets=targets, path=cfg.evaluation.code_stats.path, wandb=wandb, batch_idx=batch_idx, chrom_map=colshift_inp, scale = microscope.get_ch_mult().detach())
+                        hydra.utils.call(cfg.evaluation.code_stats.eval_func, model=model, post_proc=post_proc, targets=targets,
+                                         path=cfg.evaluation.code_stats.path, wandb=wandb, batch_idx=batch_idx, chrom_map=get_color_shift_inp(micro.color_shifts, micro.col_shifts_yx), scale = microscope.get_ch_mult().detach())
 
             # storing
             save_train_state(save_dir, model, microscope, optim_dict, batch_idx)

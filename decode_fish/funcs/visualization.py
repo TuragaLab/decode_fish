@@ -15,13 +15,13 @@ from torch.utils.data import DataLoader
 from ..engine.microscope import Microscope, get_roi_filt_inds, mic_inp_apply_inds, extract_psf_roi
 from ..engine.point_process import PointProcessUniform
 from matplotlib.backends.backend_agg import FigureCanvas
+import kornia
 
 # Cell
-def get_simulation_statistics(decode_dl, micro, int_conc, int_rate, int_loc, int_threshold=1, samples = 1, channels=1, n_bits=1, psf_noise=True, codebook=None):
+def get_simulation_statistics(decode_dl, micro, int_conc, int_rate, int_loc, int_threshold=1, samples = 1, channels=1, n_bits=1, psf_noise=True, const_theta_sim=True):
 
     """
-    Draws a sample from the dataloader, and plots a slice of the real volume, the extracted background and
-    a slice from a simulated volume.
+    Draws a sample from the dataloader, and plots a slice of the real volume and the simulated volume.
     """
     z_ind = decode_dl.dataset.dataset_tfms[0].crop_sz[0]//2
     with torch.no_grad():
@@ -30,51 +30,33 @@ def get_simulation_statistics(decode_dl, micro, int_conc, int_rate, int_loc, int
 
             xmax = 0
             while xmax <= int_threshold:
-                x, local_rate, background = next(iter(decode_dl))
-                xmax = x[0,0,z_ind].max()
+                ret_dict = next(iter(decode_dl))
+                xmax = ret_dict['x'][0,0,z_ind].max()
 
             rand_ch = np.random.randint(0,channels)
 
-            sim_vars = PointProcessUniform(local_rate[:,0],int_conc, int_rate, int_loc, channels=channels, n_bits=n_bits, sim_z=True,
-                                  codebook=codebook, int_option=3).sample(from_code_book=(codebook is not None), phasing=False)
+            sim_vars = PointProcessUniform(ret_dict['local_rate'][:,0],int_conc, int_rate, int_loc, channels=channels, n_bits=n_bits, sim_z=True,
+                                  codebook=None, int_option=3).sample(from_code_book=False, phasing=False)
             ch_inp = micro.get_single_ch_inputs(*sim_vars[:-1])
             xsim = micro(*ch_inp, add_noise=psf_noise)
-            xsim = micro.noise(xsim, background).sample()
+            xsim = micro.noise(xsim, ret_dict['background'], const_theta_sim=const_theta_sim).sample()
 
             sim_df = sample_to_df(*sim_vars[:5], sim_vars[-1], px_size_zyx=[1.,1.,1.])
             sim_df = sim_df[sim_df['frame_idx'] == 0]
             sim_df = sim_df[sim_df[f'int_{rand_ch}'] > 0]
 
-            x = cpu(x[0,rand_ch])
+            x = cpu(ret_dict['x'][0,rand_ch])
             xsim = cpu(xsim[0,rand_ch])
-
-            if xsim.shape[-3] > 1:
-
-                fig, axes = plt.subplots(ncols=3, figsize=(15,5))
-                fig.suptitle('z slice', fontsize=15, y=0.96)
-
-                im = axes[0].imshow(x[z_ind])
-                add_colorbar(im)
-                axes[0].set_title('Recording')
-
-                im = axes[1].imshow(cpu(background[0,rand_ch])[z_ind])
-                add_colorbar(im)
-                axes[1].set_title('Background')
-
-                im = axes[2].imshow(xsim[z_ind])
-                add_colorbar(im)
-                axes[2].set_title('Simulation')
-                plt.show()
 
             fig1, axes = plot_3d_projections(x, display=False)
             fig2, axes = plot_3d_projections(xsim, display=False)
             scat_3d_projections(axes, sim_df)
 
-            figure = combine_figures([fig1,fig2],[f'Data {rand_ch}','Simulation'], nrows=1, ncols=2, figsize=(20,10))
+            figure = combine_figures([fig1,fig2],[f'Channel {rand_ch}','Simulation'], nrows=1, ncols=2, figsize=(20,10))
             figure.suptitle('Max projection', fontsize=15, y=0.9)
 
 # Cell
-def get_prediction(model, post_proc, img, micro=None, cuda=True, return_rec=False, channel=0):
+def get_prediction(model, post_proc, img, micro=None, cuda=True, return_rec=False):
 
     with torch.no_grad():
 
@@ -104,6 +86,7 @@ def get_prediction(model, post_proc, img, micro=None, cuda=True, return_rec=Fals
 
         return pred_df
 
+# Cell
 def eval_random_crop(decode_dl, model, post_proc, micro, proj_func=np.max, cuda=False, samples=1, int_threshold=1, plot='rec', crop_sz_xy=40, ret_preds=False):
 
     with torch.no_grad():
@@ -117,15 +100,26 @@ def eval_random_crop(decode_dl, model, post_proc, micro, proj_func=np.max, cuda=
 
             x = torch.zeros(1)
             while x.max() < int_threshold:
-                x, local_rate, background = next(iter(dl_copy))
+                ret_dict = next(iter(decode_dl))
+                x, local_rate, background = ret_dict['x'], ret_dict['local_rate'], ret_dict['background']
+                zcrop, ycrop, xcrop = ret_dict['crop_z'], ret_dict['crop_y'], ret_dict['crop_x']
+                background = background * micro.get_ch_mult().detach()
+                x = x * micro.get_ch_mult().detach()
                 x = x[:1]
+
+            if micro.col_shifts_enabled:
+                colshift_crop = get_color_shift_inp(micro.color_shifts, micro.col_shifts_yx, ycrop, xcrop, cfg.sim.random_crop.crop_sz)
+                colshift_crop = colshift_crop[:1]
+                net_inp = torch.concat([x,colshift_crop], 1)
+            else:
+                net_inp = x
 
             rand_ch = np.random.randint(0, x.shape[1])
             print(rand_ch)
-            pred_df, rec, res_dict, psf_recs, psf_bgs, rois, ch_inp = get_prediction(model, post_proc, x, micro=micro, cuda=True, return_rec=True, channel=rand_ch)
+            pred_df, rec, res_dict, psf_recs, psf_bgs, rois, ch_inp = get_prediction(model, post_proc, net_inp, micro=micro, cuda=True, return_rec=True)
             pred_df = nm_to_px(pred_df, post_proc.px_size_zyx)
 
-            sub_df = pred_df#[code_ref[pred_df['code_inds']][:,rand_ch] > 0]
+            sub_df = pred_df[codebook[pred_df['code_inds']][:,rand_ch] > 0]
 
             x_plot = x[0,rand_ch].cpu().numpy()
             rec = rec[0,rand_ch].cpu().numpy()
@@ -145,8 +139,7 @@ def eval_random_crop(decode_dl, model, post_proc, micro, proj_func=np.max, cuda=
                 combine_figures([fig1,fig2], ['Predictions', 'Reconstruction'], figsize=(20,10))
 
             if 'bg' in plot:
-
-                fig2, axes = plot_3d_projections(res_dict['background'], proj_func=proj_func, display=False)
+                fig2, axes = plot_3d_projections(res_dict['background'][0,rand_ch].cpu().numpy(), proj_func=proj_func, display=False)
                 combine_figures([fig1,fig2], ['Predictions', 'BG pred.'], figsize=(20,10))
 
             plt.show()
@@ -156,6 +149,7 @@ def eval_random_crop(decode_dl, model, post_proc, micro, proj_func=np.max, cuda=
             return x, local_rate, background, pred_df, rec, res_dict, psf_recs, psf_bgs, rois, ch_inp
 
 
+# Cell
 def eval_random_sim(decode_dl, model, post_proc, micro, proj_func=np.max, plot_gt=True, cuda=True, samples=1):
 
     with torch.no_grad():

@@ -63,6 +63,7 @@ genm:
         gauss_radii: [1.,1.,1.]
         psf_extent_zyx : [21,21,21]
         n_cols: 1
+        fac: 1.
     noise:
         _target_: decode_fish.engine.noise.sCMOS
         theta: 2. 
@@ -76,12 +77,14 @@ genm:
     microscope:
         _target_: decode_fish.engine.microscope.Microscope
         scale: 100
-        psf_noise: 0.1
+        psf_noise: 0.0
         pos_noise_xy: 0.5
         pos_noise_z: 0.1
         slice_rec: ${genm.exp_type.slice_rec} 
         norm: 'none'    
         ch_facs:
+        col_shifts_enabled: False
+        col_shifts_yxds: [2048, 2048, 50]
     foci:
         _target_: decode_fish.funcs.dataset.AddFoci
         n_foci_avg: 0.

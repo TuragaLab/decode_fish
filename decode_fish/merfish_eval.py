@@ -32,6 +32,12 @@ from decode_fish.funcs.merfish_eval import *
 def my_app(cfg):
 
     model_cfg = OmegaConf.load(cfg.model_cfg)
+    
+    model_cfg.genm.microscope.col_shifts_enabled =  True
+    model_cfg.genm.microscope.col_shifts_yxds =  [2048, 2048, 50]
+    del(model_cfg.codebook.n_genes)
+    del(model_cfg.codebook.z_to_batch)
+    model_cfg.codebook._target_ = 'decode_fish.funcs.exp_specific.get_mop_codebook'
 
     model, post_proc, micro, img_3d, decode_dl = load_all(model_cfg)
     path = Path(model_cfg.output.save_dir)
@@ -39,7 +45,7 @@ def my_app(cfg):
     load_model_state(model, path/f'model.pkl')
     model.eval().cuda()
     
-    bench_df, code_ref, targets = hydra.utils.instantiate(model_cfg.codebook)
+    code_ref, targets = hydra.utils.instantiate(model_cfg.codebook)
     code_inds = np.stack([np.nonzero(c)[0] for c in code_ref])  
     
     image_paths = sorted(glob.glob(cfg.image_path))
@@ -49,13 +55,8 @@ def my_app(cfg):
     else:
         crop = np.s_[:,:,:,:]
         
-    upsamp = torch.nn.UpsamplingBilinear2d(size = [2048,2048])
-    colshift_inp = kornia.filters.gaussian_blur2d(micro.color_shifts[None],  (9,9), (3,3))
-    colshift_inp = upsamp(colshift_inp)
-    colshift_inp = (colshift_inp * model.inp_scale) + model.inp_offset
-    colshift_inp = colshift_inp.detach()
-
-    res_df = merfish_predict(model, post_proc, image_paths, window_size=[None, 128, 128], crop=crop, device='cuda', chrom_map=colshift_inp[:,:,None], scale=micro.get_ch_mult())      
+    res_df = merfish_predict(model, post_proc, image_paths, window_size=[None, 128, 128], crop=crop, device='cuda', 
+                             chrom_map=get_color_shift_inp(micro.color_shifts, micro.col_shifts_yx)[:,:,None], scale=micro.get_ch_mult())      
     
     #res_df = exclude_borders(res_df, border_size_zyx=[0,4000,4000], img_size=[2048*100,2048*100,2048*100])
     res_df['gene'] = targets[res_df['code_inds']]

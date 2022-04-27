@@ -52,6 +52,8 @@ class DecodeDataset:
 
     def __getitem__(self, _):
 
+        ret_dict = {}
+
         i = random.randint(0,len(self.volumes)-1)
         x = self.volumes[i] # Adding dimension here to get to 4.
         x = self._compose(x, self.dataset_tfms, ind = i).to(self.device)
@@ -59,8 +61,16 @@ class DecodeDataset:
         background = self._compose(x, self.bg_tfms)
 
 #         print(self.dataset_tfms[0].slice_h_glob, self.dataset_tfms[0].slice_w_glob, self.dataset_tfms[0].slice_d_glob)
+        ret_dict['x'] = x
+        ret_dict['local_rate'] = local_rate
+        ret_dict['background'] = background
+        ret_dict['crop_z'] = self.dataset_tfms[0].slice_z_glob
+        ret_dict['crop_y'] = self.dataset_tfms[0].slice_y_glob
+        ret_dict['crop_x'] = self.dataset_tfms[0].slice_x_glob
 
-        return x, local_rate, background, self.dataset_tfms[0].slice_h_glob, self.dataset_tfms[0].slice_w_glob, self.dataset_tfms[0].slice_d_glob
+        return ret_dict
+
+#         return x, local_rate, background, self.dataset_tfms[0].slice_h_glob, self.dataset_tfms[0].slice_w_glob, self.dataset_tfms[0].slice_d_glob
 #         return x.to(self.device), local_rate.to(self.device), background.to(self.device)
 
     def __repr__(self):
@@ -192,25 +202,25 @@ class RandomCrop3D(TransformBase):
         self.crop_prod = crop_sz[0]*crop_sz[1]*crop_sz[2]
         self.roi_masks = roi_masks
 
-        self.slice_h_glob = 0
-        self.slice_w_glob = 0
-        self.slice_d_glob = 0
+        self.slice_z_glob = 0
+        self.slice_y_glob = 0
+        self.slice_x_glob = 0
 
     def __call__(self, x, **kwargs):
-        ch, h, w, d = x.shape
-        img_sz  = tuple((h, w, d))
+        ch, d, h, w = x.shape
+        img_sz  = tuple((d, h, w))
         assert (img_sz) >=  self.crop_sz
         super().__call__(x, **kwargs)
-        slice_hwd = [self._get_slice(i, k) for i, k in zip(img_sz, self.crop_sz)]
+        slice_zyx = [self._get_slice(i, k) for i, k in zip(img_sz, self.crop_sz)]
         if 'ind' in kwargs:
-            while self._crop(self.roi_masks[kwargs['ind']][None], *slice_hwd).sum()/self.crop_prod < 0.5:
-                slice_hwd = [self._get_slice(i, k) for i, k in zip(img_sz, self.crop_sz)]
+            while self._crop(self.roi_masks[kwargs['ind']][None], *slice_zyx).sum()/self.crop_prod < 0.5:
+                slice_zyx = [self._get_slice(i, k) for i, k in zip(img_sz, self.crop_sz)]
 
-        self.slice_h_glob = slice_hwd[0][0] if slice_hwd[0][0] is not None else 0
-        self.slice_w_glob = slice_hwd[1][0]
-        self.slice_d_glob = slice_hwd[2][0]
+        self.slice_z_glob = slice_zyx[0][0] if slice_zyx[0][0] is not None else 0
+        self.slice_y_glob = slice_zyx[1][0]
+        self.slice_x_glob = slice_zyx[2][0]
 
-        return self._crop(x, *slice_hwd)
+        return self._crop(x, *slice_zyx)
 
 
     @staticmethod

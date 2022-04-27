@@ -9,7 +9,6 @@ from ..funcs.utils import *
 from torch.jit import script
 from typing import Union, List
 import torch.nn.functional as F
-from ..funcs.plotting import *
 from .place_psfs import _place_psf, CudaPlaceROI
 # import elasticdeform.torch as etorch
 import kornia
@@ -43,7 +42,7 @@ class Microscope(nn.Module):
     """
 
 
-    def __init__(self, psf: torch.nn.Module=None, noise: Union[torch.nn.Module, None]=None, scale: float = 10000., norm='max', psf_noise=0, pos_noise_xy=0, pos_noise_z=0, slice_rec=False, ch_facs=None, ch_cols=None):
+    def __init__(self, psf, noise, scale = 10000., norm='none', psf_noise=0, pos_noise_xy=0, pos_noise_z=0, slice_rec=False, ch_facs=None, ch_cols=None, col_shifts_enabled=False, col_shifts_yxds=None):
 
         super().__init__()
         self.psf = psf
@@ -51,6 +50,10 @@ class Microscope(nn.Module):
         self.scale = scale
         self.noise = noise
         self.norm = norm
+        self.col_shifts_enabled = col_shifts_enabled
+        if col_shifts_enabled:
+            self.col_shifts_yx = col_shifts_yxds[:2]
+            self.col_shift_ds = col_shifts_yxds[2]
 
         self.psf_norm_init = 1.
         if slice_rec:
@@ -77,7 +80,10 @@ class Microscope(nn.Module):
         self.register_parameter(name='channel_shifts', param=self.noise.channel_shifts)
 
         ###
-        self.register_parameter(name='color_shifts', param=torch.nn.Parameter(torch.zeros([2, 41, 41])))
+        if self.col_shifts_enabled:
+            xs = int(np.ceil(self.col_shifts_yx[0]/self.col_shift_ds))
+            ys = int(np.ceil(self.col_shifts_yx[1]/self.col_shift_ds))
+            self.register_parameter(name='color_shifts', param=torch.nn.Parameter(torch.zeros([self.psf.n_cols, ys, xs])))
         ###
 
         self.ch_scale = 1. if ch_facs is None else torch.tensor(ch_facs).cuda()
@@ -94,7 +100,7 @@ class Microscope(nn.Module):
         '''Gaussian noise'''
         noise = torch.distributions.Normal(loc=0, scale=self.psf_noise).sample(psf_stack.shape).to(psf_stack.device)
         noise *= torch.sqrt(psf_stack)
-#         noise *= torch.rand(len(psf_stack), device='cuda')[:,None,None,None,None]
+
         return psf_stack + noise
 
         '''Individual elastic deformation for each PSF (to slow)'''
@@ -106,7 +112,6 @@ class Microscope(nn.Module):
 
     def add_pos_noise(self, x_os, y_os, z_os):
 
-        # Hardcoded n_bits for now.
         x_n = torch.distributions.Normal(loc=0, scale=self.pos_noise_xy).sample(x_os.shape).to(x_os.device).reshape(-1,4)
         x_n -= x_n.mean(-1, keepdim=True)
         x_os = x_os + x_n.reshape(-1)
@@ -123,29 +128,33 @@ class Microscope(nn.Module):
 
         ch_inds = i_val.nonzero(as_tuple=True)
 
-        if ch_inds[1].max() > 0:
+        if len(ch_inds[1]):
+            if ch_inds[1].max() > 0:
 
-            locations = [l[ch_inds[0]] for l in locations]
-            locations.insert(1,ch_inds[1])
+                locations = [l[ch_inds[0]] for l in locations]
+                locations.insert(1,ch_inds[1])
 
-            shifts = self.channel_shifts - self.channel_shifts.mean(0)[None]
+                shifts = self.channel_shifts - self.channel_shifts.mean(0)[None]
 
-            x_os_ch = x_os_val[ch_inds[0]] + shifts[ch_inds[1], 0]
-            y_os_ch = y_os_val[ch_inds[0]] + shifts[ch_inds[1], 1]
-            z_os_ch = z_os_val[ch_inds[0]] + shifts[ch_inds[1], 2]
-            i_val = i_val[ch_inds]
+                x_os_val = x_os_val[ch_inds[0]] + shifts[ch_inds[1], 0]
+                y_os_val = y_os_val[ch_inds[0]] + shifts[ch_inds[1], 1]
+                z_os_val = z_os_val[ch_inds[0]] + shifts[ch_inds[1], 2]
+                i_val = i_val[ch_inds]
 
-            if ycrop is not None:
-                ###
-                c_inds = torch.tensor(self.ch_cols)[ch_inds[1]]
-                blurred_col_shift = kornia.filters.gaussian_blur2d(self.color_shifts[None],  (9,9), (3,3))[0]
-                col_shifts = blurred_col_shift[:, (locations[2][ch_inds[0]] + ycrop.cuda()[locations[0]])//50, (locations[3][ch_inds[0]] + xcrop.cuda()[locations[0]])//50]
-                ###
+                if self.col_shifts_enabled and ycrop is not None:
+                    c_inds = torch.tensor(self.ch_cols)[ch_inds[1]]
+                    blurred_col_shift = kornia.filters.gaussian_blur2d(self.color_shifts[None],  (9,9), (3,3))[0]
 
-                x_os_ch[c_inds==1] = x_os_ch[c_inds==1] + col_shifts[0, c_inds==1]
-                y_os_ch[c_inds==1] = y_os_ch[c_inds==1] + col_shifts[1, c_inds==1]
+                    col_shifts = blurred_col_shift[:, torch.div(locations[2][ch_inds[0]] + ycrop.cuda()[locations[0]], self.col_shift_ds, rounding_mode='trunc'),
+                                                      torch.div(locations[3][ch_inds[0]] + xcrop.cuda()[locations[0]], self.col_shift_ds, rounding_mode='trunc')]
 
-        return locations, x_os_ch, y_os_ch, z_os_ch, i_val, output_shape
+                    x_os_val[c_inds==1] = x_os_val[c_inds==1] + col_shifts[0, c_inds==1]
+                    y_os_val[c_inds==1] = y_os_val[c_inds==1] + col_shifts[1, c_inds==1]
+
+        else:
+            locations.insert(1,locations[0])
+
+        return locations, x_os_val, y_os_val, z_os_val, i_val, output_shape
 
     def get_psf_norm(self, c_inds = None, z_inds=None):
 
@@ -178,7 +187,7 @@ class Microscope(nn.Module):
             if self.slice_rec and self.psf_z_size > 1:
                 z_os_ch = torch.clamp(z_os_ch,-0.49999,0.49999) + 0.5 # transform to [0,1]
                 z_scaled = z_os_ch * (self.psf_z_size - 2) # [0, z_size]
-                z_inds = (z_scaled//1).type(torch.cuda.LongTensor) + 1
+                z_inds = (torch.div(z_scaled, 1, rounding_mode='trunc')).type(torch.cuda.LongTensor) + 1
                 z_os = -(z_scaled%1.) + 0.5
 
                 if self.pos_noise_xy and add_pos_noise:
@@ -189,11 +198,20 @@ class Microscope(nn.Module):
             else:
                 if self.pos_noise_xy and add_noise:
                     x_os_ch, y_os_ch, z_os_ch = self.add_pos_noise(x_os_ch, y_os_ch, z_os_ch)
+
                 psf = self.psf(x_os_ch, y_os_ch, z_os_ch, c_inds=c_inds)
                 z_inds = None
 
-            torch.clamp_min_(psf,0)
-            psf = psf/self.get_psf_norm(c_inds, z_inds)
+#             torch.clamp_min_(psf,0)
+#             psf = psf/self.get_psf_norm(c_inds, z_inds)
+#             psf = torch.nn.Softmax(-1)(psf.flatten(-2,-1)).reshape(psf.shape)
+
+            if self.norm != 'none':
+                psf = torch.abs(psf)
+                psf = psf/psf.flatten(-2,-1).sum(-1)[...,None,None]
+            else:
+                torch.clamp_min_(psf,0)
+                psf /= self.psf.psf_fac
 
             if self.psf_noise and add_noise:
                 psf = self.add_psf_noise(psf)
@@ -301,7 +319,7 @@ def _extract_psf_roi(x_vol, batch, ch, z, y, x, roi_shape):
 
     psf_b, psf_ch, psf_d, psf_h, psf_w = roi_shape[0], roi_shape[1], roi_shape[2], roi_shape[3], roi_shape[4]
     roi_vol = torch.empty(psf_b, psf_ch, psf_d, psf_h, psf_w).to(x_vol.device)
-    pad_zyx = [psf_d//2, psf_h//2, psf_w//2]
+    pad_zyx = [torch.div(psf_d, 2, rounding_mode='trunc'), torch.div(psf_h, 2, rounding_mode='trunc'), torch.div(psf_w, 2, rounding_mode='trunc')]
 
     z_l = z - pad_zyx[0]
     y_l = y - pad_zyx[1]

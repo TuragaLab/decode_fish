@@ -3,12 +3,14 @@
 __all__ = ['seed_everything', 'free_mem', 'center_crop', 'smooth', 'gaussian_sphere', 'tiff_imread', 'load_tiff_image',
            'load_tiff_from_list', 'gpu', 'cpu', 'prepend_line', 'zip_longest_special', 'param_iter',
            'generate_perlin_noise_2d_torch', 'generate_fractal_noise_2d_torch', 'generate_perlin_noise_3d_torch',
-           'generate_fractal_noise_3d_torch']
+           'generate_fractal_noise_3d_torch', 'estimate_noise_scale', 'get_color_shift_inp']
 
 # Cell
 from ..imports import *
 from itertools import product as iter_product
 from tifffile import imread
+from scipy import stats
+import kornia
 
 import gc
 import random
@@ -242,3 +244,46 @@ def generate_fractal_noise_3d_torch(shape, res, octaves=1, persistence=0.5, devi
         frequency *= 2
         amplitude *= persistence
     return noise
+
+# Cell
+def estimate_noise_scale(img, bg_est, percentile=99, plot=True):
+    """ Returns an estimate of theta given a volume and a background estimate
+
+    Args:
+        img: recorded volume for which we want to estimate the noise
+        bg_est: estimated background for img
+        percentile: we wan't to exclude the signal for our fit. therefore we only use the lower percentile of all voxels
+        plot: whether to plot the data and the final fit
+
+    Returns:
+        fit_theta: theta estimate
+    """
+
+    img = cpu(img)
+    bg_est = cpu(bg_est)
+    residual = np.clip(img - bg_est + bg_est.mean(), img.min(), 1e10)
+    fit_vals = residual[residual < np.percentile(residual, percentile)]
+    fit_vals = fit_vals[fit_vals > np.percentile(fit_vals, 100-percentile)]
+    fit_alpha, fit_loc, fit_theta=stats.gamma.fit(fit_vals, floc=0)
+
+    if plot:
+        _ = plt.hist(fit_vals,bins=np.linspace(fit_vals.min(),fit_vals.max(), 51),  histtype ='step',label='data', density=True)
+        x = np.linspace(fit_vals.min(),fit_vals.max(),101)
+        y = stats.gamma.pdf(x, fit_alpha, fit_loc, fit_theta)
+        plt.plot(x, y, label='Fit')
+        plt.legend()
+
+    return fit_theta
+
+# Cell
+def get_color_shift_inp(color_shifts, outp_size=[2048,2048], ycrop=0, xcrop=0, window_size=None):
+
+    upsamp = torch.nn.UpsamplingBilinear2d(size = [2048,2048])
+    colshift_inp = kornia.filters.gaussian_blur2d(color_shifts[None],  (9,9), (3,3))
+    colshift_inp = upsamp(colshift_inp)
+    colshift_inp = colshift_inp.detach()
+
+    if window_size:
+        colshift_inp = torch.concat([colshift_inp[:,:,ycrop[i]:ycrop[i]+window_size, xcrop[i]:xcrop[i]+window_size][:,:,None] for i in range(len(ycrop))], 0)
+
+    return colshift_inp

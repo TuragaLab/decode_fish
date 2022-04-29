@@ -56,6 +56,7 @@ def get_vol_psf(filename, device='cuda', psf_extent_zyx=None, n_cols=1, fac=1.):
 
     if 'tif' in filename:
         psf_vol = load_tiff_image(filename)
+        psf_vol = psf_vol/psf_vol.max()
         psf_vol = psf_vol*fac
         psf = LinearInterpolatedPSF(psf_vol.shape[-3:], device=device, n_cols=n_cols)
         psf.psf_fac = fac
@@ -145,7 +146,7 @@ def get_dataloader(cfg):
 
     return imgs_5d, decode_dl
 
-def load_all(cfg):
+def load_all(cfg, load_ds=True):
 
     path = Path(cfg.output.save_dir)
     model = hydra.utils.instantiate(cfg.network)
@@ -153,6 +154,9 @@ def load_all(cfg):
     post_proc = hydra.utils.instantiate(cfg.post_proc_isi, samp_threshold=0.5)
     _, noise, micro = load_psf_noise_micro(cfg)
     micro.load_state_dict(torch.load(path/'microscope.pkl'), strict=False)
-    imgs_5d, decode_dl = get_dataloader(cfg)
+    if load_ds:
+        imgs_5d, decode_dl = get_dataloader(cfg)
+    else:
+        imgs_5d, decode_dl = None, None
 
     return model, post_proc, micro, imgs_5d, decode_dl

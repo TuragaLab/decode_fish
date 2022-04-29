@@ -16,6 +16,7 @@ class LinearInterpolatedPSF(nn.Module):
 
     Args:
         size_zyx: size of the psf volume in pixels
+        n_cols: number of colorchannels (and therefore PSFs)
         device: 'cuda' or 'cpu'
 
     ToDo:
@@ -37,16 +38,18 @@ class LinearInterpolatedPSF(nn.Module):
         self.register_buffer('z_2d', torch.zeros(1))
         self.device=device
         self.psf_volume = nn.Parameter(0.01*torch.rand(self.n_cols, *self.psf_size), requires_grad=True)
-        self.forward_nonlin = torch.nn.Identity()
+        self.forward_nonlin = torch.nn.Identity() # Could be used if one want's to save the psf volume in log space
 
     def forward(self, x_offset_val, y_offset_val, z_offset_val, z_inds=None, c_inds=None):
         """ Returns the PSF volume for a number of given subpixel shift.
 
         Args:
             x_offset_val, y_offset_val, z_offset_val: Vector of shifts in x,y,z
+            z_inds: indices of the psf_slices used (only for 2D data)
+            c_inds: colors indices
 
         Returns:
-            PSF volumes shifted by x,y,z
+            PSF volumes/slices shifted by x,y,z
         """
 
         N_em = x_offset_val.shape[0]
@@ -54,13 +57,16 @@ class LinearInterpolatedPSF(nn.Module):
         x_offset = 2 * x_offset_val.view(-1) / self.psf_size[2]
         y_offset = 2 * y_offset_val.view(-1) / self.psf_size[1]
         if z_inds is None:
+            # Treat z like the other dimensions
             z_offset = 2 * z_offset_val.view(-1) / self.psf_size[0]
             z_g = self.z.to(self.device)
             vol = self.forward_nonlin(self.psf_volume).expand(N_em, -1, -1, -1, -1).to(self.device)
         else:
-            z_offset = z_offset = 2 * z_offset_val.view(-1) / 3
+
+            z_offset = 2 * z_offset_val.view(-1) / 3
             z_g = self.z_2d.to(self.device)
 
+            # We select a 3 pixel wide volume around the indexed z slice for interpolation
             vol = torch.cat([self.psf_volume[None,:,[z-1 for z in z_inds]],
                              self.psf_volume[None,:,z_inds],
                              self.psf_volume[None,:,[z+1 for z in z_inds]]], dim=0).transpose(0,2).to(self.device)
@@ -69,8 +75,10 @@ class LinearInterpolatedPSF(nn.Module):
             vol = vol[torch.arange(len(c_inds)),c_inds]
             vol = vol[:,None]
 
+        # Create the grids
         i_img, x_grid, y_grid, z_grid = torch.meshgrid(torch.arange(N_em, dtype=torch.float32).to(self.device), self.x.to(self.device), self.y.to(self.device), z_g)
 
+        # Shift the grids
         x_grid = x_grid - x_offset[:, None, None, None]
         y_grid = y_grid - y_offset[:, None, None, None]
         z_grid = z_grid - z_offset[:, None, None, None]

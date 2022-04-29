@@ -55,18 +55,6 @@ class Microscope(nn.Module):
             self.col_shifts_yx = col_shifts_yxds[:2]
             self.col_shift_ds = col_shifts_yxds[2]
 
-        self.psf_norm_init = 1.
-        if slice_rec:
-            if norm == 'sum':
-                self.psf_norm_init = self.psf.psf_volume.detach().sum(2, keepdim=True).sum(3, keepdim=True).to('cuda')
-            if norm == 'max':
-                self.psf_norm_init = self.psf.psf_volume.detach().amax(2, keepdim=True).amax(3, keepdim=True).to('cuda')
-        else:
-            if norm == 'sum':
-                self.psf_norm_init = self.psf.psf_volume.detach().sum().to('cuda')
-            if norm == 'max':
-                self.psf_norm_init = self.psf.psf_volume.detach().amax().to('cuda')
-
         self.theta = self.noise.theta_scale * self.noise.theta_par
 
         self.psf_noise = psf_noise
@@ -77,7 +65,7 @@ class Microscope(nn.Module):
         self.psf_z_size = self.psf.psf_volume.shape[-3]
         self.ch_cols = ch_cols
 
-        self.register_parameter(name='channel_shifts', param=self.noise.channel_shifts)
+        self.register_parameter(name='channel_shifts', param=torch.nn.Parameter(torch.zeros((int(self.noise.channels/self.psf.n_cols), 3))))
 
         ###
         if self.col_shifts_enabled:
@@ -87,7 +75,7 @@ class Microscope(nn.Module):
         ###
 
         self.ch_scale = 1. if ch_facs is None else torch.tensor(ch_facs).cuda()
-        self.register_parameter(name='channel_facs', param=torch.nn.Parameter(torch.ones(len(self.channel_shifts)).cuda()))
+        self.register_parameter(name='channel_facs', param=torch.nn.Parameter(torch.ones(int(self.noise.channels)).cuda()))
 
         self.register_parameter(name='theta_par', param=self.noise.theta_par)
         self.register_parameter(name='psf_vol', param=self.psf.psf_volume)
@@ -131,17 +119,24 @@ class Microscope(nn.Module):
         if len(ch_inds[1]):
             if ch_inds[1].max() > 0:
 
+                i_val = i_val[ch_inds]
+                c_inds = torch.tensor(self.ch_cols)[ch_inds[1]]
+
                 locations = [l[ch_inds[0]] for l in locations]
                 locations.insert(1,ch_inds[1])
 
                 shifts = self.channel_shifts - self.channel_shifts.mean(0)[None]
+                multi_col_shifts = torch.zeros([self.noise.channels, 3]).to(shifts.device)
 
-                x_os_val = x_os_val[ch_inds[0]] + shifts[ch_inds[1], 0]
-                y_os_val = y_os_val[ch_inds[0]] + shifts[ch_inds[1], 1]
-                z_os_val = z_os_val[ch_inds[0]] + shifts[ch_inds[1], 2]
-                i_val = i_val[ch_inds]
+                multi_col_shifts[torch.tensor(self.ch_cols)==0,:] = shifts
+                multi_col_shifts[torch.tensor(self.ch_cols)==1,:] = shifts
+
+                x_os_val = x_os_val[ch_inds[0]] + multi_col_shifts[ch_inds[1], 0]
+                y_os_val = y_os_val[ch_inds[0]] + multi_col_shifts[ch_inds[1], 1]
+                z_os_val = z_os_val[ch_inds[0]] + multi_col_shifts[ch_inds[1], 2]
 
                 if self.col_shifts_enabled and ycrop is not None:
+
                     c_inds = torch.tensor(self.ch_cols)[ch_inds[1]]
                     blurred_col_shift = kornia.filters.gaussian_blur2d(self.color_shifts[None],  (9,9), (3,3))[0]
 
@@ -155,28 +150,6 @@ class Microscope(nn.Module):
             locations.insert(1,locations[0])
 
         return locations, x_os_val, y_os_val, z_os_val, i_val, output_shape
-
-    def get_psf_norm(self, c_inds = None, z_inds=None):
-
-        if self.norm != 'max' and self.norm != 'sum':
-            return 1.
-        if not self.slice_rec:
-            if self.norm == 'max': psf_norm = self.psf.psf_volume.max()
-            if self.norm == 'sum': psf_norm = torch.clamp_min(self.psf.psf_volume, 0).sum()
-            init = self.psf_norm_init
-        else:
-            if self.norm == 'max':
-                psf_norm = self.psf.psf_volume.amax(2, keepdim=True).amax(3, keepdim=True)
-            if self.norm == 'sum':
-                psf_norm = torch.clamp_min(self.psf.psf_volume, 0).sum(2, keepdim=True).sum(3, keepdim=True)
-            if c_inds is not None:
-                psf_norm = psf_norm[c_inds, z_inds][:,:,None,None]
-                init = self.psf_norm_init[c_inds, z_inds][:,:,None,None]
-            else:
-                psf_norm = psf_norm[0,z_inds][:,None,None]
-                init = self.psf_norm_init[0,z_inds][:,None,None]
-
-        return psf_norm/init
 
     def forward(self, locations, x_os_ch, y_os_ch, z_os_ch, i_val, output_shape, ret_psfs=False, add_noise=False, add_pos_noise=False):
 
@@ -202,13 +175,9 @@ class Microscope(nn.Module):
                 psf = self.psf(x_os_ch, y_os_ch, z_os_ch, c_inds=c_inds)
                 z_inds = None
 
-#             torch.clamp_min_(psf,0)
-#             psf = psf/self.get_psf_norm(c_inds, z_inds)
-#             psf = torch.nn.Softmax(-1)(psf.flatten(-2,-1)).reshape(psf.shape)
-
             if self.norm != 'none':
                 psf = torch.abs(psf)
-                psf = psf/psf.flatten(-2,-1).sum(-1)[...,None,None]
+                psf = 4.5*psf/psf.flatten(-2,-1).sum(-1)[...,None,None]
             else:
                 torch.clamp_min_(psf,0)
                 psf /= self.psf.psf_fac
@@ -216,9 +185,7 @@ class Microscope(nn.Module):
             if self.psf_noise and add_noise:
                 psf = self.add_psf_noise(psf)
 
-            # applying intenseties
-#             tot_intensity = torch.clamp_min(i_val, 0)  * self.channel_facs[locations[1]]
-            tot_intensity = torch.clamp_min(i_val, 0)  #* (self.ch_scale * self.channel_facs)[locations[1]] * (self.ch_norm/self.channel_facs.sum())
+            tot_intensity = torch.clamp_min(i_val, 0)
 
             psf = psf * tot_intensity[:,None,None,None,None]
 

@@ -230,7 +230,7 @@ def get_starfish_benchmark(magnitude_threshold=10**0.75*4):
     return bench_df
 
 def get_starfish_codebook():
-    codebook = np.load(base_path + '/decode_fish/data/merfish_codebook.npz')['arr_0']
+    codebook = np.load(base_path + '/decode_fish/data/merfish_code_ref.npz')['arr_0']
     targets = np.load(base_path + '/decode_fish/data/merfish_targets.npz', allow_pickle=True)['arr_0']
     return codebook, targets
 
@@ -300,6 +300,7 @@ def get_mop_fov(bench_df, img_nr, mouse=1, sample=1):
     return bench_sub
 
 def get_mop_colors():
+#     cols = (pd.read_csv('/groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/datasets/CodFish/MERFISH/MOp/additional_files/data_organization_raw.csv',encoding='latin')['color (nm)'].values == 750)
     return np.array([0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
        0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0])
 
@@ -319,7 +320,7 @@ def exp_train_eval_starfish(model, post_proc, targets, path, wandb, batch_idx, c
         res_df['gene'] = targets[res_df['code_inds']]
         res_df = res_df[res_df['gene'] != 'MALAT1']
 
-        bench_df, _, _ = get_benchmark()
+        bench_df = get_starfish_benchmark()
         bench_df = bench_df[bench_df['gene'] != 'MALAT1']
 
         res_sub = res_df.nsmallest(len(bench_df), 'comb_sig')

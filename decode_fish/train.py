@@ -37,7 +37,7 @@ def my_app(cfg):
     model = hydra.utils.instantiate(cfg.network, inp_scale=inp_scale, inp_offset=inp_offset)
     post_proc = hydra.utils.instantiate(cfg.post_proc_isi)
     
-    bench_df, code_ref, targets = hydra.utils.instantiate(cfg.codebook)
+    code_ref, targets = hydra.utils.instantiate(cfg.codebook)
     post_proc.codebook = torch.tensor(code_ref)
     
     psf  .to(cfg.device.gpu_device)

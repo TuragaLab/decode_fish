@@ -116,7 +116,7 @@ def train(cfg,
 
     # Load codebook
     if 'codebook' in cfg:
-        bench_df, code_ref, targets = hydra.utils.instantiate(cfg.codebook)
+        code_ref, targets = hydra.utils.instantiate(cfg.codebook)
 #         bench_df = exclude_borders(bench_df, border_size_zyx=[0,4000,4000], img_size=[2048*100,2048*100,2048*100])
 
     # Controls which genmodel parameters are optimized
@@ -147,7 +147,7 @@ def train(cfg,
         background = background * microscope.get_ch_mult().detach()
         x = x * microscope.get_ch_mult().detach()
 
-        colshift_crop = get_color_shift_inp(micro.color_shifts, micro.col_shifts_yx, ycrop, xcrop, cfg.sim.random_crop.crop_sz)
+        colshift_crop = get_color_shift_inp(microscope.color_shifts, microscope.col_shifts_yx, ycrop, xcrop, cfg.sim.random_crop.crop_sz)
 
         if cfg.training.net.enabled:
 
@@ -370,7 +370,7 @@ def train(cfg,
                     if cfg.evaluation.code_stats.enabled:
 
                         hydra.utils.call(cfg.evaluation.code_stats.eval_func, model=model, post_proc=post_proc, targets=targets,
-                                         path=cfg.evaluation.code_stats.path, wandb=wandb, batch_idx=batch_idx, chrom_map=get_color_shift_inp(micro.color_shifts, micro.col_shifts_yx), scale = microscope.get_ch_mult().detach())
+                                         path=cfg.evaluation.code_stats.path, wandb=wandb, batch_idx=batch_idx, chrom_map=get_color_shift_inp(microscope.color_shifts, microscope.col_shifts_yx), scale = microscope.get_ch_mult().detach())
 
             # storing
             save_train_state(save_dir, model, microscope, optim_dict, batch_idx)

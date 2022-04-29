@@ -28,7 +28,7 @@ data_path:
             _target_: decode_fish.funcs.exp_specific.read_starfish_tiff 
 
 codebook:
-    _target_: decode_fish.funcs.exp_specific.get_benchmark
+    _target_: decode_fish.funcs.exp_specific.get_starfish_codebook
     
 evaluation:
     code_stats: 

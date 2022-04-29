@@ -83,7 +83,7 @@ genm:
         slice_rec: ${genm.exp_type.slice_rec} 
         norm: 'none'    
         ch_facs:
-        col_shifts_enabled: False
+        col_shifts_enabled: True
         col_shifts_yxds: [2048, 2048, 50]
     foci:
         _target_: decode_fish.funcs.dataset.AddFoci

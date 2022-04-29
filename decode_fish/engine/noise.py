@@ -30,7 +30,6 @@ class sCMOS(nn.Module):
         if channels:
             self.theta_scale = torch.tensor(theta)
             self.theta_par = torch.nn.Parameter(torch.ones(channels))
-            self.channel_shifts = torch.nn.Parameter(torch.zeros([channels, 3]))
         else:
             self.theta_scale = theta
             self.theta_par = torch.nn.Parameter(torch.tensor(1.))

@@ -17,13 +17,20 @@ import random
 
 # Cell
 def seed_everything(seed=1234):
+    """
+    Set all the seeds. While this will ensure deterministic weight init. and data sampling the model
+    includes several components that are not supported for deterministic running.
+    """
     random.seed(seed)
     os.environ['PYTHONHASHSEED'] = str(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     torch.backends.cudnn.deterministic = True
-seed_everything()
+    # Should be False but might cause slowdown
+    torch.backends.cudnn.benchmark = True
+    # Will throw an error. Can't run the current algorithm fully deterministic.
+    # torch.use_deterministic_algorithms(True)
 
 def free_mem():
     gc.collect()
@@ -63,12 +70,9 @@ def tiff_imread(path):
     if isinstance(path, Path): return imread(str(path))
 
 def load_tiff_image(image_path: str):
-    "Given tiff stack path, loads the stack and converts it to a tensor. If necessary adds a dimension for the batch size"
+    "Given tiff stack path, loads the stack and converts it to a tensor. "
     image_path = Path(image_path)
     image  = torch.tensor(tiff_imread(image_path).astype('float32'))
-#     if len(image.shape) == 3: image.unsqueeze_(0)
-#     assert len(image.shape) == 4, 'the shape of image must be 4, (1, Z, X, Y)'
-    #removing minum values of the image
     return image
 
 def load_tiff_from_list(path_list):

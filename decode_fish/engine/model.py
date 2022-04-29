@@ -433,6 +433,11 @@ class OutputNet(nn.Module):
     Args:
         f_maps: number of channels of the U-net output
         p_offset: probability channel bias
+        is_2D: whether the input is 1D in the z dimension
+        n_p_ch: Number probability channels (number of genes)
+        n_bg_ch: Number background channels (number of channels or 1)
+        n_int_ch: Number intensity channels (number of channels)
+
     """
     def __init__(self, f_maps=64, p_offset=-5., is_2D=False, n_p_ch=1, n_bg_ch=1, n_int_ch=1):
         super().__init__()
@@ -496,18 +501,17 @@ class OutputNet(nn.Module):
 class UnetDecodeNoBn(nn.Module):
     """
     Our DECODE network consists of a 3D U-net, and an output net module.
-    The network parameters can accessed through model.network
+    The network parameters can be accessed through model.network
 
     We also store the parameters of the intensity distribution here for easier access. (model.int_dist)
 
-    The forward function returns a tensor batch_size x 10 tensor to make it compatible with the monai.inferers.sliding_window_inference function.
+    The forward function returns a tensor batch_size x n_output_channel tensor to make it compatible with the monai.inferers.sliding_window_inference function.
 
     To get the final output dictionary one has to also apply the tensor_to_dict function.
 
     Args:
-        ch_in (int): number of input channels
-            Multiple input channels are currently not supported
-        depth (int): number of levels in the encoder/decoder path (applied only if f_maps is an int)
+        ch_in (int): number of input channels (i.e. n_rounds * n_colors)
+        depth (int): number of levels in the encoder/decoder path
         inp_offset, inp_scale (float): Values used for normalizing the input.
         order (string): determines the order of layers
             in `SingleConv` module. e.g. 'ce' stands for Conv3d+ELU.
@@ -515,15 +519,17 @@ class UnetDecodeNoBn(nn.Module):
             Before the input is given to the network is is normalized using these variables.
         f_maps (int, tuple): number of feature maps at each level of the encoder; if it's an integer the number
             of feature maps is given by the geometric progression: f_maps ^ k, k=1,2,3,4
+        is_2D: whether the input is 1D in the z dimension
+        pred_z: setting to false will disable inference of the z position
         p_offset (float):
             bias of the probabilty channel. The negative value avoids very high rates at the start of the training which might cause memory issues.
         int_conc, int_rate (float): parameters of the torch.distributions.gamma class.
         int_loc (float): shift parameter.
-
-    ToDo:
-        Support for multiple channels?
-
-
+        p_offset: probability channel bias
+        n_p_ch: Number probability channels (number of genes)
+        n_bg_ch: Number background channels (number of channels or 1)
+        n_int_ch: Number intensity channels (number of channels)
+        chrom_map: whether the network using the chromatic abberation map as an additional input
     """
     def __init__(self, ch_in=1, depth=3, inp_scale=1., inp_offset=0., order='ce', f_maps=64,
                  is_2D=False, pred_z=True, p_offset=-5., int_conc=4., int_rate=1., int_loc=1., n_p_ch=1, n_bg_ch=1, n_int_ch=1, chrom_map=False):

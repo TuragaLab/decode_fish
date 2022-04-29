@@ -33,11 +33,11 @@ def my_app(cfg):
 
     model_cfg = OmegaConf.load(cfg.model_cfg)
     
-    model_cfg.genm.microscope.col_shifts_enabled =  True
-    model_cfg.genm.microscope.col_shifts_yxds =  [2048, 2048, 50]
-    del(model_cfg.codebook.n_genes)
-    del(model_cfg.codebook.z_to_batch)
-    model_cfg.codebook._target_ = 'decode_fish.funcs.exp_specific.get_mop_codebook'
+#    model_cfg.genm.microscope.col_shifts_enabled =  True
+#    model_cfg.genm.microscope.col_shifts_yxds =  [2048, 2048, 50]
+#    del(model_cfg.codebook.n_genes)
+#    del(model_cfg.codebook.z_to_batch)
+#    model_cfg.codebook._target_ = 'decode_fish.funcs.exp_specific.get_mop_codebook'
 
     model, post_proc, micro, img_3d, decode_dl = load_all(model_cfg)
     path = Path(model_cfg.output.save_dir)

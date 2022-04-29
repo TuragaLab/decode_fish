@@ -7,7 +7,6 @@ from ..imports import *
 from torch import nn
 from torch import distributions as D
 from ..funcs.utils import *
-from ..funcs.plotting import *
 import scipy.stats as stats
 
 # Cell

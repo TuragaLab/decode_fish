@@ -78,8 +78,6 @@ genm:
         _target_: decode_fish.engine.microscope.Microscope
         scale: 100
         psf_noise: 0.0
-        pos_noise_xy: 0.5
-        pos_noise_z: 0.1
         slice_rec: ${genm.exp_type.slice_rec} 
         norm: 'none'    
         ch_facs:
@@ -98,6 +96,9 @@ genm:
     prob_generator:
         low: 1e-8
         high: 0.005
+    pos_noise:
+        pos_noise_xy: 0.5
+        pos_noise_z: 0.1
         
 sim:
     random_crop: 

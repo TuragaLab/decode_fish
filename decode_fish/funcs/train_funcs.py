@@ -16,7 +16,7 @@ import torch.nn.functional as F
 from torch import distributions as D
 from torch.utils.data import DataLoader
 import torch_optimizer
-from ..engine.microscope import Microscope, get_roi_filt_inds, extract_psf_roi, mic_inp_apply_inds
+from ..engine.microscope import Microscope, get_roi_filt_inds, extract_psf_roi, mic_inp_apply_inds, add_pos_noise
 from ..engine.model import UnetDecodeNoBn
 from ..engine.point_process import PointProcessUniform
 from ..engine.gmm_loss import PointProcessGaussian
@@ -160,8 +160,9 @@ def train(cfg,
 
             # sim_vars = locs_sl, x_os_sl, y_os_sl, z_os_sl, ints_sl, output_shape, codes
 #             print('Sim, ', time.time()-t0); t0 = time.time()
-            ch_inp = microscope.get_single_ch_inputs(*sim_vars[:-1], ycrop=ycrop.flatten(), xcrop=xcrop.flatten())
-            xsim = microscope(*ch_inp, add_noise=True, add_pos_noise=True)
+            ch_inp = list(microscope.get_single_ch_inputs(*sim_vars[:-1], ycrop=ycrop.flatten(), xcrop=xcrop.flatten()))
+            ch_inp[1:4] = add_pos_noise(ch_inp[1:4], [cfg.genm.pos_noise.pos_noise_xy, cfg.genm.pos_noise.pos_noise_xy, cfg.genm.pos_noise.pos_noise_z], cfg.genm.exp_type.n_bits)
+            xsim = microscope(*ch_inp, add_noise=True)
 
 #             print('Micro, ', time.time()-t0); t0 = time.time()
 

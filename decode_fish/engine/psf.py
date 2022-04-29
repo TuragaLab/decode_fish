@@ -8,7 +8,6 @@ import torch.nn as nn
 from torch.jit import script
 import torch.nn.functional as F
 from ..funcs.utils import *
-from ..funcs.plotting import *
 
 # Cell
 class LinearInterpolatedPSF(nn.Module):

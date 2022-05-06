@@ -18,7 +18,7 @@ from decode_fish.engine.gmm_loss import PointProcessGaussian
 from decode_fish.funcs.fit_psf import get_peaks_3d
 
 from decode_fish.funcs.routines import *
-from decode_fish.funcs.predict import merfish_predict
+from decode_fish.funcs.predict import window_predict
 from decode_fish.funcs.exp_specific import *
 import wandb
 import kornia
@@ -33,20 +33,18 @@ def my_app(cfg):
 
     model_cfg = OmegaConf.load(cfg.model_cfg)
     
-#    model_cfg.genm.microscope.col_shifts_enabled =  True
-#    model_cfg.genm.microscope.col_shifts_yxds =  [2048, 2048, 50]
-#    del(model_cfg.codebook.n_genes)
-#    del(model_cfg.codebook.z_to_batch)
-#    model_cfg.codebook._target_ = 'decode_fish.funcs.exp_specific.get_mop_codebook'
-
-    model, post_proc, micro, img_3d, decode_dl = load_all(model_cfg)
+    psf, noise, micro = load_psf_noise_micro(model_cfg)
+    post_proc = hydra.utils.instantiate(model_cfg.post_proc_isi)
+    model = hydra.utils.instantiate(model_cfg.network)
+    
     path = Path(model_cfg.output.save_dir)
-    #load_model_state(model, path/f'model_{cfg.out_id}.pkl')
     load_model_state(model, path/f'model.pkl')
+    micro.load_state_dict(torch.load(path/'microscope.pkl'), strict=False)
+    post_proc.samp_threshold = 0.5
+    
     model.eval().cuda()
     
     code_ref, targets = hydra.utils.instantiate(model_cfg.codebook)
-    code_inds = np.stack([np.nonzero(c)[0] for c in code_ref])  
     
     image_paths = sorted(glob.glob(cfg.image_path))
     
@@ -55,20 +53,21 @@ def my_app(cfg):
     else:
         crop = np.s_[:,:,:,:]
         
-    res_df = merfish_predict(model, post_proc, image_paths, window_size=[None, 128, 128], crop=crop, device='cuda', 
+    image_vol = read_MOp_tiff(image_paths[0], scaled=False, z_to_batch=True)
+    res_df = window_predict(model, post_proc, image_vol, window_size=[None, 128, 128], crop=crop, device='cuda', 
                              chrom_map=get_color_shift_inp(micro.color_shifts, micro.col_shifts_yx)[:,:,None], scale=micro.get_ch_mult())      
     
     #res_df = exclude_borders(res_df, border_size_zyx=[0,4000,4000], img_size=[2048*100,2048*100,2048*100])
     res_df['gene'] = targets[res_df['code_inds']]
     
-    
     ###
-    max_p = cpu(read_MOp_tiff(image_paths[0], scaled=True, z_to_batch=True)).max(0).max(0)[0]
-    fids = get_peaks(max_p, 18000, 20)
+    # max_vol = read_MOp_tiff(image_paths[0], scaled=True, z_to_batch=True)
+    # max_p = cpu(max_vol).max(0).max(0)[0]
+    # fids = get_peaks(max_p, 18000, 20)
     
     res_df['zm'] = res_df['z']%100
     res_df = exclude_borders(res_df, border_size_zyx=[0,15000,15000], img_size=[2048*100,2048*100,2048*100])
-    res_df = remove_fids(res_df, px_to_nm(fids), tolerance=1000)
+    # res_df = remove_fids(res_df, px_to_nm(fids), tolerance=1000)
     res_df = remove_doublets(res_df, tolerance=200)
     ###
     

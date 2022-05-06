@@ -15,8 +15,9 @@ import shutil
 from decode_fish.engine.point_process import PointProcessUniform
 from decode_fish.engine.gmm_loss import PointProcessGaussian
 import torch_optimizer
-from decode_fish.funcs.train_funcs import *
+from decode_fish.funcs.gen_train_funcs import *
 import wandb
+
 
 @hydra.main(config_path='../config', config_name='train')
 def my_app(cfg):
@@ -43,7 +44,7 @@ def my_app(cfg):
     psf  .to(cfg.device.gpu_device)
     model.to(cfg.device.gpu_device)
     micro.to(cfg.device.gpu_device)
-    
+        
     save_dir = Path(cfg.output.save_dir)
     save_dir.mkdir(exist_ok=True, parents=True)
     
@@ -57,15 +58,9 @@ def my_app(cfg):
                    mode=cfg.output.wandb_mode)
 
     optim_dict = {}
-    optim_dict['optim_net'] = hydra.utils.instantiate(cfg.training.net.opt, params=model.network.parameters())
     optim_dict['optim_mic'] = hydra.utils.instantiate(cfg.training.mic.opt, params=micro.parameters())
-    optim_dict['optim_int'] = hydra.utils.instantiate(cfg.training.int.opt, params=model.int_dist.parameters())
-
-    optim_dict['sched_net'] = hydra.utils.instantiate(cfg.training.net.sched, optimizer=optim_dict['optim_net'])
     optim_dict['sched_mic'] = hydra.utils.instantiate(cfg.training.mic.sched, optimizer=optim_dict['optim_mic'])
-    optim_dict['sched_int'] = hydra.utils.instantiate(cfg.training.int.sched, optimizer=optim_dict['optim_int'])
 
-    
     if cfg.training.resume:
         cfg.data_path.model_init = cfg.output.save_dir
     
@@ -74,20 +69,11 @@ def my_app(cfg):
         model = load_model_state(model, Path(cfg.data_path.model_init)/'model.pkl').cuda()
         '''temp disable'''
         # micro.load_state_dict(torch.load(Path(cfg.data_path.model_init)/'microscope.pkl'), strict=False)
-
-        if cfg.training.net.enabled:
-            train_state_dict = torch.load(Path(cfg.data_path.model_init)/'training_state.pkl')
-            for k in optim_dict:
-                '''temp'''
-                if 'net' in k:
-                    optim_dict[k].load_state_dict(train_state_dict[k])    
-            
-            cfg.training.start_iter = train_state_dict['train_iter']
             
     if cfg.data_path.micro_init is not None:
         micro.load_state_dict(torch.load(cfg.data_path.micro_init), strict=False)
         
-    train(cfg=cfg,
+    gen_train(cfg=cfg,
          model=model, 
          microscope=micro, 
          post_proc=post_proc,

@@ -25,7 +25,7 @@ data_path:
         crop_sl: s_[:,:,:,:]
         override:
             _target_: decode_fish.funcs.exp_specific.read_MOp_tiff 
-            scaled: True
+            scaled: False
             z_to_batch: ${network.is_2D}
             
 codebook:
@@ -34,8 +34,12 @@ codebook:
 evaluation:
     code_stats: 
         enabled: True
-        path: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/decode_fish/data/MOp_eval_ztb/
+        crop: s_[:,:,:,500:1250,500:1250]
         eval_func:
             _target_: decode_fish.funcs.exp_specific.exp_train_eval_MOp 
+        bench_func:
+            _target_: decode_fish.funcs.exp_specific.get_train_eval_benchmark_MOp
+            datapath: ${data_path.image_path}
+        
             
     

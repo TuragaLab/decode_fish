@@ -108,7 +108,7 @@ def eval_random_crop(decode_dl, model, post_proc, micro, proj_func=np.max, cuda=
                 x = x[:1]
 
             if micro.col_shifts_enabled:
-                colshift_crop = get_color_shift_inp(micro.color_shifts, micro.col_shifts_yx, ycrop, xcrop, cfg.sim.random_crop.crop_sz)
+                colshift_crop = get_color_shift_inp(micro.color_shifts, micro.col_shifts_yx, ycrop, xcrop, x.shape[-1])
                 colshift_crop = colshift_crop[:1]
                 net_inp = torch.concat([x,colshift_crop], 1)
             else:
@@ -119,28 +119,30 @@ def eval_random_crop(decode_dl, model, post_proc, micro, proj_func=np.max, cuda=
             pred_df, rec, res_dict, psf_recs, psf_bgs, rois, ch_inp = get_prediction(model, post_proc, net_inp, micro=micro, cuda=True, return_rec=True)
             pred_df = nm_to_px(pred_df, post_proc.px_size_zyx)
 
-            sub_df = pred_df[codebook[pred_df['code_inds']][:,rand_ch] > 0]
+            sub_df = pred_df[cpu(post_proc.codebook)[pred_df['code_inds']][:,rand_ch] > 0]
 
             x_plot = x[0,rand_ch].cpu().numpy()
             rec = rec[0,rand_ch].cpu().numpy()
 
-            fig1, axes = plot_3d_projections(x_plot, proj_func=proj_func, display=False)
-            scat_3d_projections(axes, [sub_df])
+            if plot is not None:
 
-            if 'res' in plot:
+                fig1, axes = plot_3d_projections(x_plot, proj_func=proj_func, display=False)
+                scat_3d_projections(axes, [sub_df])
 
-                diff = abs(x_plot-rec)
-                fig2, axes = plot_3d_projections(diff, proj_func=proj_func, display=False)
-                combine_figures([fig1,fig2], ['Predictions', 'Residual'], figsize=(20,10))
+                if 'res' in plot:
 
-            if 'rec' in plot:
+                    diff = x_plot-rec
+                    fig2, axes = plot_3d_projections(diff, proj_func=proj_func, display=False)
+                    combine_figures([fig1,fig2], ['Predictions', 'Residual'], figsize=(20,10))
 
-                fig2, axes = plot_3d_projections(rec, proj_func=proj_func, display=False)
-                combine_figures([fig1,fig2], ['Predictions', 'Reconstruction'], figsize=(20,10))
+                if 'rec' in plot:
 
-            if 'bg' in plot:
-                fig2, axes = plot_3d_projections(res_dict['background'][0,rand_ch].cpu().numpy(), proj_func=proj_func, display=False)
-                combine_figures([fig1,fig2], ['Predictions', 'BG pred.'], figsize=(20,10))
+                    fig2, axes = plot_3d_projections(rec, proj_func=proj_func, display=False)
+                    combine_figures([fig1,fig2], ['Predictions', 'Reconstruction'], figsize=(20,10))
+
+                if 'bg' in plot:
+                    fig2, axes = plot_3d_projections(res_dict['background'][0,rand_ch].cpu().numpy(), proj_func=proj_func, display=False)
+                    combine_figures([fig1,fig2], ['Predictions', 'BG pred.'], figsize=(20,10))
 
             plt.show()
 
@@ -156,11 +158,14 @@ def eval_random_sim(decode_dl, model, post_proc, micro, proj_func=np.max, plot_g
 
         for _ in range(samples):
 
-            x, local_rate, background = next(iter(decode_dl))
+            ret_dict = next(iter(decode_dl))
+            x, local_rate, background = ret_dict['x'], ret_dict['local_rate'], ret_dict['background']
+            zcrop, ycrop, xcrop = ret_dict['crop_z'], ret_dict['crop_y'], ret_dict['crop_x']
 
-            sim_vars = PointProcessUniform(local_rate, model.int_dist.int_conc.item(), model.int_dist.int_rate.item(), model.int_dist.int_loc.item()).sample()
-            xsim = micro(*sim_vars)
-            x = micro.noise(xsim, background).sample()
+            sim_vars = PointProcessUniform(local_rate[:,0] ,model.int_dist.int_conc, model.int_dist.int_rate, model.int_dist.int_loc, sim_z=True, codebook=torch.tensor(codebook), int_option=cfg.training.int_option).sample(from_code_book=(codebook is not None))
+            ch_inp = micro.get_single_ch_inputs(*sim_vars[:-1], ycrop=ycrop.flatten(), xcrop=xcrop.flatten())
+            xsim = micro(*ch_inp, add_noise=True)
+
             pred_df, rec, res_dict = get_prediction(model, post_proc, x[:1], micro=micro, cuda=True, return_rec=True)
             pred_df = nm_to_px(pred_df, post_proc.px_size_zyx)
             sim_df = nm_to_px(sample_to_df(*sim_vars[:-1]))

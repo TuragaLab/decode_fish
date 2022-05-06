@@ -10,7 +10,7 @@ from matplotlib import pyplot as plt
 from matplotlib import gridspec
 import seaborn as sns
 from .utils import *
-from .emitter_io import *
+from .emitter_io import nm_to_px
 from matplotlib.backends.backend_agg import FigureCanvas
 
 # Cell

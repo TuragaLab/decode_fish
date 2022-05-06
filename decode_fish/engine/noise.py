@@ -39,7 +39,7 @@ class sCMOS(nn.Module):
         self.channels = channels
         self.sim_scale = sim_scale
 
-    def forward(self, x_sim, background, const_theta_sim=False):
+    def forward(self, x_sim, background, const_theta_sim=False, ch_inds=None):
         """ Calculates the concentration (mean / theta) of a Gamma distribution given
         the signal x_sim and background tensors.
         Also applies a shift and returns resulting the Gamma distribution
@@ -50,8 +50,11 @@ class sCMOS(nn.Module):
             theta = self.theta_const * self.sim_scale
         else:
             theta = theta * self.sim_scale
-
-        theta = theta[None,:,None,None,None]
+        if ch_inds is None:
+            theta = theta[None,:,None,None,None]
+        else:
+            theta = theta[ch_inds]
+            theta = theta[:,None,None,None,None]
 
         x_sim_background = x_sim + background
         x_sim_background.clamp_(1.0 + self.baseline)

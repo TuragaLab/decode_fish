@@ -34,14 +34,6 @@ data_path:
     
 evaluation:
     px_size_zyx: [100,100,100]
-    reconstruction:
-        enabled: False
-        image_path: ${data_path.image_path}
-        sm_fish_ch: ${genm.exp_type.sm_fish_ch}
-        txt_path: 
-        psf_path: 
-        crop_sl: s_[:,:,:,:]
-        img_ind: 0
     code_stats: 
         enabled: False
         path: ${data_path.image_path}
@@ -98,8 +90,9 @@ genm:
         high: 0.005
     pos_noise:
         pos_noise_xy: 0.5
-        pos_noise_z: 0.1
-        
+        pos_noise_z: 0.04
+    phasing: 0.
+
 sim:
     random_crop: 
         crop_sz: 48
@@ -144,7 +137,7 @@ network:
 post_proc_isi:
     _target_: decode_fish.funcs.output_trafo.ISIPostProcess
     m1_threshold: 0.03
-    samp_threshold: 0.7
+    samp_threshold: 0.5
     px_size_zyx: ${evaluation.px_size_zyx}
     diag: True
     
@@ -181,14 +174,18 @@ training:
         enabled: True
         roi_rec: True
         grad_clip: 0.1
-        norm_reg: 0.5
+        norm_reg: 0.0
         l1_reg: 0.0003
+        mean_diff: True
+        freq: 1
+
         par_grads:
             channel_facs: False
             channel_shifts: False
             theta_par: False
             psf_vol: False
             color_shifts: False
+            z_facs: False
         opt:
             _target_: torch_optimizer.QHAdam
             lr: 0.00025

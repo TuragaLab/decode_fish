@@ -4,7 +4,6 @@ __all__ = ['matching']
 
 # Cell
 from ..imports import *
-# from  decode_fish.funcs.emitter_io import *
 from scipy.spatial.distance import cdist
 from scipy.spatial import cKDTree
 

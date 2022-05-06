@@ -3,19 +3,14 @@
 __all__ = ['simfish_to_df', 'matlab_fq_to_df', 'load_sim_fish', 'big_fishq_to_df', 'rsfish_to_df', 'get_MOp_scale',
            'read_MOp_tiff', 'read_starfish_tiff', 'get_benchmark_from_starfish', 'get_starfish_benchmark',
            'get_starfish_codebook', 'get_istdeco', 'get_mop_codebook', 'get_mop_benchmark', 'get_mop_fov',
-           'get_mop_colors', 'exp_train_eval_starfish', 'exp_train_eval_MOp']
+           'get_mop_colors', 'get_train_eval_benchmark_MOp', 'exp_train_eval_MOp', 'exp_train_eval_starfish']
 
 # Cell
 from ..imports import *
 from .utils import *
 from tifffile import imread
-from ..engine.microscope import Microscope
-from ..engine.psf import crop_psf
-from ..engine.psf import LinearInterpolatedPSF
 from .emitter_io import *
-from .dataset import *
-from torch.utils.data import DataLoader
-from collections.abc import MutableSequence
+import pandas as pd
 
 # Cell
 def simfish_to_df(sim_file, frame_idx=0, int_fac=1.05):
@@ -235,7 +230,7 @@ def get_starfish_codebook():
     return codebook, targets
 
 def get_istdeco():
-    istdeco_df = pd.read_csv('../../decode_fish/data/results/ISTDECO.csv')
+    istdeco_df = pd.read_csv(base_path + '/decode_fish/data/results/ISTDECO.csv')
     istdeco_df = istdeco_df.rename(columns={'target_name':'gene'})
     fov = [40,40,2008,2008]
     istdeco_df = istdeco_df[ (istdeco_df['x'] >= fov[0]) & (istdeco_df['x'] <= fov[2])  & (istdeco_df['y'] >= fov[1]) & (istdeco_df['y'] <= fov[3])]
@@ -305,8 +300,58 @@ def get_mop_colors():
        0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0])
 
 # Cell
-from .predict import merfish_predict
+from .predict import window_predict
 from .evaluation import matching
+
+
+def get_train_eval_benchmark_MOp(datapath, crop):
+
+    fov = int(''.join(filter(str.isdigit, datapath[-10:])))
+
+    bench_df = get_mop_benchmark(z_to_batch=True)
+    bench_df = get_mop_fov(bench_df, fov)
+    bench_df = nm_to_px(bench_df, [1.085,1.085,1.085])
+    bench_df['x'] += 70
+    bench_df['y'] += 70
+
+    return crop_df(bench_df, crop[-4:], px_size_zyx=[100., 100., 100.])
+
+
+def exp_train_eval_MOp(model, bench_df, post_proc, crop, targets, image_vol, wandb, batch_idx, chrom_map=None, scale=None):
+
+    res_df = window_predict(model, post_proc, image_vol, window_size=[None, 64, 64], device='cuda', crop=crop, chrom_map=chrom_map, scale=scale)
+    res_df['gene'] = targets[res_df['code_inds']]
+
+    if len(res_df):
+
+        res_sub = res_df.nsmallest(len(bench_df), 'comb_sig')
+
+        bench_counts = DF(data=None, index=targets)
+        bench_counts['Res_all'] = res_sub.groupby('gene')['gene'].count()
+        bench_counts['Bench_all'] = bench_df.groupby('gene')['gene'].count()
+        bench_counts = bench_counts.fillna(0)
+
+        r = np.corrcoef(bench_counts['Bench_all'].values, bench_counts['Res_all'].values)[0, 1]
+
+        blinds = []
+        for i,g in enumerate(targets):
+            if 'Blank' in g:
+                blinds.append(g)
+
+        bc = bench_counts.loc[blinds,'Res_all'].values.sum()
+        bench_bc = bench_counts.loc[blinds,'Bench_all'].values.sum()
+
+        bench_df['z'] = bench_df['z']/1000
+        res_sub['z'] = res_sub['z']/100
+
+        wandb.log({'AE Losses/code_bench_corr': r}, step=batch_idx)
+        wandb.log({'AE Losses/N_blanks': bc/bench_bc}, step=batch_idx)
+
+        perf_dict, match_df, shifts = matching(bench_df,  res_sub, tolerance=500)
+        wandb.log({'AE Losses/jaccard': perf_dict['jaccard']}, step=batch_idx)
+
+    wandb.log({'AE Losses/N_pred_tot': len(res_df)/len(bench_df)}, step=batch_idx)
+
 def exp_train_eval_starfish(model, post_proc, targets, path, wandb, batch_idx, chrom_map=None, scale=None):
     '''Not tested'''
 
@@ -342,49 +387,6 @@ def exp_train_eval_starfish(model, post_proc, targets, path, wandb, batch_idx, c
         wandb.log({'AE Losses/N_blanks': bc}, step=batch_idx)
 
         perf_dict, match_df, shifts = matching(bench_df,  res_sub, tolerance=500, print_res=False)
-        wandb.log({'AE Losses/precision': perf_dict['precision']}, step=batch_idx)
-        wandb.log({'AE Losses/recall': perf_dict['recall']}, step=batch_idx)
-        wandb.log({'AE Losses/jaccard': perf_dict['jaccard']}, step=batch_idx)
-
-    wandb.log({'AE Losses/N_pred_tot': len(res_df)}, step=batch_idx)
-
-def exp_train_eval_MOp(model, post_proc, targets, path, wandb, batch_idx, chrom_map=None, scale=None):
-
-    if chrom_map is not None:
-        chrom_map = chrom_map[...,500:1250,500:1250][:,:,None]
-
-    res_df = merfish_predict(model, post_proc, [path + '/eval_img.tif'], window_size=[None, 64, 64], device='cuda', chrom_map=chrom_map, scale=scale)
-    res_df['gene'] = targets[res_df['code_inds']]
-
-    if len(res_df):
-
-        bench_df = pd.read_csv(path + '/bench_df.csv')
-        res_sub = res_df.nsmallest(len(bench_df), 'comb_sig')
-
-        bench_counts = DF(data=None, index=targets)
-        bench_counts['Res_all'] = res_sub.groupby('gene')['gene'].count()
-        bench_counts['Bench_all'] = bench_df.groupby('gene')['gene'].count()
-        bench_counts = bench_counts.fillna(0)
-
-        r = np.corrcoef(bench_counts['Bench_all'].values, bench_counts['Res_all'].values)[0, 1]
-
-        blinds = []
-        for i,g in enumerate(targets):
-            if 'Blank' in g:
-                blinds.append(g)
-
-        bc = bench_counts.loc[blinds,'Res_all'].values.sum()
-
-        bench_df['z'] = bench_df['z']/1000
-        res_sub['z'] = res_sub['z']/100
-
-
-        wandb.log({'AE Losses/code_bench_corr': r}, step=batch_idx)
-        wandb.log({'AE Losses/N_blanks': bc}, step=batch_idx)
-
-        perf_dict, match_df, shifts = matching(bench_df,  res_sub, tolerance=500)
-        wandb.log({'AE Losses/precision': perf_dict['precision']}, step=batch_idx)
-        wandb.log({'AE Losses/recall': perf_dict['recall']}, step=batch_idx)
         wandb.log({'AE Losses/jaccard': perf_dict['jaccard']}, step=batch_idx)
 
     wandb.log({'AE Losses/N_pred_tot': len(res_df)}, step=batch_idx)

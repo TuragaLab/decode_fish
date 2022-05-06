@@ -3,14 +3,13 @@
 __all__ = ['place_roi', 'CudaPlaceROI']
 
 # Cell
-from ..funcs.utils import cpu
+# from decode_fish.funcs.utils import cpu
 import torch
-import numpy as np
+# import numpy as np
 from torch.jit import script
-from typing import Union, List
+import numba
 from numba import cuda
 
-import numba
 # import warnings
 # warnings.filterwarnings("ignore", category=numba.errors.NumbaPerformanceWarning)
 

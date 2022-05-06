@@ -6,13 +6,13 @@ __all__ = ['DecodeDataset', 'print_class_signature', 'TransformBase', 'ScaleTens
 
 # Cell
 from ..imports import *
+from .utils import *
 from typing import Union
 import skimage.measure
 from torch.utils.data import DataLoader
 import random
 import inspect
 from scipy.ndimage import gaussian_filter
-from .utils import *
 from perlin_numpy import generate_fractal_noise_3d, generate_perlin_noise_3d
 from torch.nn import functional as F
 import numbers

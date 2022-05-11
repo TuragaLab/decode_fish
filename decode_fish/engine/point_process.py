@@ -60,7 +60,8 @@ class PointProcessUniform(Distribution):
         n_emitter = int(locations.sum().item())
         x_offset = D.Uniform(low=-0.5, high=0.5).sample(sample_shape=[n_emitter]).to(self.device)
         y_offset = D.Uniform(low=-0.5, high=0.5).sample(sample_shape=[n_emitter]).to(self.device)
-        z_offset = D.Uniform(low=-0.5, high=0.5).sample(sample_shape=[n_emitter]).to(self.device)
+        '''1.0 only makes sense for slice rec.'''
+        z_offset = D.Uniform(low=-1.0, high=1.0).sample(sample_shape=[n_emitter]).to(self.device)
 
 #         intensities = torch.zeros([n_emitter, self.channels]).to(self.device)
         if self.int_option == 1:

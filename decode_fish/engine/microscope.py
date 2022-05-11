@@ -161,7 +161,7 @@ class Microscope(nn.Module):
 
             # Apply continuous shift
             if self.slice_rec and self.psf_z_size > 1:
-                z_os_ch = torch.clamp(z_os_ch,-0.49999,0.49999) + 0.5 # transform to [0,1]
+                z_os_ch = torch.clamp(0.5*z_os_ch,-0.49999,0.49999) + 0.5 # transform to [0,1]
                 z_scaled = z_os_ch * (self.psf_z_size - 2) # [0, z_size]
                 z_inds = (torch.div(z_scaled, 1, rounding_mode='trunc')).type(torch.cuda.LongTensor) + 1
                 z_os = -(z_scaled%1.) + 0.5

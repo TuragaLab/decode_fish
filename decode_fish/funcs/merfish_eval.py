@@ -81,10 +81,12 @@ def make_roc(df, var='code_err', ascending=True, n_max=30000):
 
     if n_max is None:
         n_max = len(df)
-    x = np.arange(1000,n_max,100)
+    x = np.arange(0,n_max,100)
     df = df.sort_values(var, ascending=ascending)
     n_blanks = []
-    for i in x:
-        n_blanks.append((df[:int(i)]['gene'].str.contains('Blank')).sum())
+    c_blanks = 0
+    for i in range(1, len(x)):
+        c_blanks += (df[x[i-1]:x[i]]['gene'].str.contains('Blank')).sum()
+        n_blanks.append((c_blanks).sum())
 
-    return x, n_blanks
+    return x[1:], n_blanks

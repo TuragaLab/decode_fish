@@ -81,7 +81,7 @@ class PointProcessGaussian(Distribution):
         if slice_rec: xyzi_mu[:,2] = z_sig_fac*xyzi_mu[:,2]
         # We squish the network output range in z to -0.5:0.5 beause for slice rec the true pixel inds are unqiue (i.e. cant point to the same point from different pixels)
         # Not needed if we turn slices to batches
-        xyzi_mu[:,:3] += torch.stack([pix_inds[4],pix_inds[3],pix_inds[2]], 1) + 0.5
+        xyzi_mu[:,:3] += torch.stack([pix_inds[4],pix_inds[3],pix_inds[2]], 1)
         xyzi_mu = xyzi_mu.reshape(batch_size,-1,gauss_dim)
         xyzi_sig = self.xyzi_sigma[pix_inds[0],:,pix_inds[2],pix_inds[3],pix_inds[4]].reshape(batch_size,-1,gauss_dim)
 
@@ -143,10 +143,10 @@ def get_true_labels_mf(bs, locations, x_os, y_os, z_os, int_ch, codes, slice_rec
     s_mask, s_arr = get_sample_mask(bs, locations)
     max_counts = s_mask.shape[1]
 
-    x =  x_os + locations[-1].type(torch.cuda.FloatTensor) + 0.5
-    y =  y_os + locations[-2].type(torch.cuda.FloatTensor) + 0.5
+    x =  x_os + locations[-1].type(torch.cuda.FloatTensor)
+    y =  y_os + locations[-2].type(torch.cuda.FloatTensor)
     if slice_rec: z_os = z_os * z_sig_fac
-    z =  z_os + locations[-3].type(torch.cuda.FloatTensor) + 0.5
+    z =  z_os + locations[-3].type(torch.cuda.FloatTensor)
 
     loc_idx = torch.arange(n_gt).repeat_interleave(4)
     if int_inf == 'sum':

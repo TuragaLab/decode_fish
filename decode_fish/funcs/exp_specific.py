@@ -321,6 +321,7 @@ def exp_train_eval_MOp(model, bench_df, post_proc, crop, targets, image_vol, wan
 
     res_df = window_predict(model, post_proc, image_vol, window_size=[None, 64, 64], device='cuda', crop=crop, chrom_map=chrom_map, scale=scale)
     res_df['gene'] = targets[res_df['code_inds']]
+    res_df = remove_doublets(res_df, 200)
 
     if len(res_df):
 
@@ -362,6 +363,7 @@ def exp_train_eval_starfish(model, post_proc, targets, path, wandb, batch_idx, c
 
     if len(res_df):
 
+        res_df = remove_doublets(res_df, 200)
         res_df['gene'] = targets[res_df['code_inds']]
         res_df = res_df[res_df['gene'] != 'MALAT1']
 

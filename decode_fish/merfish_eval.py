@@ -61,13 +61,13 @@ def my_app(cfg):
     res_df['gene'] = targets[res_df['code_inds']]
     
     ###
-    # max_vol = read_MOp_tiff(image_paths[0], scaled=True, z_to_batch=True)
-    # max_p = cpu(max_vol).max(0).max(0)[0]
-    # fids = get_peaks(max_p, 18000, 20)
+    max_vol = image_vol * micro.get_ch_mult().to(image_vol.device)
+    max_p = cpu(max_vol).max(0).max(0)[0]
+    fids = get_peaks(max_p, 18000, 20)
     
     res_df['zm'] = res_df['z']%100
     res_df = exclude_borders(res_df, border_size_zyx=[0,15000,15000], img_size=[2048*100,2048*100,2048*100])
-    # res_df = remove_fids(res_df, px_to_nm(fids), tolerance=1000)
+    res_df = remove_fids(res_df, px_to_nm(fids), tolerance=1000)
     res_df = remove_doublets(res_df, tolerance=200)
     ###
     

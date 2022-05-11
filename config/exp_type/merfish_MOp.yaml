@@ -34,7 +34,7 @@ codebook:
 evaluation:
     code_stats: 
         enabled: True
-        crop: s_[:,:,:,500:1250,500:1250]
+        crop: s_[:,:,:,500:1500,500:1500]
         eval_func:
             _target_: decode_fish.funcs.exp_specific.exp_train_eval_MOp 
         bench_func:

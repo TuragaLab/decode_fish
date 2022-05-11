@@ -73,14 +73,12 @@ def my_app(cfg):
         print('loading')
         model = load_model_state(model, Path(cfg.data_path.model_init)/'model.pkl').cuda()
         '''temp disable'''
-        # micro.load_state_dict(torch.load(Path(cfg.data_path.model_init)/'microscope.pkl'), strict=False)
+        micro.load_state_dict(torch.load(Path(cfg.data_path.model_init)/'microscope.pkl'), strict=False)
 
         if cfg.training.net.enabled:
             train_state_dict = torch.load(Path(cfg.data_path.model_init)/'training_state.pkl')
             for k in optim_dict:
-                '''temp'''
-                if 'net' in k:
-                    optim_dict[k].load_state_dict(train_state_dict[k])    
+                optim_dict[k].load_state_dict(train_state_dict[k])    
             
             cfg.training.start_iter = train_state_dict['train_iter']
             

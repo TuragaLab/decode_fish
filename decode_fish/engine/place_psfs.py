@@ -3,15 +3,70 @@
 __all__ = ['place_roi', 'CudaPlaceROI']
 
 # Cell
-# from decode_fish.funcs.utils import cpu
 import torch
-# import numpy as np
 from torch.jit import script
 import numba
 from numba import cuda
 
 # import warnings
 # warnings.filterwarnings("ignore", category=numba.errors.NumbaPerformanceWarning)
+
+# Cell
+@cuda.jit
+def place_roi(frames, roi_grads, frame_s_b, frame_s_c, frame_s_z, frame_s_y, frame_s_x, rois, roi_s_n, roi_s_z, roi_s_y, roi_s_x, b, c, z, y, x):
+
+    kx = cuda.grid(1)
+    # One thread for every pixel in the roi stack. Exit if outside
+    if kx >= roi_s_n * roi_s_z * roi_s_y * roi_s_x:
+        return
+
+    # roi index
+    xir = kx % roi_s_x; kx = kx // roi_s_x
+    yir = kx % roi_s_y; kx = kx // roi_s_y
+    zir = kx % roi_s_z; kx = kx // roi_s_z
+    nir = kx % roi_s_n
+
+    # frame index
+    bif = b[nir]
+    cif = c[nir]
+    zif = z[nir] + zir
+    yif = y[nir] + yir
+    xif = x[nir] + xir
+
+    if ((bif < 0) or (bif >= frame_s_b)): return
+    if ((cif < 0) or (cif >= frame_s_c)): return
+    if ((zif < 0) or (zif >= frame_s_z)): return
+    if ((yif < 0) or (yif >= frame_s_y)): return
+    if ((xif < 0) or (xif >= frame_s_x)): return
+
+    cuda.atomic.add(frames, (bif, cif, zif, yif, xif), rois[nir, zir, yir, xir])
+    # The gradients for the ROIs are just one if they are inside the frames and 0 otherwise. Easy to do here and then just ship to the backward function
+    roi_grads[nir, zir, yir, xir] = 1
+    # Alternative to atomic.add. No difference in speed
+#     frames[bif, cif, zif, yif, xif] += rois[nir, zir, yir, xir]
+
+# Cell
+"""THIS FUNCTION BREAKS AUTORELOAD FOR SOME REASON? https://discuss.pytorch.org/t/class-autograd-function-in-module-cause-autoreload-fail-in-jupyter-lab/96250/2"""
+class CudaPlaceROI(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, rois, frame_s_b, frame_s_c, frame_s_z, frame_s_y, frame_s_x, roi_s_n, roi_s_z, roi_s_y, roi_s_x, b, c, z, y, x):
+
+        frames = torch.zeros([frame_s_b, frame_s_c, frame_s_z, frame_s_y, frame_s_x]).to('cuda')
+        rois_grads = torch.zeros([roi_s_n, roi_s_z, roi_s_y, roi_s_x]).to('cuda')
+
+        threadsperblock = 256
+        blocks = ((roi_s_n * roi_s_z * roi_s_y * roi_s_x) + (threadsperblock - 1)) // threadsperblock
+        place_roi[blocks, threadsperblock](frames, rois_grads, frame_s_b, frame_s_c, frame_s_z, frame_s_y, frame_s_x, rois.detach(), roi_s_n, roi_s_z, roi_s_y, roi_s_x, b, c, z, y, x)
+
+        ctx.save_for_backward(rois_grads)
+
+        return frames
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        rois_grads, = ctx.saved_tensors
+        return rois_grads, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None
 
 # Cell
 @script
@@ -91,59 +146,3 @@ def _place_psf(psf_vols, b, ch, z, y, x, output_shape):
                                   pad_zyx[1]: w_sz - pad_zyx[1],
                                   pad_zyx[2]: d_sz - pad_zyx[2]]
     return placed_psf
-
-# Cell
-@cuda.jit
-def place_roi(frames, roi_grads, frame_s_b, frame_s_c, frame_s_z, frame_s_y, frame_s_x, rois, roi_s_n, roi_s_z, roi_s_y, roi_s_x, b, c, z, y, x):
-
-    kx = cuda.grid(1)
-    # One thread for every pixel in the roi stack. Exit if outside
-    if kx >= roi_s_n * roi_s_z * roi_s_y * roi_s_x:
-        return
-
-    # roi index
-    xir = kx % roi_s_x; kx = kx // roi_s_x
-    yir = kx % roi_s_y; kx = kx // roi_s_y
-    zir = kx % roi_s_z; kx = kx // roi_s_z
-    nir = kx % roi_s_n
-
-    # frame index
-    bif = b[nir]
-    cif = c[nir]
-    zif = z[nir] + zir
-    yif = y[nir] + yir
-    xif = x[nir] + xir
-
-    if ((bif < 0) or (bif >= frame_s_b)): return
-    if ((cif < 0) or (cif >= frame_s_c)): return
-    if ((zif < 0) or (zif >= frame_s_z)): return
-    if ((yif < 0) or (yif >= frame_s_y)): return
-    if ((xif < 0) or (xif >= frame_s_x)): return
-
-    cuda.atomic.add(frames, (bif, cif, zif, yif, xif), rois[nir, zir, yir, xir])
-    # The gradients for the ROIs are just one if they are inside the frames and 0 otherwise. Easy to do here and then just ship to the backward function
-    roi_grads[nir, zir, yir, xir] = 1
-    # Alternative to atomic.add. No difference in speed
-#     frames[bif, cif, zif, yif, xif] += rois[nir, zir, yir, xir]
-
-# Cell
-class CudaPlaceROI(torch.autograd.Function):
-
-    @staticmethod
-    def forward(ctx, rois, frame_s_b, frame_s_c, frame_s_z, frame_s_y, frame_s_x, roi_s_n, roi_s_z, roi_s_y, roi_s_x, b, c, z, y, x):
-
-        frames = torch.zeros([frame_s_b, frame_s_c, frame_s_z, frame_s_y, frame_s_x]).to('cuda')
-        rois_grads = torch.zeros([roi_s_n, roi_s_z, roi_s_y, roi_s_x]).to('cuda')
-
-        threadsperblock = 256
-        blocks = ((roi_s_n * roi_s_z * roi_s_y * roi_s_x) + (threadsperblock - 1)) // threadsperblock
-        place_roi[blocks, threadsperblock](frames, rois_grads, frame_s_b, frame_s_c, frame_s_z, frame_s_y, frame_s_x, rois.detach(), roi_s_n, roi_s_z, roi_s_y, roi_s_x, b, c, z, y, x)
-
-        ctx.save_for_backward(rois_grads)
-
-        return frames
-
-    @staticmethod
-    def backward(ctx, grad_output):
-        rois_grads, = ctx.saved_tensors
-        return rois_grads, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None

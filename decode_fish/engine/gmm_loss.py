@@ -48,6 +48,7 @@ class PointProcessGaussian(Distribution):
 
         if loss_option == 0:
             # Calculate count loss individually for each code
+            # Performs worse on sim. data. check again
             count_mean = P.sum(dim=[2, 3, 4]).squeeze(-1)
             count_var = (P - P ** 2).sum(dim=[2, 3, 4]).squeeze(-1)
             count_dist = D.Normal(count_mean, torch.sqrt(count_var))
@@ -108,7 +109,7 @@ class PointProcessGaussian(Distribution):
             dist_normal_xyzi = D.Independent(D.Normal(xyzi_mu[...,i], xyzi_sig[...,i] + 0.00001), 1)
             log_norm_prob_xyzi += dist_normal_xyzi.base_dist.log_prob(xyzi_inp[...,i]) * xyzi_inp[...,i].ne(0)
 
-        if loss_option == 0:
+        if loss_option == 'bugged?':
             log_cat_prob = torch.log_softmax(mix_logits, -1) # + torch.log(counts+1e-6)[:, None]       # normalized (sum to 1 over pixels) log probs for the categorical dist. of the GMM. batch_size * n_pixels
         else:
             log_cat_prob = torch.log_softmax(mix_logits.view(batch_size, -1), -1).view(mix_logits.shape)

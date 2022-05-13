@@ -86,7 +86,7 @@ def make_roc(df, var='code_err', ascending=True, n_max=30000):
     n_blanks = []
     c_blanks = 0
     for i in range(1, len(x)):
-        c_blanks += (df[x[i-1]:x[i]]['gene'].str.contains('Blank')).sum()
+        c_blanks += (df[x[i-1]:x[i]]['class'] == 1).sum()
         n_blanks.append((c_blanks).sum())
 
     return x[1:], n_blanks

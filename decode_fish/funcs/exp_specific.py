@@ -3,7 +3,8 @@
 __all__ = ['simfish_to_df', 'matlab_fq_to_df', 'load_sim_fish', 'big_fishq_to_df', 'rsfish_to_df', 'get_MOp_scale',
            'read_MOp_tiff', 'read_starfish_tiff', 'get_benchmark_from_starfish', 'get_starfish_benchmark',
            'get_starfish_codebook', 'get_istdeco', 'get_mop_codebook', 'get_mop_benchmark', 'get_mop_fov',
-           'get_mop_colors', 'get_train_eval_benchmark_MOp', 'exp_train_eval_MOp', 'exp_train_eval_starfish']
+           'get_mop_colors', 'get_train_eval_benchmark_MOp', 'get_train_eval_benchmark_starfish', 'df_pp_mop',
+           'df_pp_starfish']
 
 # Cell
 from ..imports import *
@@ -316,79 +317,23 @@ def get_train_eval_benchmark_MOp(datapath, crop):
 
     return crop_df(bench_df, crop[-4:], px_size_zyx=[100., 100., 100.])
 
+def get_train_eval_benchmark_starfish(crop):
 
-def exp_train_eval_MOp(model, bench_df, post_proc, crop, targets, image_vol, wandb, batch_idx, chrom_map=None, scale=None):
+    bench_df = get_starfish_benchmark()
+    bench_df = bench_df[bench_df['gene'] != 'MALAT1']
 
-    res_df = window_predict(model, post_proc, image_vol, window_size=[None, 64, 64], device='cuda', crop=crop, chrom_map=chrom_map, scale=scale)
-    res_df['gene'] = targets[res_df['code_inds']]
+    return bench_df
+
+def df_pp_mop(res_df):
+
     res_df = remove_doublets(res_df, 200)
+    return res_df
 
-    if len(res_df):
+def df_pp_starfish(res_df):
 
-        res_sub = res_df.nsmallest(len(bench_df), 'comb_sig')
-
-        bench_counts = DF(data=None, index=targets)
-        bench_counts['Res_all'] = res_sub.groupby('gene')['gene'].count()
-        bench_counts['Bench_all'] = bench_df.groupby('gene')['gene'].count()
-        bench_counts = bench_counts.fillna(0)
-
-        r = np.corrcoef(bench_counts['Bench_all'].values, bench_counts['Res_all'].values)[0, 1]
-
-        blinds = []
-        for i,g in enumerate(targets):
-            if 'Blank' in g:
-                blinds.append(g)
-
-        bc = bench_counts.loc[blinds,'Res_all'].values.sum()
-        bench_bc = bench_counts.loc[blinds,'Bench_all'].values.sum()
-
-        bench_df['z'] = bench_df['z']/1000
-        res_sub['z'] = res_sub['z']/100
-
-        wandb.log({'AE Losses/code_bench_corr': r}, step=batch_idx)
-        wandb.log({'AE Losses/N_blanks': bc/bench_bc}, step=batch_idx)
-
-        perf_dict, match_df, shifts = matching(bench_df,  res_sub, tolerance=500)
-        wandb.log({'AE Losses/jaccard': perf_dict['jaccard']}, step=batch_idx)
-
-    wandb.log({'AE Losses/N_pred_tot': len(res_df)/len(bench_df)}, step=batch_idx)
-
-def exp_train_eval_starfish(model, post_proc, targets, path, wandb, batch_idx, chrom_map=None, scale=None):
-    '''Not tested'''
-
-    chrom_map = chrom_map[:,:,None]
-
-    res_df = merfish_predict(model, post_proc, [path], window_size=[None, 64, 64], device='cuda', chrom_map=chrom_map)
+    res_df = res_df[res_df['gene'] != 'MALAT1']
     res_df = exclude_borders(res_df, border_size_zyx=[0,4000,4000], img_size=[2048*100,2048*100,2048*100])
-
-    if len(res_df):
-
-        res_df = remove_doublets(res_df, 200)
-        res_df['gene'] = targets[res_df['code_inds']]
-        res_df = res_df[res_df['gene'] != 'MALAT1']
-
-        bench_df = get_starfish_benchmark()
-        bench_df = bench_df[bench_df['gene'] != 'MALAT1']
-
-        res_sub = res_df.nsmallest(len(bench_df), 'comb_sig')
-
-        bench_counts = DF(data=None, index=targets)
-        bench_counts['Res_all'] = res_sub.groupby('gene')['gene'].count()
-        bench_counts['Bench_all'] = bench_df.groupby('gene')['gene'].count()
-        bench_counts = bench_counts.fillna(0)
-        r = np.corrcoef(bench_counts['Bench_all'].values, bench_counts['Res_all'].values)[0, 1]
-
-        blinds = []
-        for i,g in enumerate(targets):
-            if 'Blank' in g:
-                blinds.append(g)
-
-        bc = bench_counts.loc[blinds,'Res_all'].values.sum()
-
-        wandb.log({'AE Losses/code_bench_corr': r}, step=batch_idx)
-        wandb.log({'AE Losses/N_blanks': bc}, step=batch_idx)
-
-        perf_dict, match_df, shifts = matching(bench_df,  res_sub, tolerance=500, print_res=False)
-        wandb.log({'AE Losses/jaccard': perf_dict['jaccard']}, step=batch_idx)
-
-    wandb.log({'AE Losses/N_pred_tot': len(res_df)}, step=batch_idx)
+    res_df = remove_doublets(res_df, 200)
+    res_df['x'] += 100
+    res_df['y'] += 100
+    return res_df

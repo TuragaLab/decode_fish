@@ -10,7 +10,7 @@ import torch.nn as nn
 from torch.jit import script
 from typing import Union, List
 import torch.nn.functional as F
-from .place_psfs import _place_psf, CudaPlaceROI
+from .place_psfs import CudaPlaceROI
 # import elasticdeform.torch as etorch
 import kornia
 
@@ -189,7 +189,7 @@ class Microscope(nn.Module):
             psf_sc = self.z_facs[z_inds][:,None,None,None,None] * psf_sc
 
             if ret_psfs:
-                return psf.detach(), self.scale * psf_sc
+                return self.scale * psf_sc
 
             # place psf according to locations
             xsim = place_psf(locations, psf_sc, output_shape)

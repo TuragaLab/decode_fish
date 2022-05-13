@@ -86,20 +86,6 @@ class PointProcessUniform(Distribution):
             if from_code_book:
                 code_draw = torch.randint(0, len(self.codebook), size=[n_emitter])
                 ch_draw = self.codebook[code_draw]
-#                 code_draw = torch.randint(0, len(self.codebook) + self.n_dump_codes,size=[n_emitter])
-
-#                 ch_draw = torch.zeros([n_emitter, self.channels], dtype=torch.bool).to(self.device)
-#                 code_inds = code_draw<len(self.codebook)
-#                 dump_inds = code_draw>=len(self.codebook)
-#                 # All draws lower than the codebook length get a code from it
-#                 ch_draw[code_inds] = self.codebook[code_draw[code_inds]].to(self.device)
-#                 # All draws higher than the codebook length get a random code with an average length of n_bits, but at least 1
-#                 # There is a certain probability that dump codes are in the codebook. We ignore it for now.
-#                 ch_draw[dump_inds, torch.randint(0, self.channels, size=[sum(dump_inds)])] = 1
-#                 ch_draw[dump_inds] += torch.distributions.Binomial(total_count=1, probs=torch.ones([sum(dump_inds),self.channels])/self.channels*(self.n_bits - 1)).sample().type(torch.bool).to(self.device)
-
-#                 # n_dump_codes controsl the rate of out-of-code book codes, but they all get assigned to the code_index len(codebook)+1
-#                 code_draw = torch.clamp_max(code_draw, len(self.codebook))
 
             else:
 

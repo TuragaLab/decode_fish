@@ -44,7 +44,7 @@ class LinearInterpolatedPSF(nn.Module):
 
         Args:
             x_offset_val, y_offset_val, z_offset_val: Vector of shifts in x,y,z
-            z_inds: indices of the psf_slices used (only for 2D data)
+            z_inds: indices of the psf_slices used (only for slice data)
             c_inds: colors indices
 
         Returns:

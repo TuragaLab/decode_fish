@@ -133,6 +133,9 @@ def sel_int_ch(res_df, codebook):
     ret_df[int_m[:4]] = int_arr
     ret_df[int_s[:4]] = int_sig
 
+    ret_df['tot_int'] = int_arr.sum(1)
+    ret_df['tot_int_sig'] = int_sig.sum(1)
+
     return ret_df
 
 def zero_int_ch(res_df, codebook):

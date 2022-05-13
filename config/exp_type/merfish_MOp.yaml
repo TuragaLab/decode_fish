@@ -35,8 +35,8 @@ evaluation:
     code_stats: 
         enabled: True
         crop: s_[:,:,:,500:1500,500:1500]
-        eval_func:
-            _target_: decode_fish.funcs.exp_specific.exp_train_eval_MOp 
+        df_postp_func:
+            _target_: decode_fish.funcs.exp_specific.df_pp_mop
         bench_func:
             _target_: decode_fish.funcs.exp_specific.get_train_eval_benchmark_MOp
             datapath: ${data_path.image_path}

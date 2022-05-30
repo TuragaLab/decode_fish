@@ -25,6 +25,7 @@ class DecodeDataset:
                  rate_tfms: list,
                  bg_tfms: list,
                  num_iter: int = 5000,
+                 from_records: bool = True,
                  device: str = 'cpu'):
         """
         Basic Dataset
@@ -44,6 +45,7 @@ class DecodeDataset:
         self.rate_tfms = rate_tfms
         self.bg_tfms = bg_tfms
         self.device = device
+        self.from_records = from_records
 
         print(f'{len(self.volumes)} volumes')
 
@@ -64,9 +66,10 @@ class DecodeDataset:
         ret_dict['x'] = x
         ret_dict['local_rate'] = local_rate
         ret_dict['background'] = background
-        ret_dict['crop_z'] = self.dataset_tfms[0].slice_z_glob
-        ret_dict['crop_y'] = self.dataset_tfms[0].slice_y_glob
-        ret_dict['crop_x'] = self.dataset_tfms[0].slice_x_glob
+        if self.from_records:
+            ret_dict['crop_z'] = self.dataset_tfms[0].slice_z_glob
+            ret_dict['crop_y'] = self.dataset_tfms[0].slice_y_glob
+            ret_dict['crop_x'] = self.dataset_tfms[0].slice_x_glob
 
         return ret_dict
 
@@ -152,13 +155,25 @@ class RandScale(TransformBase):
         return ratio * x
 
 class UniformValue(TransformBase):
-    def __init__(self, min_val=0., max_val=0.):
+    def __init__(self, min_val=0., max_val=0., img_mean=False, sep_channels=False):
         self.min_val = min_val
         self.max_val = max_val
+        self.sep_channels = sep_channels
+        self.img_mean = img_mean
 
     def __call__(self, image, **kwargs):
-        rand_val = torch.distributions.Uniform(self.min_val, self.max_val).sample([1]).to(image.device)
-        return torch.ones_like(image[:1])*rand_val
+        if self.sep_channels:
+            if self.img_mean:
+                rand_val = image.mean(-1).mean(-1).mean(-1)
+            else:
+                rand_val = torch.distributions.Uniform(self.min_val, self.max_val).sample([len(image)]).to(image.device)
+            return torch.ones_like(image)*rand_val[:,None,None,None]
+        else:
+            if self.img_mean:
+                rand_val = image.mean()
+            else:
+                rand_val = torch.distributions.Uniform(self.min_val, self.max_val).sample([1]).to(image.device)
+            return torch.ones_like(image[:1])*rand_val
 
 def get_forward_scaling(img):
 

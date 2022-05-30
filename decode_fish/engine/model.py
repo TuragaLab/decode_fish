@@ -639,9 +639,9 @@ class UnetDecodeNoBn(nn.Module):
 
         if not self.pred_z:
 
-            xyzi_mu[:,3] *= 0
-            xyzi_sig[:,3] *= 0
-            xyzi_sig[:,3] += 1
+            xyzi_mu[:,2] *= 0
+            xyzi_sig[:,2] *= 0
+            xyzi_sig[:,2] += 1
 
         ret_dict = {'logits': logits,
                     'xyzi_mu': xyzi_mu,

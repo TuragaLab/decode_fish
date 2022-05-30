@@ -60,8 +60,8 @@ class PointProcessGaussian(Distribution):
                 counts[i, inds[inds>=0]] = c[inds>=0].type(torch.cuda.FloatTensor)
 
             count_prob =  count_dist.log_prob(counts)
-            if count_mult:
-                count_prob = count_prob * counts
+#             if count_mult:
+#                 count_prob = count_prob * counts
 
             count_prob = count_prob.sum(-1)
 
@@ -73,8 +73,8 @@ class PointProcessGaussian(Distribution):
 
             counts = s_mask.sum(-1)
             count_prob =  count_dist.log_prob(counts)
-            if count_mult:
-                count_prob = count_prob * counts
+#             if count_mult:
+#                 count_prob = count_prob * counts
 
         pix_inds = torch.nonzero(P[:,:1],as_tuple=True)
 
@@ -107,7 +107,9 @@ class PointProcessGaussian(Distribution):
         log_norm_prob_xyzi = 0
         for i in range(gauss_dim):
             dist_normal_xyzi = D.Independent(D.Normal(xyzi_mu[...,i], xyzi_sig[...,i] + 0.00001), 1)
-            log_norm_prob_xyzi += dist_normal_xyzi.base_dist.log_prob(xyzi_inp[...,i]) * xyzi_inp[...,i].ne(0)
+#             log_norm_prob_xyzi += dist_normal_xyzi.base_dist.log_prob(xyzi_inp[...,i]) * xyzi_inp[...,i].ne(0)
+
+            log_norm_prob_xyzi += dist_normal_xyzi.base_dist.log_prob(xyzi_inp[...,i]) * (xyzi_inp[...,i].ne(0) + count_mult * xyzi_inp[...,i].eq(0))
 
         if loss_option == 'bugged?':
             log_cat_prob = torch.log_softmax(mix_logits, -1) # + torch.log(counts+1e-6)[:, None]       # normalized (sum to 1 over pixels) log probs for the categorical dist. of the GMM. batch_size * n_pixels

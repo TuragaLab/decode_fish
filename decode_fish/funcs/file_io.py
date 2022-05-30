@@ -43,7 +43,7 @@ def add_df_to_hdf5(parent, name, df):
 # Cell
 def swap_psf_vol(psf, vol):
     state_dict = psf.state_dict()
-    if len(vol) == 1:
+    if vol.ndim == 3:
         for i in range(len(state_dict['psf_volume'])):
             state_dict['psf_volume'][i] = torch.cuda.FloatTensor(torch.Tensor(vol).cuda())
     else:
@@ -66,15 +66,14 @@ def get_gaussian_psf(size_zyx, radii, pred_z, n_cols=1):
     psf = swap_psf_vol(psf, gauss_vol)
     return psf
 
-def get_vol_psf(filename, device='cuda', psf_extent_zyx=None, n_cols=1, fac=1.):
+def get_vol_psf(filename, device='cuda', psf_extent_zyx=None, n_cols=1):
 
     if 'tif' in filename:
         psf_vol = load_tiff_image(filename)
         psf_vol = psf_vol/psf_vol.max()
-        psf_vol = psf_vol*fac
         psf = LinearInterpolatedPSF(psf_vol.shape[-3:], device=device, n_cols=n_cols)
-        psf.psf_fac = fac
         if psf_vol.ndim == 3: psf_vol = psf_vol[None]
+        if psf_vol.shape[0] == 1: psf_vol = psf_vol.repeat_interleave(n_cols,0)
         psf = swap_psf_vol(psf, psf_vol)
 
     else:
@@ -90,7 +89,7 @@ def get_vol_psf(filename, device='cuda', psf_extent_zyx=None, n_cols=1, fac=1.):
 def load_psf(cfg):
 
     if cfg.data_path.psf_path:
-        psf = get_vol_psf(cfg.data_path.psf_path,cfg.genm.PSF.device, cfg.genm.PSF.psf_extent_zyx, cfg.genm.PSF.n_cols, cfg.genm.PSF.fac)
+        psf = get_vol_psf(cfg.data_path.psf_path,cfg.genm.PSF.device, cfg.genm.PSF.psf_extent_zyx, cfg.genm.PSF.n_cols)
     else:
         psf = get_gaussian_psf(cfg.genm.PSF.psf_extent_zyx, cfg.genm.PSF.gauss_radii, cfg.genm.exp_type.pred_z, cfg.genm.PSF.n_cols)
 
@@ -112,22 +111,26 @@ def load_post_proc(cfg):
 
 def get_dataloader(cfg):
 
-    sim = True if cfg.data_path.image_path is None else False
+    from_records = False if cfg.data_path.image_path is None else True
     sl = eval(cfg.data_path.image_proc.crop_sl,{'__builtins__': None},{'s_': np.s_})
 
-    if not sim:
+    if from_records:
         if 'override' in cfg.data_path.image_proc:
             imgs_5d = torch.cat([hydra.utils.instantiate(cfg.data_path.image_proc.override, image_path=f) for f in sorted(glob.glob(cfg.data_path.image_path))], 0)
         else:
             imgs_5d   = torch.cat([load_tiff_image(f)[None] for f in sorted(glob.glob(cfg.data_path.image_path))], 0)
 
+        if imgs_5d.ndim > 5:
+            imgs_5d = imgs_5d.view(-1, *(imgs_5d.size()[2:]))
+
         imgs_5d       = torch.cat([img.permute(*cfg.data_path.image_proc.swap_dim)[sl][None] for img in imgs_5d], 0)
         roi_masks     = [get_roi_mask(img, tuple(cfg.sim.roi_mask.pool_size), percentile= cfg.sim.roi_mask.percentile) for img in imgs_5d]
     else:
-        imgs_5d       = torch.cat([torch.empty(list(cfg.data_path.image_shape))], 0)
+        imgs_5d       = torch.cat([torch.empty(list(cfg.data_path.image_sim.image_shape))], 0)
         roi_masks     = None
         gen_bg        = [hydra.utils.instantiate(cfg.sim.bg_estimation.uniform)]
         dataset_tfms  = []
+
 
     min_shape = tuple(np.stack([v.shape for v in imgs_5d]).min(0)[-3:])
     crop_zyx = (cfg.sim.random_crop.crop_sz, cfg.sim.random_crop.crop_sz,cfg.sim.random_crop.crop_sz)
@@ -135,8 +138,12 @@ def get_dataloader(cfg):
         crop_zyx = tuple(np.stack([min_shape, crop_zyx]).min(0))
         print('Crop size larger than volume in at least one dimension. Crop size changed to', crop_zyx)
 
-    if not sim:
-        gen_bg        = [hydra.utils.instantiate(cfg.sim.bg_estimation.smoothing, z_size=crop_zyx[0])]
+    if from_records:
+        if cfg.sim.bg_estimation.type == 'smoothing':
+            gen_bg        = [hydra.utils.instantiate(cfg.sim.bg_estimation.smoothing, z_size=crop_zyx[0])]
+        elif cfg.sim.bg_estimation.type == 'uniform':
+            gen_bg        = [hydra.utils.instantiate(cfg.sim.bg_estimation.uniform)]
+
         rand_crop = RandomCrop3D(crop_zyx, roi_masks)
         dataset_tfms  = [rand_crop]
 
@@ -154,6 +161,7 @@ def get_dataloader(cfg):
                        rate_tfms = rate_tfms,
                        bg_tfms = gen_bg,
                        device='cuda:0',
+                       from_records=from_records,
                        num_iter=(cfg.training.num_iters) * cfg.training.bs)
 
     decode_dl = DataLoader(ds, batch_size=cfg.training.bs, num_workers=0)

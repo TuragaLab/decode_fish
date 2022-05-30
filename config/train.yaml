@@ -38,6 +38,9 @@ evaluation:
         enabled: False
         path: ${data_path.image_path}
         
+codebook:
+    _target_:
+        
 genm:
     exp_type:
         n_channels: 1
@@ -55,7 +58,6 @@ genm:
         gauss_radii: [1.,1.,1.]
         psf_extent_zyx : [21,21,21]
         n_cols: 1
-        fac: 1.
     noise:
         _target_: decode_fish.engine.noise.sCMOS
         theta: 2. 
@@ -73,7 +75,7 @@ genm:
         slice_rec: ${genm.exp_type.slice_rec} 
         norm: 'none'    
         ch_facs:
-        col_shifts_enabled: True
+        col_shifts_enabled: False
         col_shifts_yxds: [2048, 2048, 50]
     foci:
         _target_: decode_fish.funcs.dataset.AddFoci
@@ -100,13 +102,16 @@ sim:
         pool_size: [10,10,10]
         percentile: 50 # Percentage of volume that is not sampled from
     bg_estimation:
+        type: 'smoothing'
         smoothing:
             _target_: decode_fish.funcs.dataset.GaussianSmoothing
             smoothing_filter_size: 5
         uniform:
             _target_: decode_fish.funcs.dataset.UniformValue
-            min_val: 100.
+            min_val: 50.
             max_val: 100.
+            img_mean: False
+            sep_channels: True
         fractal:
             _target_: decode_fish.funcs.dataset.AddPerlinNoise
             shape: ${sim.random_crop.crop_sz}

@@ -59,17 +59,22 @@ def rescale_train(cfg,
 
             ret_dict = next(iter(dl))
             x, local_rate, background = ret_dict['x'], ret_dict['local_rate'], ret_dict['background']
-            zcrop, ycrop, xcrop = ret_dict['crop_z'], ret_dict['crop_y'], ret_dict['crop_x']
+            if cfg.genm.microscope.col_shifts_enabled:
+                zcrop, ycrop, xcrop = ret_dict['crop_z'], ret_dict['crop_y'], ret_dict['crop_x']
+                zcrop, ycrop, xcrop = zcrop.flatten(), ycrop.flatten(), xcrop.flatten()
+                colshift_crop = get_color_shift_inp(microscope.color_shifts, microscope.col_shifts_yx, ycrop, xcrop, cfg.sim.random_crop.crop_sz)
+            else:
+                zcrop, ycrop, xcrop, colshift_crop = None, None, None, None
 
             x = x * microscope.get_ch_mult().detach()
-            colshift_crop = get_color_shift_inp(microscope.color_shifts, microscope.col_shifts_yx, ycrop, xcrop, cfg.sim.random_crop.crop_sz)
 
-            out_inp = model.tensor_to_dict(model(torch.concat([x, colshift_crop], 1)))
+            out_inp = torch.concat([x,colshift_crop], 1) if colshift_crop is not None else x
+            out_inp = model.tensor_to_dict(model(out_inp))
             proc_out_inp = post_proc.get_micro_inp(out_inp)
 
         if len(proc_out_inp[1]) > 0:
 
-            ch_out_inp = microscope.get_single_ch_inputs(*proc_out_inp, ycrop=ycrop.flatten(), xcrop=xcrop.flatten())
+            ch_out_inp = microscope.get_single_ch_inputs(*proc_out_inp, ycrop=ycrop, xcrop=xcrop)
 
             # Get ch_fac loss
             ch_inds = ch_out_inp[0][1]
@@ -79,7 +84,8 @@ def rescale_train(cfg,
             for i in range(cfg.genm.exp_type.n_channels):
                 if i in ch_inds:
                     int_means[i] = int_vals[ch_inds == i].mean() / int_vals.mean()
-
+            int_means_col.append(int_means.detach())
+#             print(int_means)
             ch_fac_loss = torch.sqrt(torch.mean((microscope.channel_facs - microscope.channel_facs.detach() / int_means)**2))
 
             ch_fac_loss.backward()
@@ -94,3 +100,4 @@ def rescale_train(cfg,
             if batch_idx % cfg.output.log_interval == 0:
 
                 print(ch_fac_loss)
+#                 print(micro.channel_facs)

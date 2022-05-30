@@ -92,17 +92,17 @@ def extract_rmses(vol, ixy_coords, size_xy = 10, px_size=100):
 # Cell
 class code_net(nn.Module):
 
-    def __init__(self, n_inputs=13, n_outputs=1):
+    def __init__(self, n_inputs=48, n_outputs=1):
         super(code_net, self).__init__()
 
         self.layers = nn.Sequential(
-          nn.Linear(n_inputs, 128),
+          nn.Linear(n_inputs, 256),
+          nn.BatchNorm1d(256),
+          nn.ReLU(),
+          nn.Linear(256, 128),
           nn.BatchNorm1d(128),
           nn.ReLU(),
           nn.Linear(128, 64),
-          nn.BatchNorm1d(64),
-          nn.ReLU(),
-          nn.Linear(64, 64),
           nn.BatchNorm1d(64),
           nn.ReLU(),
           nn.Linear(64, 32),
@@ -117,12 +117,15 @@ class code_net(nn.Module):
 
 net = code_net().cuda()
 
-def input_from_df(df):
+def input_from_df(df, codebook):
 
-    input_keys = ['prob', 'z', 'x_sig','y_sig','z_sig'] + [f'int_sig_{i}' for i in range(4)]  + [f'int_{i}' for i in range(4)]
-    offsets = [0.75, 50., 20., 20., 15.] + 4*[1.] + 4*[4.]
-    scales = [1., 50., 20., 20., 15.] + 4*[2.] + 4*[5.]
+    input_keys = ['prob', 'x_sig','y_sig','z_sig'] + [f'int_sig_{i}' for i in range(22)]  + [f'int_{i}' for i in range(22)]
+    offsets = [0.75, 20., 20., 15.] + 22*[1.] + 22*[0.]
+    scales = [1., 20., 20., 15.] + 22*[2.] + 22*[5.]
     inp_arr = df[input_keys].values
     inp_arr = (inp_arr - np.array(offsets))/np.array(scales)
+
+#     inp_arr = np.concatenate([inp_arr, codebook[df['code_inds'].values]], 1)
+    inp_arr[:,-22:] = inp_arr[:,-22:] - 2*(inp_arr[:,-22:] * codebook[df['code_inds'].values])
 
     return torch.tensor(inp_arr, dtype=torch.float32).cuda()

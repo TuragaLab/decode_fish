@@ -64,7 +64,7 @@ def exp_train_eval(bench_df, res_df, targets, wandb, batch_idx):
 
     if len(res_df):
 
-        res_sub = res_df.nsmallest(len(bench_df), 'comb_sig')
+        res_sub = res_df.nsmallest(len(bench_df), 'int_ratio')
 
         bench_counts = DF(data=None, index=targets)
         bench_counts['Res_all'] = res_sub.groupby('gene')['gene'].count()
@@ -123,13 +123,14 @@ def train(cfg,
 
     # Load codebook
     if 'codebook' in cfg:
-        code_ref, targets = hydra.utils.instantiate(cfg.codebook)
+        codebook, targets = hydra.utils.instantiate(cfg.codebook)
 
     # Controls which genmodel parameters are optimized
     for name, p in microscope.named_parameters():
         p.requires_grad = cfg.training.mic.par_grads[name]
 
     calc_log_p_x = False
+    col_shift_map = cfg.genm.microscope.col_shifts_enabled
 
     # Hacky way to switch between network / genmodel training
     if cfg.training.schedule is not None:
@@ -152,12 +153,17 @@ def train(cfg,
         ret_dict = next(iter(dl))
         # Get real data window and rate/background for the simulation
         x, local_rate, background = ret_dict['x'], ret_dict['local_rate'], ret_dict['background']
-        zcrop, ycrop, xcrop = ret_dict['crop_z'], ret_dict['crop_y'], ret_dict['crop_x']
+
+        if col_shift_map:
+            zcrop, ycrop, xcrop = ret_dict['crop_z'], ret_dict['crop_y'], ret_dict['crop_x']
+            zcrop, ycrop, xcrop = zcrop.flatten(), ycrop.flatten(), xcrop.flatten()
+            colshift_crop = get_color_shift_inp(microscope.color_shifts, microscope.col_shifts_yx, ycrop, xcrop, cfg.sim.random_crop.crop_sz)
+        else:
+            zcrop, ycrop, xcrop, colshift_crop = None, None, None, None
 
         background = background * microscope.get_ch_mult().detach()
         x = x * microscope.get_ch_mult().detach()
 
-        colshift_crop = get_color_shift_inp(microscope.color_shifts, microscope.col_shifts_yx, ycrop, xcrop, cfg.sim.random_crop.crop_sz)
 
         if cfg.training.net.enabled:
 
@@ -166,17 +172,17 @@ def train(cfg,
             sim_vars = PointProcessUniform(local_rate[:,0], int_conc=model.int_dist.int_conc.detach(),
                                            int_rate=model.int_dist.int_rate.detach(), int_loc=model.int_dist.int_loc.detach(),
                                            sim_iters=5, channels=cfg.genm.exp_type.n_channels, n_bits=cfg.genm.exp_type.n_bits,
-                                           sim_z=cfg.genm.exp_type.pred_z, codebook=torch.tensor(code_ref, dtype=torch.bool), int_option=cfg.training.int_option).sample(from_code_book=True)
+                                           sim_z=cfg.genm.exp_type.pred_z, codebook=torch.tensor(codebook, dtype=torch.bool), int_option=cfg.training.int_option).sample(from_code_book=True)
 
             # sim_vars = locs_sl, x_os_sl, y_os_sl, z_os_sl, ints_sl, output_shape, codes
 #             print('Sim, ', time.time()-t0); t0 = time.time()
-            ch_inp = list(microscope.get_single_ch_inputs(*sim_vars[:-1], ycrop=ycrop.flatten(), xcrop=xcrop.flatten()))
+            ch_inp = list(microscope.get_single_ch_inputs(*sim_vars[:-1], ycrop=ycrop, xcrop=xcrop))
             ch_inp[1:4] = add_pos_noise(ch_inp[1:4], [cfg.genm.pos_noise.pos_noise_xy, cfg.genm.pos_noise.pos_noise_xy, cfg.genm.pos_noise.pos_noise_z], cfg.genm.exp_type.n_bits)
             xsim = microscope(*ch_inp, add_noise=True)
 
             if cfg.genm.phasing:
 
-                phasing_inp = list(microscope.get_single_ch_inputs(*sim_vars[:4], get_phased_ints(sim_vars[4], microscope.ch_cols, microscope.psf.n_cols) ,sim_vars[5], ycrop=ycrop.flatten(), xcrop=xcrop.flatten()))
+                phasing_inp = list(microscope.get_single_ch_inputs(*sim_vars[:4], get_phased_ints(sim_vars[4], microscope.ch_cols, microscope.psf.n_cols) ,sim_vars[5], ycrop=ycrop, xcrop=xcrop))
                 phasing_inp[1:4] = add_pos_noise(phasing_inp[1:4], [cfg.genm.pos_noise.pos_noise_xy, cfg.genm.pos_noise.pos_noise_xy, cfg.genm.pos_noise.pos_noise_z], cfg.genm.exp_type.n_bits, rm_mean=False)
                 xsim += microscope(*phasing_inp, add_noise=True) * cfg.genm.phasing * torch.rand(xsim.shape, device=xsim.device)
 #             print('Micro, ', time.time()-t0); t0 = time.time()
@@ -189,7 +195,7 @@ def train(cfg,
                                                sim_iters=5, channels=cfg.genm.exp_type.n_channels, n_bits=1,
                                                sim_z=cfg.genm.exp_type.pred_z, codebook=None, int_option=cfg.training.int_option).sample(from_code_book=False)
 
-                noise_inp = microscope.get_single_ch_inputs(*noise_vars[:-1], ycrop=ycrop.flatten(), xcrop=xcrop.flatten())
+                noise_inp = microscope.get_single_ch_inputs(*noise_vars[:-1], ycrop=ycrop, xcrop=xcrop)
                 xsim += microscope(*noise_inp, add_noise=True)
 
             xsim_noise = microscope.noise(xsim, background, const_theta_sim=cfg.genm.exp_type.const_theta_sim).sample()
@@ -197,7 +203,8 @@ def train(cfg,
 
 #             print('Noise. ', time.time()-t0); t0 = time.time()
 
-            out_sim = model.tensor_to_dict(model(torch.concat([xsim_noise,colshift_crop], 1)))
+            net_inp = torch.concat([xsim_noise,colshift_crop], 1) if colshift_crop is not None else xsim_noise
+            out_sim = model.tensor_to_dict(model(net_inp))
 
 #             print('Model forw. ', time.time()-t0); t0 = time.time()
 
@@ -232,12 +239,13 @@ def train(cfg,
         if batch_idx > min(cfg.training.start_mic,cfg.training.start_int) and batch_idx % cfg.training.mic.freq == 0:
 
 #             out_inp = model.tensor_to_dict(model(x))
-            out_inp = model.tensor_to_dict(model(torch.concat([x, colshift_crop], 1)))
+            net_inp = torch.concat([x,colshift_crop], 1) if colshift_crop is not None else x
+            out_inp = model.tensor_to_dict(model(net_inp))
             proc_out_inp = post_proc.get_micro_inp(out_inp)
 
             if cfg.training.mic.enabled and batch_idx > cfg.training.start_mic and len(proc_out_inp[1]) > 0: # and len(proc_out_inp[1]) < 300:
 #                 print('Pre filt ', len(proc_out_inp[1]))
-                ch_out_inp = microscope.get_single_ch_inputs(*proc_out_inp, ycrop=ycrop.flatten(), xcrop=xcrop.flatten())
+                ch_out_inp = microscope.get_single_ch_inputs(*proc_out_inp, ycrop=ycrop, xcrop=xcrop)
                 optim_dict['optim_mic'].zero_grad()
                 calc_log_p_x = False
 
@@ -364,7 +372,7 @@ def train(cfg,
 
                     if cfg.output.log_figs:
 
-                        sl_fig = sl_plot(x, xsim_noise, nm_to_px(pred_df, px_size), nm_to_px(target_df, px_size), background, out_sim)
+                        sl_fig = sl_plot(x, xsim_noise, nm_to_px(pred_df, px_size), nm_to_px(target_df, px_size), background, out_sim, from_records=dl.dataset.from_records)
                         plt.show()
                         wandb.log({'SL summary': sl_fig}, step=batch_idx)
 
@@ -378,6 +386,7 @@ def train(cfg,
                         res_df = window_predict(model, post_proc, dl.dataset.volumes, window_size=[None, 64, 64], device='cuda', crop=crop,
                                                 chrom_map=get_color_shift_inp(microscope.color_shifts, microscope.col_shifts_yx)[:,:,None], scale=microscope.get_ch_mult().detach())
                         res_df['gene'] = targets[res_df['code_inds']]
+                        res_df = sel_int_ch(res_df, codebook)
                         res_df = hydra.utils.call(cfg.evaluation.code_stats.df_postp_func, res_df=res_df)
                         exp_train_eval(bench_df, res_df, targets, wandb=wandb, batch_idx=batch_idx)
 

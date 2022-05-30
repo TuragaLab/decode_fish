@@ -8,7 +8,7 @@ from scipy.spatial.distance import cdist
 from scipy.spatial import cKDTree
 
 # Cell
-def matching(target_df, pred_df, tolerance=1000, print_res=True, eff_const=0.5, match_genes=True, self_match=False, allow_multiple_matches=False):
+def matching(target_df, pred_df, tolerance=1000, print_res=True, eff_const=0.5, match_genes=True, self_match=False, allow_multiple_matches=False, ignore_z=False):
     """Matches localizations to ground truth positions and provides assessment metrics used in the SMLM2016 challenge.
     (see http://bigwww.epfl.ch/smlm/challenge2016/index.html?p=methods#6)
     When using default parameters exactly reproduces the procedure used for the challenge (i.e. produces same numbers as the localization tool).
@@ -61,8 +61,12 @@ def matching(target_df, pred_df, tolerance=1000, print_res=True, eff_const=0.5, 
             sub_tar = target_df[target_df['frame_idx']==i].reset_index()
             sub_pred = pred_df[pred_df['frame_idx']==i].reset_index()
 
-            tar_xyz = sub_tar[['x','y','z']]
-            pred_xyz = sub_pred[['x','y','z']]
+            if ignore_z:
+                tar_xyz = sub_tar[['x','y']]
+                pred_xyz = sub_pred[['x','y']]
+            else:
+                tar_xyz = sub_tar[['x','y','z']]
+                pred_xyz = sub_pred[['x','y','z']]
 
             if match_genes:
                 tar_gene = sub_tar['code_inds']

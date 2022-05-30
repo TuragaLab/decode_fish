@@ -25,7 +25,6 @@ data_path:
         crop_sl: s_[:,:,:,:]
         override:
             _target_: decode_fish.funcs.exp_specific.read_MOp_tiff 
-            scaled: False
             z_to_batch: ${network.is_2D}
             
 codebook:

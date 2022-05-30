@@ -24,7 +24,7 @@ def get_simulation_statistics(decode_dl, micro, int_conc, int_rate, int_loc, int
     """
     Draws a sample from the dataloader, and plots a slice of the real volume and the simulated volume.
     """
-    z_ind = decode_dl.dataset.dataset_tfms[0].crop_sz[0]//2
+
     with torch.no_grad():
 
         for _ in range(samples):
@@ -32,7 +32,7 @@ def get_simulation_statistics(decode_dl, micro, int_conc, int_rate, int_loc, int
             xmax = 0
             while xmax <= int_threshold:
                 ret_dict = next(iter(decode_dl))
-                xmax = ret_dict['x'][0,0,z_ind].max()
+                xmax = ret_dict['x'][0,0,:].max()
 
             rand_ch = np.random.randint(0,channels)
 
@@ -57,43 +57,65 @@ def get_simulation_statistics(decode_dl, micro, int_conc, int_rate, int_loc, int
             figure.suptitle('Max projection', fontsize=15, y=0.9)
 
 # Cell
-def sl_plot(x, xsim, pred_df, target_df, background, res):
+def sl_plot(x, xsim, pred_df, target_df, background, res, from_records=True):
 
     pred_df = pred_df[pred_df['frame_idx']==0]
     target_df = target_df[target_df['frame_idx']==0]
+
     with torch.no_grad():
-        fig = plt.figure(figsize=(20,4))
-        plt.subplot(151)
-        im = plt.imshow(x[0][0].cpu().numpy().max(0))
-        add_colorbar(im)
-        plt.axis('off')
-        plt.title('Real image')
 
-        plt.subplot(152)
-        im = plt.imshow(xsim[0][0].cpu().numpy().max(0))
-        plt.scatter(target_df['x'], target_df['y'],facecolors='black', marker='x', s=25.)
-        plt.scatter(pred_df['x'], pred_df['y'],facecolors='red', marker='o', s=5.)
-        add_colorbar(im)
-        plt.axis('off')
-        plt.title('Sim. image')
+        if from_records:
 
-        plt.subplot(153)
-        im = plt.imshow(torch.sigmoid(res['logits'][0][0]).cpu().numpy().max(0))
-        add_colorbar(im)
-        plt.axis('off')
-        plt.title('Predicted locations')
+            fig = plt.figure(figsize=(20,4))
+            plt.subplot(151)
+            im = plt.imshow(x[0][0].cpu().numpy().max(0))
+            add_colorbar(im)
+            plt.axis('off')
+            plt.title('Real image')
 
-        plt.subplot(154)
-        im = plt.imshow(background[0][0].cpu().numpy().max(0))
-        add_colorbar(im)
-        plt.axis('off')
-        plt.title('Background')
+            plt.subplot(152)
+            im = plt.imshow(xsim[0][0].cpu().numpy().max(0))
+            plt.scatter(target_df['x'], target_df['y'],facecolors='black', marker='x', s=25.)
+            plt.scatter(pred_df['x'], pred_df['y'],facecolors='red', marker='o', s=5.)
+            add_colorbar(im)
+            plt.axis('off')
+            plt.title('Sim. image')
 
-        plt.subplot(155)
-        im = plt.imshow(res['background'][0][0].cpu().numpy().max(0))
-        add_colorbar(im)
-        plt.axis('off')
-        plt.title('Predicted background')
+            plt.subplot(153)
+            im = plt.imshow(torch.sigmoid(res['logits'][0][0]).cpu().numpy().max(0))
+            add_colorbar(im)
+            plt.axis('off')
+            plt.title('Predicted locations')
+
+            plt.subplot(154)
+            im = plt.imshow(background[0][0].cpu().numpy().max(0))
+            add_colorbar(im)
+            plt.axis('off')
+            plt.title('Background')
+
+            plt.subplot(155)
+            im = plt.imshow(res['background'][0][0].cpu().numpy().max(0))
+            add_colorbar(im)
+            plt.axis('off')
+            plt.title('Predicted background')
+
+        else:
+
+            fig = plt.figure(figsize=(10,4))
+
+            plt.subplot(121)
+            im = plt.imshow(xsim[0][0].cpu().numpy().max(0))
+            plt.scatter(target_df['x'], target_df['y'],facecolors='black', marker='x', s=25.)
+            plt.scatter(pred_df['x'], pred_df['y'],facecolors='red', marker='o', s=5.)
+            add_colorbar(im)
+            plt.axis('off')
+            plt.title('Sim. image')
+
+            plt.subplot(122)
+            im = plt.imshow(torch.sigmoid(res['logits'][0][0]).cpu().numpy().max(0))
+            add_colorbar(im)
+            plt.axis('off')
+            plt.title('Predicted locations')
 
     return fig
 

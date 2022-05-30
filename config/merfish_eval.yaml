@@ -7,7 +7,7 @@ crop: s_[:,:,:,:,:]
 out_file: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/decode_fish/data/results/MERFISH/merfish_${sweep_name}_${run_name}_${out_id}_${file_nr}.csv
 
 model_cfg: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/models/fishcod/MERFISH_MOp/${sweep_name}/${run_name}/train.yaml
-image_path: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm//datasets/CodFish/MERFISH/MOp/mouse1_sample1_raw/aligned_images${file_nr}.tif
+image_path: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm//datasets/CodFish/MERFISH/MOp/mouse1_sample1_raw/aligned_scaled_images${file_nr}.tif
 
 #model_cfg: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/models/fishcod/MERFISH_starfish/${sweep_name}/${run_name}/train.yaml
 #image_path: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm//datasets/CodFish/MERFISH/starfish_scaled/img_stack.tiff

@@ -35,12 +35,16 @@ def sim_data(decode_dl, micro, batches, int_conc=4., int_rate=1., int_loc=.5, ch
         with torch.no_grad():
             ret_dict = next(iter(decode_dl))
             x, local_rate, background = ret_dict['x'], ret_dict['local_rate'], ret_dict['background'],
-            zcrop, ycrop, xcrop = ret_dict['crop_z'], ret_dict['crop_y'], ret_dict['crop_x']
+            if micro.col_shifts_enabled:
+                zcrop, ycrop, xcrop = ret_dict['crop_z'], ret_dict['crop_y'], ret_dict['crop_x']
+                zcrop, ycrop, xcrop = zcrop.flatten(), ycrop.flatten(), xcrop.flatten()
+            else:
+                zcrop, ycrop, xcrop, colshift_crop = None, None, None, None
             background = background * micro.get_ch_mult()
             local_rate *= rate_fac
 
             sim_vars = PointProcessUniform(local_rate[:,0], int_conc, int_rate, int_loc, channels=channels, n_bits=n_bits, sim_z=micro.slice_rec, codebook=codebook, int_option=int_option).sample(from_code_book=(codebook is not None))
-            ch_inp = list(micro.get_single_ch_inputs(*sim_vars[:-1], ycrop=ycrop.flatten(), xcrop=xcrop.flatten()))
+            ch_inp = list(micro.get_single_ch_inputs(*sim_vars[:-1], ycrop=ycrop, xcrop=xcrop))
             if pos_noise_xy or pos_noise_z:
                 ch_inp[1:4] = add_pos_noise(ch_inp[1:4], [pos_noise_xy, pos_noise_xy, pos_noise_z], n_bits)
             xsim = micro(*ch_inp, add_noise=True)
@@ -51,7 +55,7 @@ def sim_data(decode_dl, micro, batches, int_conc=4., int_rate=1., int_loc=.5, ch
                                                sim_iters=5, channels=channels, n_bits=1,
                                                sim_z=micro.slice_rec, codebook=None, int_option=int_option).sample(from_code_book=False)
 
-                noise_inp = micro.get_single_ch_inputs(*noise_vars[:-1], ycrop=ycrop.flatten(), xcrop=xcrop.flatten())
+                noise_inp = micro.get_single_ch_inputs(*noise_vars[:-1], ycrop=ycrop, xcrop=xcrop)
                 xsim += micro(*noise_inp, add_noise=True)
 
             x = micro.noise(xsim, background, const_theta_sim=const_theta_sim).sample()
@@ -67,7 +71,9 @@ def sim_data(decode_dl, micro, batches, int_conc=4., int_rate=1., int_loc=.5, ch
             gt_df = sample_to_df(*gt_vars, sim_vars[-1], px_size_zyx=[1.,1.,1.])
             gt_dfs.append(gt_df)
 
-    return torch.cat(xsim_col), torch.cat(cols_col), cat_emitter_dfs(gt_dfs, decode_dl.batch_size)
+    cols_col = torch.cat(cols_col) if micro.col_shifts_enabled else None
+
+    return torch.cat(xsim_col), cols_col, cat_emitter_dfs(gt_dfs, decode_dl.batch_size)
 
 # Cell
 def get_prediction(model, vol, post_proc, col_offset_map=None, micro=None, cuda=True, return_rec=False):

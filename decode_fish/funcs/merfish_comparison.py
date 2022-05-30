@@ -15,11 +15,9 @@ from .plotting import *
 from ..engine.noise import estimate_noise_scale
 import shutil
 from .visualization import *
-from .predict import predict
-import torch.nn as nn
-import torch.nn.functional as F
-import torch.tensor as T
+from .predict import window_predict
 from .predict import *
+from .evaluation import *
 
 from omegaconf import open_dict
 from hydra import compose, initialize
@@ -30,10 +28,10 @@ sys.path.append('/groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/FQ
 from istdeco import ISTDeco
 from utils import random_codebook, random_image_stack
 from codebook import Codebook
-from starfish.image import Filter
+# from starfish.image import Filter
 
 sys.path.append('/groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/FQ/bardensr/')
-import bardensr
+# import bardensr # Crashes kernel?
 
 import optuna
 optuna.logging.set_verbosity(optuna.logging.INFO)
@@ -73,7 +71,7 @@ def get_istdeco_df(sim_data, codebook, psf_sig=(1.7, 1.7), n_iter=100, bg=100.):
                 'code_inds': code_id
         })
 
-        istd_results = istd_results.append(df)
+        istd_results = pd.concat([istd_results,df]) #istd_results.append(df)
 
     istd_results = px_to_nm(istd_results)
 

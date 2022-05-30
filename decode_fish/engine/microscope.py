@@ -178,7 +178,6 @@ class Microscope(nn.Module):
                 psf = 4.5*psf/psf.flatten(-2,-1).sum(-1)[...,None,None]
             else:
                 torch.clamp_min_(psf,0)
-                psf /= self.psf.psf_fac
 
             if self.psf_noise and add_noise:
                 psf = self.add_psf_noise(psf)
@@ -186,7 +185,9 @@ class Microscope(nn.Module):
             tot_intensity = torch.clamp_min(i_val, 0)
 
             psf_sc = psf * tot_intensity[:,None,None,None,None]
-            psf_sc = self.z_facs[z_inds][:,None,None,None,None] * psf_sc
+
+            if z_inds is not None:
+                psf_sc = self.z_facs[z_inds][:,None,None,None,None] * psf_sc
 
             if ret_psfs:
                 return self.scale * psf_sc
@@ -280,13 +281,15 @@ def add_pos_noise(offset_vars, scales, n_bits, rm_mean=True):
     """
     for i in range(len(scales)):
 
-        if rm_mean:
-            noise = torch.distributions.Normal(loc=0, scale=scales[i]).sample(offset_vars[i].shape).to(offset_vars[i].device).reshape(-1, n_bits)
-            noise -= noise.mean(-1, keepdim=True)
-        else:
-            noise = torch.distributions.Normal(loc=0, scale=scales[i]).sample(offset_vars[i].shape).to(offset_vars[i].device)
+        if scales[i] > 0:
 
-        offset_vars[i] = offset_vars[i] + noise.reshape(-1)
+            if rm_mean:
+                noise = torch.distributions.Normal(loc=0, scale=scales[i]).sample(offset_vars[i].shape).to(offset_vars[i].device).reshape(-1, n_bits)
+                noise -= noise.mean(-1, keepdim=True)
+            else:
+                noise = torch.distributions.Normal(loc=0, scale=scales[i]).sample(offset_vars[i].shape).to(offset_vars[i].device)
+
+            offset_vars[i] = offset_vars[i] + noise.reshape(-1)
 
     return offset_vars
 

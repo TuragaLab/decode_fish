@@ -51,7 +51,7 @@ def swap_psf_vol(psf, vol):
     psf.load_state_dict(state_dict)
     return psf
 
-def get_gaussian_psf(size_zyx, radii, pred_z, n_cols=1):
+def get_gaussian_psf(size_zyx, radii, pred_z, n_cols=1, mode='bilinear'):
 
     if not pred_z:
         size_zyx[0] = 1
@@ -59,39 +59,39 @@ def get_gaussian_psf(size_zyx, radii, pred_z, n_cols=1):
     if not isinstance(radii, MutableSequence):
         radii = 3*[radii]
 
-    psf = LinearInterpolatedPSF(size_zyx, device='cuda', n_cols=n_cols)
+    psf = LinearInterpolatedPSF(size_zyx, device='cuda', n_cols=n_cols, mode=mode)
     gauss_vol = gaussian_sphere(size_zyx, radii, [size_zyx[0]//2,size_zyx[1]//2,size_zyx[2]//2])
-    gauss_vol = gauss_vol/gauss_vol.max()
 
     psf = swap_psf_vol(psf, gauss_vol)
     return psf
 
-def get_vol_psf(filename, device='cuda', psf_extent_zyx=None, n_cols=1):
+def get_vol_psf(filename, device='cuda', psf_extent_zyx=None, n_cols=1, mode='bilinear'):
 
     if 'tif' in filename:
         psf_vol = load_tiff_image(filename)
-        psf_vol = psf_vol/psf_vol.max()
-        psf = LinearInterpolatedPSF(psf_vol.shape[-3:], device=device, n_cols=n_cols)
+        psf_vol *= psf_extent_zyx
+#         psf_vol = torch.tensor(np.array(psf_vol).take(indices=range(0, psf_extent_zyx), axis=-3))
+        psf = LinearInterpolatedPSF(psf_vol.shape[-3:], device=device, n_cols=n_cols, mode=mode)
         if psf_vol.ndim == 3: psf_vol = psf_vol[None]
         if psf_vol.shape[0] == 1: psf_vol = psf_vol.repeat_interleave(n_cols,0)
         psf = swap_psf_vol(psf, psf_vol)
 
     else:
         psf_state = torch.load(filename)
-        psf = LinearInterpolatedPSF(psf_state['psf_volume'].shape[-3:], device=device, n_cols=n_cols)
+        psf = LinearInterpolatedPSF(psf_state['psf_volume'].shape[-3:], device=device, n_cols=n_cols, mode=mode)
         psf.load_state_dict(psf_state)
 
-        if psf_extent_zyx:
-            psf = crop_psf(psf,psf_extent_zyx)
+#         if psf_extent_zyx:
+#             psf = crop_psf(psf,psf_extent_zyx)
 
     return psf
 
 def load_psf(cfg):
 
     if cfg.data_path.psf_path:
-        psf = get_vol_psf(cfg.data_path.psf_path,cfg.genm.PSF.device, cfg.genm.PSF.psf_extent_zyx, cfg.genm.PSF.n_cols)
+        psf = get_vol_psf(cfg.data_path.psf_path,cfg.genm.PSF.device, cfg.genm.PSF.psf_extent_zyx, cfg.genm.PSF.n_cols, cfg.genm.PSF.mode)
     else:
-        psf = get_gaussian_psf(cfg.genm.PSF.psf_extent_zyx, cfg.genm.PSF.gauss_radii, cfg.genm.exp_type.pred_z, cfg.genm.PSF.n_cols)
+        psf = get_gaussian_psf(cfg.genm.PSF.psf_extent_zyx, cfg.genm.PSF.gauss_radii, cfg.genm.exp_type.pred_z, cfg.genm.PSF.n_cols, cfg.genm.PSF.mode)
 
     return psf
 

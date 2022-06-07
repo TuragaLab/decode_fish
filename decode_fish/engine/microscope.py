@@ -79,9 +79,9 @@ class Microscope(nn.Module):
         self.ch_scale = 1. if ch_facs is None else torch.tensor(ch_facs).cuda()
         self.register_parameter(name='channel_facs', param=torch.nn.Parameter(torch.ones(int(self.noise.channels)).cuda()))
         self.register_parameter(name='z_facs', param=torch.nn.Parameter(torch.ones(int(self.psf_z_size)).cuda()))
-
+        self.register_parameter(name='sc_fac', param=torch.nn.Parameter(torch.ones(1).cuda()))
         self.register_parameter(name='theta_par', param=self.noise.theta_par)
-        self.register_parameter(name='psf_vol', param=self.psf.psf_volume)
+#         self.register_parameter(name='psf_vol', param=self.psf.psf_volume)
 
     def get_ch_mult(self):
         return (self.channel_facs * (len(self.channel_facs) / self.channel_facs.sum()) * self.ch_scale)[None,:,None,None,None]
@@ -114,7 +114,9 @@ class Microscope(nn.Module):
 
         x_os_val = x_os_val[ch_inds[0]] + multi_col_shifts[ch_inds[1], 0]
         y_os_val = y_os_val[ch_inds[0]] + multi_col_shifts[ch_inds[1], 1]
-        z_os_val = z_os_val[ch_inds[0]] + multi_col_shifts[ch_inds[1], 2]
+
+        ''' Can't get optimization to work for some reason. look into it '''
+        z_os_val = z_os_val[ch_inds[0]] # + multi_col_shifts[ch_inds[1], 2]
 
         return x_os_val, y_os_val, z_os_val
 
@@ -159,12 +161,12 @@ class Microscope(nn.Module):
         if len(locations[0]):
             col_inds=torch.tensor(self.ch_cols)[locations[1]] if self.ch_cols is not None else None
 
-            # Apply continuous shift
             if self.slice_rec and self.psf_z_size > 1:
                 z_os_ch = torch.clamp(0.5*z_os_ch,-0.49999,0.49999) + 0.5 # transform to [0,1]
                 z_scaled = z_os_ch * (self.psf_z_size - 2) # [0, z_size]
                 z_inds = (torch.div(z_scaled, 1, rounding_mode='trunc')).type(torch.cuda.LongTensor) + 1
-                z_os = -(z_scaled%1.) + 0.5
+#                 z_os = -(z_scaled%1.) + 0.5
+                z_os = -(torch.fmod(z_scaled, 1.)) + 0.5
 
                 psf = self.psf(x_os_ch, y_os_ch, z_os, z_inds, c_inds=col_inds)
 #                 psf = psf[torch.arange(len(z_os_ch)),:,z_inds][:,:,None]
@@ -175,7 +177,7 @@ class Microscope(nn.Module):
 
             if self.norm == 'escort':
                 psf = torch.abs(psf)
-                psf = 4.5*psf/psf.flatten(-2,-1).sum(-1)[...,None,None]
+                psf = psf/psf.flatten(-2,-1).sum(-1)[...,None,None]
             else:
                 torch.clamp_min_(psf,0)
 
@@ -190,13 +192,13 @@ class Microscope(nn.Module):
                 psf_sc = self.z_facs[z_inds][:,None,None,None,None] * psf_sc
 
             if ret_psfs:
-                return self.scale * psf_sc
+                return self.sc_fac * self.scale * psf_sc
 
             # place psf according to locations
             xsim = place_psf(locations, psf_sc, output_shape)
 
             # scale (not learnable)
-            xsim = self.scale * xsim
+            xsim = self.sc_fac * self.scale * xsim
 
             return xsim
 

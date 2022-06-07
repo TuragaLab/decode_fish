@@ -58,11 +58,13 @@ def my_app(cfg):
 
     optim_dict = {}
     optim_dict['optim_net'] = hydra.utils.instantiate(cfg.training.net.opt, params=model.network.parameters())
-    optim_dict['optim_mic'] = hydra.utils.instantiate(cfg.training.mic.opt, params=micro.parameters())
+    optim_dict['optim_mic'] = hydra.utils.instantiate(cfg.training.mic.opt, params=micro.parameters(recurse=False))
+    optim_dict['optim_psf'] = hydra.utils.instantiate(cfg.training.psf.opt, params=micro.psf.parameters())
     optim_dict['optim_int'] = hydra.utils.instantiate(cfg.training.int.opt, params=model.int_dist.parameters())
 
     optim_dict['sched_net'] = hydra.utils.instantiate(cfg.training.net.sched, optimizer=optim_dict['optim_net'])
     optim_dict['sched_mic'] = hydra.utils.instantiate(cfg.training.mic.sched, optimizer=optim_dict['optim_mic'])
+    optim_dict['sched_psf'] = hydra.utils.instantiate(cfg.training.psf.sched, optimizer=optim_dict['optim_psf'])
     optim_dict['sched_int'] = hydra.utils.instantiate(cfg.training.int.sched, optimizer=optim_dict['optim_int'])
 
     

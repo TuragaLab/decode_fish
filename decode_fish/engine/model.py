@@ -443,7 +443,7 @@ class OutputNet(nn.Module):
         n_int_ch: Number intensity channels (number of channels)
 
     """
-    def __init__(self, f_maps=64, p_offset=-5., is_2D=False, n_p_ch=1, n_bg_ch=1, n_int_ch=1., n_out_l=1):
+    def __init__(self, f_maps=64, p_offset=-5., is_2D=False, n_p_ch=1, n_bg_ch=1, n_int_ch=1., n_out_l=1, resid_x_ch=0):
         super().__init__()
 
         self.is_2D = is_2D
@@ -451,6 +451,7 @@ class OutputNet(nn.Module):
         self.n_bg_ch = n_bg_ch
         self.n_int_ch = n_int_ch
         self.p_offset = p_offset
+        self.resid_x_ch = resid_x_ch
 
         xyzi_dim = 3 + n_int_ch
 
@@ -492,7 +493,6 @@ class OutputNet(nn.Module):
 #         for net in [self.p_out_l, self.xyzi_out_l, self.xyzis_out_l, self.bg_out_l]:
 #             net.apply(init_weights)
 
-
         self.p_out1 = nn.Conv3d(f_maps, f_maps, kernel_size=kernel_size, padding=padding, padding_mode='replicate')
         self.p_out2 = nn.Conv3d(f_maps, n_p_ch, kernel_size=1, padding=0)
         nn.init.constant_(self.p_out2.bias,p_offset)
@@ -503,7 +503,7 @@ class OutputNet(nn.Module):
         self.xyzis_out1 = nn.Conv3d(f_maps, f_maps, kernel_size=kernel_size, padding=padding, padding_mode='replicate')
         self.xyzis_out2 = nn.Conv3d(f_maps, xyzi_dim, kernel_size=1, padding=0)
 
-        self.bg_out1 = nn.Conv3d(f_maps, f_maps, kernel_size=kernel_size, padding=padding, padding_mode='replicate')
+        self.bg_out1 = nn.Conv3d(f_maps + resid_x_ch, f_maps, kernel_size=kernel_size, padding=padding, padding_mode='replicate')
         self.bg_out2 = nn.Conv3d(f_maps, n_bg_ch, kernel_size=1, padding=0)
 
         nn.init.kaiming_normal_(self.p_out1.weight, mode='fan_in', nonlinearity='relu')
@@ -515,7 +515,7 @@ class OutputNet(nn.Module):
         nn.init.kaiming_normal_(self.bg_out1.weight, mode='fan_in', nonlinearity='relu')
         nn.init.kaiming_normal_(self.bg_out2.weight, mode='fan_in', nonlinearity='linear')
 
-    def forward(self, x):
+    def forward(self, u_net_out, resid_x=None):
 
 #         logit = self.p_out_l(x) + self.p_offset
 #         logit = torch.clamp(logit, -20., 20)
@@ -533,11 +533,11 @@ class OutputNet(nn.Module):
 #         background = self.bg_out_l(x)
 #         background = F.softplus(background)
 
-        logit    = F.elu(self.p_out1(x))
+        logit    = F.elu(self.p_out1(u_net_out))
         logit    = self.p_out2(logit)
         logit    = torch.clamp(logit, -20., 20)
 
-        xyzi = F.elu(self.xyzi_out1(x))
+        xyzi = F.elu(self.xyzi_out1(u_net_out))
         xyzi = self.xyzi_out2(xyzi)
 
         xyz_mu   = torch.tanh(xyzi[:, :3])
@@ -545,11 +545,12 @@ class OutputNet(nn.Module):
         i_mu     = F.softplus(xyzi[:, 3:])
         xyzi_mu = torch.cat((xyz_mu, i_mu), dim=1)
 
-        xyzis = F.elu(self.xyzis_out1(x))
+        xyzis = F.elu(self.xyzis_out1(u_net_out))
         xyzis = self.xyzis_out2(xyzis)
         xyzi_sig = F.softplus(xyzis) + 0.01
+        bg_inp = u_net_out if resid_x is None else torch.cat([u_net_out, resid_x], 1)
 
-        background = F.elu(self.bg_out1(x))
+        background = F.elu(self.bg_out1(bg_inp))
         background = self.bg_out2(background)
         background = F.softplus(background)
 
@@ -590,7 +591,7 @@ class UnetDecodeNoBn(nn.Module):
         chrom_map: whether the network using the chromatic abberation map as an additional input
     """
     def __init__(self, ch_in=1, depth=3, inp_scale=1., inp_offset=0., order='ce', f_maps=64,
-                 is_2D=False, pred_z=True, p_offset=-5., int_conc=4., int_rate=1., int_loc=1., n_p_ch=1, n_bg_ch=1, n_int_ch=1, n_out_l=1, chrom_map=False):
+                 is_2D=False, pred_z=True, p_offset=-5., int_conc=4., int_rate=1., int_loc=1., n_p_ch=1, n_bg_ch=1, n_int_ch=1, n_out_l=1, chrom_map=False, resid_x=False):
         super().__init__()
 
         self.inp_scale = inp_scale
@@ -606,10 +607,11 @@ class UnetDecodeNoBn(nn.Module):
         self.n_p_ch = n_p_ch
         self.n_bg_ch = n_bg_ch
         self.n_int_ch = n_int_ch
+        self.resid_x = resid_x
 
         self.unet = UNet3D(ch_in, final_sigmoid=False, num_levels=depth, is_2D=is_2D,
                            layer_order = order, f_maps=f_maps)
-        self.outnet = OutputNet(f_maps=f_maps, p_offset=p_offset, is_2D=is_2D, n_p_ch=n_p_ch, n_bg_ch=n_bg_ch, n_int_ch=n_int_ch, n_out_l=n_out_l)
+        self.outnet = OutputNet(f_maps=f_maps, p_offset=p_offset, is_2D=is_2D, n_p_ch=n_p_ch, n_bg_ch=n_bg_ch, n_int_ch=n_int_ch, n_out_l=n_out_l, resid_x_ch=resid_x*ch_in)
 
         self.network = nn.ModuleList([self.unet, self.outnet])
         self.int_dist = IntensityDist(int_conc, int_rate, int_loc)
@@ -622,10 +624,14 @@ class UnetDecodeNoBn(nn.Module):
         else:
             x = (x-self.inp_offset) / self.inp_scale
 
-        for net in self.network:
-            x = net(x)
+        unet_out = self.network[0](x)
 
-        return x
+        if self.resid_x:
+            net_out = self.network[1](unet_out, x)
+        else:
+            net_out = self.network[1](unet_out)
+
+        return net_out
 
     def tensor_to_dict(self, x):
 

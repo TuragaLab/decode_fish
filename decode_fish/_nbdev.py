@@ -150,7 +150,7 @@ index = {"number_of_features_per_level": "00_models.ipynb",
          "get_train_eval_benchmark_starfish": "24_exp_specific.ipynb",
          "df_pp_mop": "24_exp_specific.ipynb",
          "df_pp_starfish": "24_exp_specific.ipynb",
-         "gen_train": "26_gen_train.ipynb",
+         "gen_train_dataset": "26_gen_train.ipynb",
          "rescale_train": "27_testtime_rescale.ipynb"}
 
 modules = ["engine/model.py",

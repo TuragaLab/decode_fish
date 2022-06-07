@@ -257,45 +257,69 @@ def plot_micro_pars(micro, figsize=[24,3]):
     add_colorbar(im)
     ax6.set_title('Color shifts map y')
 
-def plot_slice_psf_pars(micro, figsize=[32,16]):
+def plot_slice_psf_pars(micro, gt_psf=None, normed=False, figsize=[32,16]):
 
-    psf_vol = cpu(micro.psf.psf_volume)
-    psf_init = cpu(micro.psf_init_vol)
+    psf_vol = abs(cpu(micro.psf.psf_volume))
+    psf_init = abs(cpu(micro.psf_init_vol))
+
+    if normed:
+        psf_vol /= psf_vol.sum(-1).sum(-1)[...,None,None]
+        psf_init /= psf_init.sum(-1).sum(-1)[...,None,None]
 
     psf_diff = psf_vol - psf_init
     n_sl = psf_init.shape[1]
     mid_px = psf_init.shape[-1]//2
 
-    f, axes = plt.subplots(2 + 2 * micro.psf.n_cols, n_sl, sharey=False, figsize=figsize)
+    f, axes = plt.subplots(2 + 2 * micro.psf.n_cols + (1 if gt_psf is not None else 0), n_sl, sharey=False, figsize=figsize)
+
+    mlist = [psf_init.max().item(), psf_vol.max().item()]
+    if gt_psf is not None:
+        mlist += [gt_psf.max().item()]
+    plt_lim = np.max(mlist)
 
     for z in range(n_sl):
 
-        vmax_z = psf_init[0:,z].max()
-        axes[0,z].imshow(psf_init[0,z], vmax=vmax_z)
+        vmax_z = psf_vol[0:,z].max()
+        im = axes[0,z].imshow(psf_init[0,z], vmax=None)
+        add_colorbar(im)
         axes[0,z].set_axis_off()
         axes[0,z].margins(x=0, y=0, tight=True)
 
         axes[-1, z].plot(psf_init[0,z,mid_px], label='Init.')
         axes[-1, z].set_axis_off()
+        axes[-1, z].set_ylim(0,plt_lim)
 
         for n in range(micro.psf.n_cols):
 
-            axes[1+2*n,z].imshow(psf_vol[n,z], vmax=vmax_z)
+            im = axes[1+2*n,z].imshow(psf_vol[n,z], vmax=None)
+            add_colorbar(im)
             axes[1+2*n,z].set_axis_off()
             axes[1+2*n,z].margins(x=0, y=0, tight=True)
 
-            axes[2+2*n,z].imshow(psf_diff[n,z], vmax=psf_diff.max(), vmin=psf_diff.min())
+            im = axes[2+2*n,z].imshow(psf_diff[n,z], vmax=psf_diff.max(), vmin=psf_diff.min())
+            add_colorbar(im)
             axes[2+2*n,z].set_axis_off()
             axes[2+2*n,z].margins(x=0, y=0, tight=True)
 
-            axes[-1, z].plot(psf_vol[1,z,mid_px], label=f'col {n}')
+            axes[-1, z].plot(psf_vol[n,z,mid_px], label=f'col {n}')
+
+        if gt_psf is not None:
+
+            if z < len(gt_psf[0]):
+                im = axes[-2, z].imshow(gt_psf[n,z], vmax=None)
+                add_colorbar(im)
+                axes[-1, z].plot(gt_psf[n,z,mid_px], label='gt')
 
     axes[-1, 0].legend(frameon=False)
     axes[0,0].set_title('Initial PSF', loc='left')
     axes[-1,0].set_title(f'Intensity profile', loc='left')
+
     for n in range(micro.psf.n_cols):
         axes[1+2*n,0].set_title(f'Learned PSF col. {n}', loc='left')
         axes[2+2*n,0].set_title(f'Diff.', loc='left')
+
+    if gt_psf is not None:
+        axes[-2,0].set_title('GT PSF', loc='left')
 
 # Cell
 def eval_random_sim(decode_dl, model, post_proc, micro, proj_func=np.max, plot_gt=True, cuda=True, samples=1):

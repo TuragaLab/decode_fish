@@ -66,6 +66,7 @@ class DecodeDataset:
         ret_dict['x'] = x
         ret_dict['local_rate'] = local_rate
         ret_dict['background'] = background
+        ret_dict['frame_idx'] = i
         if self.from_records:
             ret_dict['crop_z'] = self.dataset_tfms[0].slice_z_glob
             ret_dict['crop_y'] = self.dataset_tfms[0].slice_y_glob

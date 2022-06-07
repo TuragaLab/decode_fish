@@ -22,7 +22,7 @@ class LinearInterpolatedPSF(nn.Module):
         Eventually remove unneeded losses.
     """
 
-    def __init__(self, size_zyx=[21,21,21], n_cols=1, device='cuda'):
+    def __init__(self, size_zyx=[21,21,21], n_cols=1, device='cuda', mode='bilinear'):
         super().__init__()
 
         self.psf_size = list(np.array(size_zyx).astype('int'))
@@ -38,6 +38,7 @@ class LinearInterpolatedPSF(nn.Module):
         self.device=device
         self.psf_volume = nn.Parameter(0.01*torch.rand(self.n_cols, *self.psf_size), requires_grad=True)
         self.forward_nonlin = torch.nn.Identity() # Could be used if one want's to save the psf volume in log space
+        self.mode = mode
 
     def forward(self, x_offset_val, y_offset_val, z_offset_val, z_inds=None, c_inds=None):
         """ Returns the PSF volume for a number of given subpixel shift.
@@ -77,15 +78,33 @@ class LinearInterpolatedPSF(nn.Module):
         # Create the grids
         i_img, x_grid, y_grid, z_grid = torch.meshgrid(torch.arange(N_em, dtype=torch.float32).to(self.device), self.x.to(self.device), self.y.to(self.device), z_g)
 
-        # Shift the grids
-        x_grid = x_grid - x_offset[:, None, None, None]
-        y_grid = y_grid - y_offset[:, None, None, None]
-        z_grid = z_grid - z_offset[:, None, None, None]
+        if self.mode == 'bilinear':
 
-        m_grid = torch.stack([x_grid, y_grid, z_grid], -1)
-        psf_out = torch.nn.functional.grid_sample(vol, m_grid, align_corners = False)
+            # Shift the grids
+            x_grid = x_grid - x_offset[:, None, None, None]
+            y_grid = y_grid - y_offset[:, None, None, None]
+            z_grid = z_grid - z_offset[:, None, None, None]
 
-        return psf_out.transpose(-3,-1)
+            m_grid = torch.stack([x_grid, y_grid, z_grid], -1)
+            psf_out = torch.nn.functional.grid_sample(vol, m_grid, align_corners = False)
+
+            return psf_out.transpose(-3,-1)
+
+        else:
+
+            z_grid_shifted = z_grid - z_offset[:, None, None, None]
+            m_grid = torch.stack([x_grid, y_grid, z_grid_shifted], -1)
+            psf_out = torch.nn.functional.grid_sample(vol, m_grid, align_corners = False, mode='bilinear')
+            psf_out = psf_out.transpose(-3,-1).transpose(1,2)[:,:,0] # Swap z into channel dim, and drop z dim.
+            i_img, x_grid, y_grid = torch.meshgrid(torch.arange(N_em, dtype=torch.float32).to(self.device), self.x.to(self.device), self.y.to(self.device))
+
+            x_grid = x_grid - x_offset[:, None, None]
+            y_grid = y_grid - y_offset[:, None, None]
+
+            m_grid = torch.stack([x_grid, y_grid], -1)
+            psf_out = torch.nn.functional.grid_sample(psf_out, m_grid, align_corners = False, mode='bicubic')
+
+            return psf_out[:,None].transpose(-2,-1)
 
     def get_com(self):
         """ Returns the center of mass of the squared volume."""

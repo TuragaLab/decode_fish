@@ -114,31 +114,25 @@ def get_n_locs(df):
             counts.append(vcounts[i])
     return counts
 
-def sel_int_ch(res_df, codebook):
+def sel_int_ch(res_df, codebook, sel_sig=True):
 
     if len(res_df):
 
         int_m = [f'int_{i}' for i in range(codebook.shape[1])]
-        int_s = [f'int_sig_{i}' for i in range(codebook.shape[1])]
-
         int_arr = res_df.loc[:,int_m].values
-        int_sig = res_df.loc[:,int_s].values
-
         int_arr_nz = int_arr[codebook[res_df['code_inds'].values].nonzero()].reshape([int_arr.shape[0], -1])
-        int_sig_nz = int_sig[codebook[res_df['code_inds'].values].nonzero()].reshape([int_sig.shape[0], -1])
-
-    #     print(int_arr.shape)
-
         ret_df = res_df.drop(columns=int_m)
-        ret_df = ret_df.drop(columns=int_s)
-
         ret_df[int_m[:4]] = int_arr_nz
-        ret_df[int_s[:4]] = int_sig_nz
-
         ret_df['tot_int'] = int_arr_nz.sum(1)
-        ret_df['tot_int_sig'] = int_sig_nz.sum(1)
-
         ret_df['int_ratio'] = ((int_arr).sum(-1) - int_arr_nz.sum(-1)) / int_arr_nz.sum(-1)
+
+        if sel_sig:
+            int_s = [f'int_sig_{i}' for i in range(codebook.shape[1])]
+            int_sig = res_df.loc[:,int_s].values
+            int_sig_nz = int_sig[codebook[res_df['code_inds'].values].nonzero()].reshape([int_sig.shape[0], -1])
+            ret_df = ret_df.drop(columns=int_s)
+            ret_df[int_s[:4]] = int_sig_nz
+            ret_df['tot_int_sig'] = int_sig_nz.sum(1)
 
         return ret_df
 

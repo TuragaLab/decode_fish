@@ -53,7 +53,7 @@ def my_app(cfg):
     else:
         crop = np.s_[:,:,:,:]
         
-    image_vol = read_MOp_tiff(image_paths[0], scaled=False, z_to_batch=True)
+    image_vol = read_MOp_tiff(image_paths[0], z_to_batch=True)
     res_df = window_predict(model, post_proc, image_vol, window_size=[None, 128, 128], crop=crop, device='cuda', 
                              chrom_map=get_color_shift_inp(micro.color_shifts, micro.col_shifts_yx)[:,:,None], scale=micro.get_ch_mult())      
     

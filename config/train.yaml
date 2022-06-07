@@ -58,6 +58,7 @@ genm:
         gauss_radii: [1.,1.,1.]
         psf_extent_zyx : [21,21,21]
         n_cols: 1
+        mode: bilinear
     noise:
         _target_: decode_fish.engine.noise.sCMOS
         theta: 2. 
@@ -103,6 +104,7 @@ sim:
         percentile: 50 # Percentage of volume that is not sampled from
     bg_estimation:
         type: 'smoothing'
+        shuffle_ch: False
         smoothing:
             _target_: decode_fish.funcs.dataset.GaussianSmoothing
             smoothing_filter_size: 5
@@ -139,6 +141,7 @@ network:
     int_conc: ${genm.intensity_dist.int_conc}
     int_rate: ${genm.intensity_dist.int_rate}
     int_loc:  ${genm.intensity_dist.int_loc}
+    resid_x: True
     
 post_proc_isi:
     _target_: decode_fish.funcs.output_trafo.ISIPostProcess
@@ -151,6 +154,7 @@ training:
     bs: 2
     start_iter: 0
     num_iters: 30000
+    checkpoint: 9900
     schedule: 
     start_int: 0
     start_mic: 0 
@@ -163,9 +167,12 @@ training:
     cat_logits: 0
     resume: False
     
+    pred_em_noise: False
+    
     net:
         enabled: True
         bl_loss_scale: 0.01
+        bl_loss: mse
         cnt_loss_scale: 1
         grad_clip: 0.005
         sched:   
@@ -180,8 +187,6 @@ training:
         enabled: True
         roi_rec: True
         grad_clip: 0.1
-        norm_reg: 0.0
-        l1_reg: 0.0003
         mean_diff: True
         freq: 1
 
@@ -192,6 +197,20 @@ training:
             psf_vol: False
             color_shifts: False
             z_facs: False
+        opt:
+            _target_: torch_optimizer.QHAdam
+            lr: 0.00025
+        sched:
+            _target_: torch.optim.lr_scheduler.StepLR
+            gamma: 0.5
+            step_size: 5000
+            
+    psf:
+        enabled: True
+        grad_clip: 0.1
+        norm_reg: 0.0
+        l1_reg: 0.0003
+
         opt:
             _target_: torch_optimizer.QHAdam
             lr: 0.00025

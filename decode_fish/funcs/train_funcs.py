@@ -50,15 +50,20 @@ def eval_logger(pred_df, target_df, iteration, data_str='Sim. '):
 
     return matches
 
-def save_train_state(save_dir, model, microscope, optim_dict, train_iter):
+def save_train_state(save_dir, model, microscope, optim_dict, train_iter, checkpoint=False):
 
-        torch.save({'state_dict':model.state_dict(), 'scaling':[model.inp_scale, model.inp_offset]}, save_dir/'model.pkl')
-        torch.save(microscope.state_dict(), save_dir/'microscope.pkl')
+    if checkpoint:
 
-        save_dict = {k:v.state_dict() for (k,v) in optim_dict.items()}
-        save_dict['train_iter'] = train_iter
+        save_dir = save_dir/'checkpoint/'
+        os.makedirs(save_dir, exist_ok=True)
 
-        torch.save(save_dict, save_dir/'training_state.pkl')
+    torch.save({'state_dict':model.state_dict(), 'scaling':[model.inp_scale, model.inp_offset]}, save_dir/'model.pkl')
+    torch.save(microscope.state_dict(), save_dir/'microscope.pkl')
+
+    save_dict = {k:v.state_dict() for (k,v) in optim_dict.items()}
+    save_dict['train_iter'] = train_iter
+
+    torch.save(save_dict, save_dir/'training_state.pkl')
 
 def exp_train_eval(bench_df, res_df, targets, wandb, batch_idx):
 
@@ -126,8 +131,10 @@ def train(cfg,
         codebook, targets = hydra.utils.instantiate(cfg.codebook)
 
     # Controls which genmodel parameters are optimized
-    for name, p in microscope.named_parameters():
+    for name, p in microscope.named_parameters(recurse=False):
         p.requires_grad = cfg.training.mic.par_grads[name]
+    for name, p in microscope.psf.named_parameters():
+        p.requires_grad = cfg.training.mic.par_grads['psf_vol']
 
     calc_log_p_x = False
     col_shift_map = cfg.genm.microscope.col_shifts_enabled
@@ -162,8 +169,12 @@ def train(cfg,
             zcrop, ycrop, xcrop, colshift_crop = None, None, None, None
 
         background = background * microscope.get_ch_mult().detach()
+        if cfg.sim.bg_estimation.shuffle_ch:
+            background = background.index_select(1, torch.randperm(background.shape[1]).cuda())
+
         x = x * microscope.get_ch_mult().detach()
 
+#         print('DL, ', time.time()-t0); t0 = time.time()
 
         if cfg.training.net.enabled:
 
@@ -196,7 +207,12 @@ def train(cfg,
                                                sim_z=cfg.genm.exp_type.pred_z, codebook=None, int_option=cfg.training.int_option).sample(from_code_book=False)
 
                 noise_inp = microscope.get_single_ch_inputs(*noise_vars[:-1], ycrop=ycrop, xcrop=xcrop)
-                xsim += microscope(*noise_inp, add_noise=True)
+                em_noise = microscope(*noise_inp, add_noise=True)
+
+                if cfg.training.pred_em_noise:
+                    background += em_noise
+                else:
+                    xsim += em_noise
 
             xsim_noise = microscope.noise(xsim, background, const_theta_sim=cfg.genm.exp_type.const_theta_sim).sample()
 
@@ -219,9 +235,12 @@ def train(cfg,
 
             gmm_loss = -(spatial_prob + cfg.training.net.cnt_loss_scale*count_prob).mean()
 
-            background_loss = F.mse_loss(out_sim['background'], background) * cfg.training.net.bl_loss_scale
+            if cfg.training.net.bl_loss == 'mse':
+                background_loss = F.mse_loss(out_sim['background'], background)
+            else:
+                background_loss = F.l1_loss(out_sim['background'], background)
 
-            loss = gmm_loss + background_loss
+            loss = gmm_loss + background_loss * cfg.training.net.bl_loss_scale
 
 #             print('Loss calc. ', time.time()-t0); t0 = time.time()
 
@@ -244,7 +263,7 @@ def train(cfg,
             proc_out_inp = post_proc.get_micro_inp(out_inp)
 
             if cfg.training.mic.enabled and batch_idx > cfg.training.start_mic and len(proc_out_inp[1]) > 0: # and len(proc_out_inp[1]) < 300:
-#                 print('Pre filt ', len(proc_out_inp[1]))
+# #                 print('Pre filt ', len(proc_out_inp[1]))
                 ch_out_inp = microscope.get_single_ch_inputs(*proc_out_inp, ycrop=ycrop, xcrop=xcrop)
                 optim_dict['optim_mic'].zero_grad()
                 calc_log_p_x = False
@@ -266,7 +285,7 @@ def train(cfg,
                     ch_out_inp = mic_inp_apply_inds(*ch_out_inp, filt_inds)
                     if len(ch_out_inp[1]):
                         psf_recs = microscope(*ch_out_inp, ret_psfs=True, add_noise=False)
-#                         print('N rec inds ', len(psf_recs))
+# #                         print('N rec inds ', len(psf_recs))
 
                         rois = extract_psf_roi(ch_out_inp[0], x, torch.tensor(psf_recs.shape))
                         bgs = extract_psf_roi(ch_out_inp[0], out_inp['background'], torch.tensor(psf_recs.shape))
@@ -296,19 +315,21 @@ def train(cfg,
 #                     print(ch_fac_loss)
                     log_p_x_given_z += ch_fac_loss
 
-                    if cfg.training.mic.norm_reg:
-                        log_p_x_given_z += cfg.training.mic.norm_reg * (microscope.psf.com_loss())
+                    if cfg.training.psf.norm_reg:
+                        log_p_x_given_z += cfg.training.psf.norm_reg * (microscope.psf.com_loss())
 
-                    if cfg.training.mic.l1_reg:
-                        log_p_x_given_z += cfg.training.mic.l1_reg * (microscope.psf.l1_diff_norm(microscope.psf_init_vol))
+                    if cfg.training.psf.l1_reg:
+                        log_p_x_given_z += cfg.training.psf.l1_reg * (microscope.psf.l1_diff_norm(microscope.psf_init_vol))
 
                     log_p_x_given_z.backward()
-                    if cfg.training.mic.grad_clip:
-                        torch.nn.utils.clip_grad_norm_(microscope.parameters(), max_norm=cfg.training.mic.grad_clip, norm_type=2)
+                    if cfg.training.mic.grad_clip: torch.nn.utils.clip_grad_norm_(microscope.parameters(recurse=False), max_norm=cfg.training.mic.grad_clip, norm_type=2)
+                    if cfg.training.mic.grad_clip: torch.nn.utils.clip_grad_norm_(microscope.psf.parameters(), max_norm=cfg.training.psf.grad_clip, norm_type=2)
 
                     optim_dict['optim_mic'].step()
+                    optim_dict['optim_psf'].step()
 
                 optim_dict['sched_mic'].step()
+                optim_dict['sched_psf'].step()
 
             if  cfg.training.int.enabled and batch_idx > cfg.training.start_int:
                 if len(ch_out_inp[1]):
@@ -329,6 +350,9 @@ def train(cfg,
 #                 print('INT ', time.time()-t0); t0 = time.time()
 
         # Logging
+        if batch_idx == cfg.training.checkpoint:
+            save_train_state(save_dir, model, microscope, optim_dict, batch_idx, checkpoint=True)
+
         if batch_idx % 10 == 0:
 
             if cfg.training.net.enabled:
@@ -336,7 +360,7 @@ def train(cfg,
                 wandb.log({'SL Losses/xyz_loss': spatial_prob.mean().detach().cpu().item()}, step=batch_idx)
     #             wandb.log({'SL Losses/ints_loss': int_prob.mean().detach().cpu().item()}, step=batch_idx)
                 wandb.log({'SL Losses/count_loss': (-count_prob.mean()).detach().cpu()}, step=batch_idx)
-    #             wandb.log({'SL Losses/bg_loss': background_loss.detach().cpu()}, step=batch_idx)
+                wandb.log({'SL Losses/bg_loss': background_loss.detach().cpu()}, step=batch_idx)
 
 #                 wandb.log({'AE Losses/int_mu': model.int_dist.int_conc.item()/model.int_dist.int_rate.item() + model.int_dist.int_loc.item()}, step=batch_idx)
 #                 wandb.log({'AE Losses/int_rate': model.int_dist.int_rate.item()}, step=batch_idx)
@@ -354,7 +378,7 @@ def train(cfg,
 #         if batch_idx > 0 and batch_idx % 1500 == 0:
 #             torch.save({'state_dict':model.state_dict(), 'scaling':[model.inp_scale, model.inp_offset]}, save_dir/f'model_{batch_idx}.pkl')
 
-        if batch_idx % cfg.output.log_interval == 0:
+        if batch_idx % cfg.output.log_interval == 0 and batch_idx > 0:
             print(batch_idx)
 
             if cfg.training.net.enabled:
@@ -365,7 +389,7 @@ def train(cfg,
                     px_size = cfg.evaluation.px_size_zyx
                     target_df = sample_to_df(*sim_vars[:5], sim_vars[-1], px_size_zyx=px_size)
     #                 print(len(pred_df), len(target_df))
-                    matches = eval_logger(pred_df, target_df, batch_idx, data_str='Sim. ')
+                    matches = eval_logger(pred_df[:5*len(target_df)], target_df, batch_idx, data_str='Sim. ')
 
                     wandb.log({'Sim. Metrics/prob_fac': torch.sigmoid(out_sim['logits']).sum().item()/(len(target_df)+0.1)}, step=batch_idx)
                     wandb.log({'Sim. Metrics/n_em_fac': len(pred_df)/(len(target_df)+0.1)}, step=batch_idx)
@@ -388,10 +412,12 @@ def train(cfg,
                         res_df['gene'] = targets[res_df['code_inds']]
                         res_df = sel_int_ch(res_df, codebook)
                         res_df = hydra.utils.call(cfg.evaluation.code_stats.df_postp_func, res_df=res_df)
-                        exp_train_eval(bench_df, res_df, targets, wandb=wandb, batch_idx=batch_idx)
+                        exp_train_eval(bench_df, res_df[:5*len(bench_df)], targets, wandb=wandb, batch_idx=batch_idx)
 
 
             # storing
             save_train_state(save_dir, model, microscope, optim_dict, batch_idx)
+
+#             print('Log., ', time.time()-t0); t0 = time.time()
 
     wandb.finish()

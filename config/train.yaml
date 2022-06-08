@@ -47,6 +47,7 @@ genm:
         n_genes: 1
         n_bits: 1
         int_inf: 'per_channel' # 'per_bit', 'per_channel'
+        em_noise_inf: True
         sample_from_codebook: False
         phasing: False
         const_theta_sim: True
@@ -127,7 +128,7 @@ network:
     depth: 2
     ch_in: ${genm.exp_type.n_channels} 
     f_maps: 32
-    n_p_ch: ${genm.exp_type.n_genes}
+    n_p_ch: ${add:${genm.exp_type.n_genes}, ${bool_fac:${genm.exp_type.em_noise_inf},${genm.exp_type.n_channels}}}
     n_bg_ch: ${genm.exp_type.n_channels}
     n_int_ch: ${n_int_ref[${genm.exp_type.int_inf}]}
     n_out_l: 1
@@ -197,6 +198,7 @@ training:
             psf_vol: False
             color_shifts: False
             z_facs: False
+            sc_fac: False
         opt:
             _target_: torch_optimizer.QHAdam
             lr: 0.00025

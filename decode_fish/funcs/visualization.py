@@ -46,7 +46,8 @@ def get_simulation_statistics(decode_dl, micro, int_conc, int_rate, int_loc, int
             sim_df = sim_df[sim_df['frame_idx'] == 0]
             sim_df = sim_df[sim_df[f'int_{rand_ch}'] > 0]
 
-            x = cpu(ret_dict['x'][0,rand_ch])
+            x = cpu(ret_dict['x'])
+            x = (x * micro.get_ch_mult().detach())[0,rand_ch]
             xsim = cpu(xsim[0,rand_ch])
 
             fig1, axes = plot_3d_projections(x, display=False)

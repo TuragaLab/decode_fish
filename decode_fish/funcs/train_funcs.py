@@ -127,8 +127,13 @@ def train(cfg,
     torch.save(microscope.psf.state_dict(), str(save_dir) + '/psf_init.pkl' )
 
     # Load codebook
+    code_weight = None
     if 'codebook' in cfg:
         codebook, targets = hydra.utils.instantiate(cfg.codebook)
+        sim_codebook = torch.tensor(codebook, dtype=torch.bool) if not cfg.genm.exp_type.em_noise_inf else torch.tensor(expand_codebook(codebook), dtype=torch.bool)
+        post_proc.codebook = sim_codebook
+        code_weight = torch.ones(len(sim_codebook))
+        code_weight[len(codebook):] *= cfg.genm.emitter_noise.rate_fac
 
     # Controls which genmodel parameters are optimized
     for name, p in microscope.named_parameters(recurse=False):
@@ -183,12 +188,15 @@ def train(cfg,
             sim_vars = PointProcessUniform(local_rate[:,0], int_conc=model.int_dist.int_conc.detach(),
                                            int_rate=model.int_dist.int_rate.detach(), int_loc=model.int_dist.int_loc.detach(),
                                            sim_iters=5, channels=cfg.genm.exp_type.n_channels, n_bits=cfg.genm.exp_type.n_bits,
-                                           sim_z=cfg.genm.exp_type.pred_z, codebook=torch.tensor(codebook, dtype=torch.bool), int_option=cfg.training.int_option).sample(from_code_book=True)
+                                           sim_z=cfg.genm.exp_type.pred_z, codebook=sim_codebook, int_option=cfg.training.int_option, code_weight=code_weight).sample(from_code_book=True)
 
             # sim_vars = locs_sl, x_os_sl, y_os_sl, z_os_sl, ints_sl, output_shape, codes
 #             print('Sim, ', time.time()-t0); t0 = time.time()
             ch_inp = list(microscope.get_single_ch_inputs(*sim_vars[:-1], ycrop=ycrop, xcrop=xcrop))
-            ch_inp[1:4] = add_pos_noise(ch_inp[1:4], [cfg.genm.pos_noise.pos_noise_xy, cfg.genm.pos_noise.pos_noise_xy, cfg.genm.pos_noise.pos_noise_z], cfg.genm.exp_type.n_bits)
+            cond = sim_vars[-1] < len(codebook)
+            cb_cool = torch.repeat_interleave(cond, cond * (cfg.genm.exp_type.n_bits - 1) + 1)
+            ch_inp[1][cb_cool], ch_inp[2][cb_cool], ch_inp[3][cb_cool] = add_pos_noise([ch_inp[1][cb_cool], ch_inp[2][cb_cool], ch_inp[3][cb_cool]],
+                                                                                       [cfg.genm.pos_noise.pos_noise_xy, cfg.genm.pos_noise.pos_noise_xy, cfg.genm.pos_noise.pos_noise_z], cfg.genm.exp_type.n_bits)
             xsim = microscope(*ch_inp, add_noise=True)
 
             if cfg.genm.phasing:
@@ -199,20 +207,20 @@ def train(cfg,
 #             print('Micro, ', time.time()-t0); t0 = time.time()
 
             # Spurious emitter patterns (not from codebook)
-            if cfg.genm.emitter_noise.rate_fac:
+#             if cfg.genm.emitter_noise.rate_fac:
 
-                noise_vars = PointProcessUniform(local_rate[:,0] * cfg.genm.emitter_noise.rate_fac, int_conc=model.int_dist.int_conc.detach() * cfg.genm.emitter_noise.int_fac,
-                                               int_rate=model.int_dist.int_rate.detach(), int_loc=model.int_dist.int_loc.detach(),
-                                               sim_iters=5, channels=cfg.genm.exp_type.n_channels, n_bits=1,
-                                               sim_z=cfg.genm.exp_type.pred_z, codebook=None, int_option=cfg.training.int_option).sample(from_code_book=False)
+#                 noise_vars = PointProcessUniform(local_rate[:,0] * cfg.genm.emitter_noise.rate_fac, int_conc=model.int_dist.int_conc.detach() * cfg.genm.emitter_noise.int_fac,
+#                                                int_rate=model.int_dist.int_rate.detach(), int_loc=model.int_dist.int_loc.detach(),
+#                                                sim_iters=5, channels=cfg.genm.exp_type.n_channels, n_bits=1,
+#                                                sim_z=cfg.genm.exp_type.pred_z, codebook=None, int_option=cfg.training.int_option).sample(from_code_book=False)
 
-                noise_inp = microscope.get_single_ch_inputs(*noise_vars[:-1], ycrop=ycrop, xcrop=xcrop)
-                em_noise = microscope(*noise_inp, add_noise=True)
+#                 noise_inp = microscope.get_single_ch_inputs(*noise_vars[:-1], ycrop=ycrop, xcrop=xcrop)
+#                 em_noise = microscope(*noise_inp, add_noise=True)
 
-                if cfg.training.pred_em_noise:
-                    background += em_noise
-                else:
-                    xsim += em_noise
+#                 if cfg.training.pred_em_noise:
+#                     background += em_noise
+#                 else:
+#                     xsim += em_noise
 
             xsim_noise = microscope.noise(xsim, background, const_theta_sim=cfg.genm.exp_type.const_theta_sim).sample()
 
@@ -409,8 +417,11 @@ def train(cfg,
 
                         res_df = window_predict(model, post_proc, dl.dataset.volumes, window_size=[None, 64, 64], device='cuda', crop=crop,
                                                 chrom_map=get_color_shift_inp(microscope.color_shifts, microscope.col_shifts_yx)[:,:,None], scale=microscope.get_ch_mult().detach())
+
+                        res_df = res_df[res_df['code_inds'] < len(codebook)]
                         res_df['gene'] = targets[res_df['code_inds']]
                         res_df = sel_int_ch(res_df, codebook)
+                        wandb.log({'AE Losses/N_pred_tot_ppp': len(res_df)/len(bench_df)}, step=batch_idx)
                         res_df = hydra.utils.call(cfg.evaluation.code_stats.df_postp_func, res_df=res_df)
                         exp_train_eval(bench_df, res_df[:5*len(bench_df)], targets, wandb=wandb, batch_idx=batch_idx)
 

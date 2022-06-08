@@ -15,6 +15,9 @@ from tqdm import tqdm
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
+OmegaConf.register_new_resolver("add", lambda *numbers: sum(numbers))
+OmegaConf.register_new_resolver("bool_fac", lambda bfac, num: bool(bfac)*num)
+
 default_conf = '../config/train.yaml'
 # simfish_dir = '/groups/turaga/home/speisera/share_TUM/FishSIM/'
 # temp_dir = '/groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deeppop/temp_save/'

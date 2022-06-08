@@ -23,7 +23,7 @@ class PointProcessUniform(Distribution):
             This results in the same average number of sampled emitters but allows us to sample multiple emitters within one voxel.
 
     """
-    def __init__(self, local_rate: torch.tensor, int_conc=0., int_rate=1., int_loc=1., sim_iters: int = 5, channels=1, n_bits=1, sim_z=True, codebook=None, int_option=1):
+    def __init__(self, local_rate: torch.tensor, int_conc=0., int_rate=1., int_loc=1., sim_iters: int = 5, channels=1, n_bits=1, sim_z=True, codebook=None, int_option=1, code_weight=None):
 
         assert sim_iters >= 1
         self.local_rate = local_rate
@@ -35,10 +35,11 @@ class PointProcessUniform(Distribution):
         self.channels = channels
         self.n_bits = n_bits
         self.sim_z=sim_z
-        self.codebook=codebook
+        self.codebook=torch.tensor(codebook) if codebook is not None else None
         self.int_option = int_option
         if self.codebook is not None:
             self.channels = self.codebook.shape[-1]
+            self.code_weight = code_weight.to(self.device) if code_weight is not None else torch.ones(len(self.codebook)).to(self.device)
 
     def sample(self, from_code_book=False, phasing=False):
 
@@ -84,13 +85,14 @@ class PointProcessUniform(Distribution):
         if self.channels > 1:
             code_draw = None
             if from_code_book:
-                code_draw = torch.randint(0, len(self.codebook), size=[n_emitter])
+#                 code_draw = torch.randint(0, len(self.codebook), size=[n_emitter])
+                code_draw = torch.multinomial(self.code_weight, num_samples=n_emitter, replacement=True)
                 ch_draw = self.codebook[code_draw]
 
             else:
 
                 m_draw = torch.multinomial(torch.ones([n_emitter,self.channels])/self.channels, self.n_bits, replacement=False)
-                ch_draw = torch.zeros(intensities.shape).to(intensities.device)
+                ch_draw = torch.zeros(intensities.shape).to(intensities.device, dtype=torch.float32)
                 ch_draw.scatter_(index=m_draw.to(intensities.device), dim=1, value=1)
 
             intensities = intensities.to(self.device) * ch_draw.to(self.device)

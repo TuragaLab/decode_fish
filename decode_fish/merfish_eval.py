@@ -58,7 +58,7 @@ def my_app(cfg):
                              chrom_map=get_color_shift_inp(micro.color_shifts, micro.col_shifts_yx)[:,:,None], scale=micro.get_ch_mult())      
     
     #res_df = exclude_borders(res_df, border_size_zyx=[0,4000,4000], img_size=[2048*100,2048*100,2048*100])
-    res_df['gene'] = targets[res_df['code_inds']]
+    # res_df['gene'] = targets[res_df['code_inds']]
     
     ###
     max_vol = image_vol * micro.get_ch_mult().to(image_vol.device)

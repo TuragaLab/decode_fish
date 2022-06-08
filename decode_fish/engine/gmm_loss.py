@@ -151,7 +151,6 @@ def get_true_labels_mf(bs, locations, x_os, y_os, z_os, int_ch, codes, slice_rec
     if slice_rec: z_os = z_os * z_sig_fac
     z =  z_os + locations[-3].type(torch.cuda.FloatTensor)
 
-    loc_idx = torch.arange(n_gt).repeat_interleave(4)
     if int_inf == 'sum':
         intensity = int_ch.sum(-1)[:,None]
     if int_inf == 'per_bit':

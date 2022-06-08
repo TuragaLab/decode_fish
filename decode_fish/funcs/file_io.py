@@ -69,7 +69,7 @@ def get_vol_psf(filename, device='cuda', psf_extent_zyx=None, n_cols=1, mode='bi
 
     if 'tif' in filename:
         psf_vol = load_tiff_image(filename)
-        psf_vol *= psf_extent_zyx
+#         psf_vol *= psf_extent_zyx
 #         psf_vol = torch.tensor(np.array(psf_vol).take(indices=range(0, psf_extent_zyx), axis=-3))
         psf = LinearInterpolatedPSF(psf_vol.shape[-3:], device=device, n_cols=n_cols, mode=mode)
         if psf_vol.ndim == 3: psf_vol = psf_vol[None]

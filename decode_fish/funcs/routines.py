@@ -93,7 +93,7 @@ def get_prediction(model, vol, post_proc, col_offset_map=None, micro=None, cuda=
             ch_inp = micro.get_single_ch_inputs(*micro_inp)
             ae_img_3d = micro(*ch_inp)
 
-            filt_inds = get_roi_filt_inds(*ch_inp[0], micro.psf.psf_volume.shape, vol.shape, slice_rec=micro.slice_rec, min_dist=10)
+            filt_inds = get_roi_filt_inds(*ch_inp[0], micro.psf.psf_volume.shape, vol.shape, slice_rec=micro.slice_rec, min_dist=0)
             ch_inp = mic_inp_apply_inds(*ch_inp, filt_inds)
             if len(ch_inp[1]):
                 psf_recs = micro(*ch_inp, ret_psfs=True, add_noise=False)

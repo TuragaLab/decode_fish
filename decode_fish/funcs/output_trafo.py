@@ -28,7 +28,7 @@ def sample_to_df(locs, x_os, y_os, z_os, ints, codes, px_size_zyx=[100,100,100])
     for i in range(channels):
         df[f'int_{i}'] = ints[:,i].cpu()
 
-    df['code_inds'] = codes
+    df['code_inds'] = cpu(codes)
     df['ints'] = ints.sum(-1).cpu()
 
     return df

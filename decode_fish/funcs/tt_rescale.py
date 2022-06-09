@@ -40,10 +40,6 @@ def rescale_train(cfg,
     save_dir = Path(cfg.output.save_dir)
     model.cuda()
 
-    # Load codebook
-    if 'codebook' in cfg:
-        code_ref, targets = hydra.utils.instantiate(cfg.codebook)
-
     # Controls which genmodel parameters are optimized
     for name, p in microscope.named_parameters():
         if name == 'channel_facs':
@@ -84,7 +80,7 @@ def rescale_train(cfg,
             for i in range(cfg.genm.exp_type.n_channels):
                 if i in ch_inds:
                     int_means[i] = int_vals[ch_inds == i].mean() / int_vals.mean()
-            int_means_col.append(int_means.detach())
+#             int_means_col.append(int_means.detach())
 #             print(int_means)
             ch_fac_loss = torch.sqrt(torch.mean((microscope.channel_facs - microscope.channel_facs.detach() / int_means)**2))
 
@@ -94,7 +90,7 @@ def rescale_train(cfg,
             optim_dict['optim_mic'].step()
             optim_dict['sched_mic'].step()
 
-            losses.append(ch_fac_loss.item())
+#             losses.append(ch_fac_loss.item())
 
             # Logging
             if batch_idx % cfg.output.log_interval == 0:

@@ -19,7 +19,7 @@ from matplotlib.backends.backend_agg import FigureCanvas
 from .routines import get_prediction
 
 # Cell
-def get_simulation_statistics(decode_dl, micro, int_conc, int_rate, int_loc, int_threshold=1, samples = 1, channels=1, n_bits=1, psf_noise=True, const_theta_sim=True):
+def get_simulation_statistics(decode_dl, micro, point_process, int_threshold=1, samples = 1):
 
     """
     Draws a sample from the dataloader, and plots a slice of the real volume and the simulated volume.
@@ -34,20 +34,20 @@ def get_simulation_statistics(decode_dl, micro, int_conc, int_rate, int_loc, int
                 ret_dict = next(iter(decode_dl))
                 xmax = ret_dict['x'][0,0,:].max()
 
-            rand_ch = np.random.randint(0,channels)
+            x = cpu(ret_dict['x'] * micro.get_ch_mult().detach())
 
-            sim_vars = PointProcessUniform(ret_dict['local_rate'][:,0],int_conc, int_rate, int_loc, channels=channels, n_bits=n_bits, sim_z=True,
-                                  codebook=None, int_option=3).sample(from_code_book=False, phasing=False)
+            rand_ch = np.random.randint(0,x.shape[1])
+
+            sim_vars = point_process.sample(ret_dict['local_rate'][:,0], from_code_book=False)
             ch_inp = micro.get_single_ch_inputs(*sim_vars[:-1])
-            xsim = micro(*ch_inp, add_noise=psf_noise)
-            xsim = micro.noise(xsim, ret_dict['background'], const_theta_sim=const_theta_sim).sample()
+            xsim = micro(*ch_inp)
+            xsim = micro.noise(xsim, ret_dict['background'] * micro.get_ch_mult().detach()).sample()
 
             sim_df = sample_to_df(*sim_vars[:5], sim_vars[-1], px_size_zyx=[1.,1.,1.])
             sim_df = sim_df[sim_df['frame_idx'] == 0]
             sim_df = sim_df[sim_df[f'int_{rand_ch}'] > 0]
 
-            x = cpu(ret_dict['x'])
-            x = (x * micro.get_ch_mult().detach())[0,rand_ch]
+            x = x[0,rand_ch]
             xsim = cpu(xsim[0,rand_ch])
 
             fig1, axes = plot_3d_projections(x, display=False)

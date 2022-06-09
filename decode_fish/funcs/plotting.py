@@ -128,11 +128,11 @@ def plot_channels(volume, n_rows=1, dfs=None, codebook=None, proj_func=np.max, s
 
             if dfs is not None:
                 for k, df in enumerate(dfs):
-                    sub_df = df[codebook[df['code_inds']][:,curr_ind] > 0]
-                    axes[i, j].scatter(sub_df['x'],sub_df['y'], edgecolors=colors[k], s=sc_sz, marker=markers[k%3], facecolors='none', linewidth=2)
+                    sub_df = df[np.array(codebook[df['code_inds'].values][:,curr_ind] > 0)]
+                    axes[i, j].scatter(sub_df['x'],sub_df['y'], edgecolors=colors[k], s=sc_sz, marker=markers[k%3], facecolors='none', linewidth=2, label=f'DF_{k}')
 
 #     fig.colorbar(im)
-
+    axes[0, 0].legend()
     plt.tight_layout()
 
     if not display: plt.close(fig)

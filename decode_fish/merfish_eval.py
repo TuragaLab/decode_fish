@@ -20,6 +20,7 @@ from decode_fish.funcs.fit_psf import get_peaks_3d
 from decode_fish.funcs.routines import *
 from decode_fish.funcs.predict import window_predict
 from decode_fish.funcs.exp_specific import *
+from decode_fish.funcs.tt_rescale import rescale_train
 import wandb
 import kornia
 
@@ -44,7 +45,6 @@ def my_app(cfg):
     
     model.eval().cuda()
     
-    code_ref, targets = hydra.utils.instantiate(model_cfg.codebook)
     
     image_paths = sorted(glob.glob(cfg.image_path))
     
@@ -53,7 +53,31 @@ def my_app(cfg):
     else:
         crop = np.s_[:,:,:,:]
         
-    image_vol = read_MOp_tiff(image_paths[0], z_to_batch=True)
+    if cfg.scale_train:
+        
+        model_cfg.training.bs = 50
+        model_cfg.training.num_iters = 200
+        model_cfg.training.mic.opt.lr = 0.01
+        model_cfg.training.mic.sched.step_size = 100
+        model_cfg.data_path.image_path = cfg.image_path
+        
+        codebook, targets = hydra.utils.instantiate(model_cfg.codebook)
+        post_proc.codebook = torch.tensor(expand_codebook(codebook)) if model_cfg.genm.exp_type.em_noise_inf else torch.tensor(codebook)
+        image_vol, decode_dl = get_dataloader(model_cfg)
+        optim_dict = {}
+        optim_dict['optim_mic'] = hydra.utils.instantiate(model_cfg.training.mic.opt, params=micro.parameters())
+        optim_dict['sched_mic'] = hydra.utils.instantiate(model_cfg.training.mic.sched, optimizer=optim_dict['optim_mic'])
+        
+        rescale_train(cfg=model_cfg,
+             model=model, 
+             microscope=micro, 
+             post_proc=post_proc,
+             dl=decode_dl, 
+             optim_dict=optim_dict)
+
+    else:
+        image_vol = read_MOp_tiff(image_paths[0], z_to_batch=True)
+        
     res_df = window_predict(model, post_proc, image_vol, window_size=[None, 128, 128], crop=crop, device='cuda', 
                              chrom_map=get_color_shift_inp(micro.color_shifts, micro.col_shifts_yx)[:,:,None], scale=micro.get_ch_mult())      
     

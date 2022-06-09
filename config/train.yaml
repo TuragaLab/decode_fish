@@ -220,14 +220,3 @@ training:
             _target_: torch.optim.lr_scheduler.StepLR
             gamma: 0.5
             step_size: 5000
-            
-    int:
-        enabled: True
-        grad_clip: 
-        opt:
-            _target_: torch_optimizer.QHAdam
-            lr: 0.001
-        sched:
-            _target_: torch.optim.lr_scheduler.StepLR
-            gamma: 0.5
-            step_size: 5000

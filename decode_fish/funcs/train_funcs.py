@@ -128,12 +128,17 @@ def train(cfg,
 
     # Load codebook
     code_weight = None
-    if 'codebook' in cfg:
-        codebook, targets = hydra.utils.instantiate(cfg.codebook)
-        sim_codebook = torch.tensor(codebook, dtype=torch.bool) if not cfg.genm.exp_type.em_noise_inf else torch.tensor(expand_codebook(codebook), dtype=torch.bool)
-        post_proc.codebook = sim_codebook
-        code_weight = torch.ones(len(sim_codebook))
-        code_weight[len(codebook):] *= cfg.genm.emitter_noise.rate_fac
+    codebook, targets = hydra.utils.instantiate(cfg.codebook)
+
+    sim_codebook = torch.tensor(codebook, dtype=torch.bool) if not cfg.genm.exp_type.em_noise_inf else torch.tensor(expand_codebook(codebook), dtype=torch.bool)
+    post_proc.codebook = sim_codebook
+    code_weight = torch.ones(len(sim_codebook))
+    code_weight[len(codebook):] *= cfg.genm.emitter_noise.rate_fac
+
+    # Load particle sampler
+    point_process = PointProcessUniform(int_conc=model.int_dist.int_conc.detach(), int_rate=model.int_dist.int_rate.detach(), int_loc=model.int_dist.int_loc.detach(),
+                                       sim_iters=5, n_channels=cfg.genm.exp_type.n_channels, sim_z=cfg.genm.exp_type.pred_z, slice_rec=cfg.genm.exp_type.slice_rec,
+                                        codebook=sim_codebook, int_option=cfg.training.int_option, code_weight=code_weight)
 
     # Controls which genmodel parameters are optimized
     for name, p in microscope.named_parameters(recurse=False):
@@ -185,10 +190,7 @@ def train(cfg,
 
             optim_dict['optim_net'].zero_grad()
 
-            sim_vars = PointProcessUniform(local_rate[:,0], int_conc=model.int_dist.int_conc.detach(),
-                                           int_rate=model.int_dist.int_rate.detach(), int_loc=model.int_dist.int_loc.detach(),
-                                           sim_iters=5, channels=cfg.genm.exp_type.n_channels, n_bits=cfg.genm.exp_type.n_bits,
-                                           sim_z=cfg.genm.exp_type.pred_z, codebook=sim_codebook, int_option=cfg.training.int_option, code_weight=code_weight).sample(from_code_book=True)
+            sim_vars = point_process.sample(local_rate[:,0])
 
             # sim_vars = locs_sl, x_os_sl, y_os_sl, z_os_sl, ints_sl, output_shape, codes
 #             print('Sim, ', time.time()-t0); t0 = time.time()
@@ -206,24 +208,7 @@ def train(cfg,
                 xsim += microscope(*phasing_inp, add_noise=True) * cfg.genm.phasing * torch.rand(xsim.shape, device=xsim.device)
 #             print('Micro, ', time.time()-t0); t0 = time.time()
 
-            # Spurious emitter patterns (not from codebook)
-#             if cfg.genm.emitter_noise.rate_fac:
-
-#                 noise_vars = PointProcessUniform(local_rate[:,0] * cfg.genm.emitter_noise.rate_fac, int_conc=model.int_dist.int_conc.detach() * cfg.genm.emitter_noise.int_fac,
-#                                                int_rate=model.int_dist.int_rate.detach(), int_loc=model.int_dist.int_loc.detach(),
-#                                                sim_iters=5, channels=cfg.genm.exp_type.n_channels, n_bits=1,
-#                                                sim_z=cfg.genm.exp_type.pred_z, codebook=None, int_option=cfg.training.int_option).sample(from_code_book=False)
-
-#                 noise_inp = microscope.get_single_ch_inputs(*noise_vars[:-1], ycrop=ycrop, xcrop=xcrop)
-#                 em_noise = microscope(*noise_inp, add_noise=True)
-
-#                 if cfg.training.pred_em_noise:
-#                     background += em_noise
-#                 else:
-#                     xsim += em_noise
-
             xsim_noise = microscope.noise(xsim, background, const_theta_sim=cfg.genm.exp_type.const_theta_sim).sample()
-
 
 #             print('Noise. ', time.time()-t0); t0 = time.time()
 
@@ -339,23 +324,6 @@ def train(cfg,
                 optim_dict['sched_mic'].step()
                 optim_dict['sched_psf'].step()
 
-            if  cfg.training.int.enabled and batch_idx > cfg.training.start_int:
-                if len(ch_out_inp[1]):
-                    optim_dict['optim_int'].zero_grad()
-                    ints = ch_out_inp[-2]
-                    ints = torch.clamp_min(ints, model.int_dist.int_loc.detach() + 0.01)
-
-                    gamma_int = D.Gamma(model.int_dist.int_conc, model.int_dist.int_rate)
-                    loc_trafo = [D.AffineTransform(loc=model.int_dist.int_loc.detach(), scale=1)]
-                    int_loss = -D.TransformedDistribution(gamma_int, loc_trafo).log_prob(ints.detach()).mean()
-
-                    if cfg.training.int.grad_clip:
-                        torch.nn.utils.clip_grad_norm_(model.int_dist.parameters(), max_norm=cfg.training.mic.grad_clip, norm_type=2)
-
-                    int_loss.backward()
-                    optim_dict['optim_int'].step()
-
-#                 print('INT ', time.time()-t0); t0 = time.time()
 
         # Logging
         if batch_idx == cfg.training.checkpoint:
@@ -386,7 +354,7 @@ def train(cfg,
 #         if batch_idx > 0 and batch_idx % 1500 == 0:
 #             torch.save({'state_dict':model.state_dict(), 'scaling':[model.inp_scale, model.inp_offset]}, save_dir/f'model_{batch_idx}.pkl')
 
-        if batch_idx % cfg.output.log_interval == 0 and batch_idx > 0:
+        if batch_idx % cfg.output.log_interval == 0 and batch_idx > 1200:
             print(batch_idx)
 
             if cfg.training.net.enabled:
@@ -422,8 +390,9 @@ def train(cfg,
                         res_df['gene'] = targets[res_df['code_inds']]
                         res_df = sel_int_ch(res_df, codebook)
                         wandb.log({'AE Losses/N_pred_tot_ppp': len(res_df)/len(bench_df)}, step=batch_idx)
+                        res_df = res_df[:3*len(bench_df)]
                         res_df = hydra.utils.call(cfg.evaluation.code_stats.df_postp_func, res_df=res_df)
-                        exp_train_eval(bench_df, res_df[:5*len(bench_df)], targets, wandb=wandb, batch_idx=batch_idx)
+                        exp_train_eval(bench_df, res_df, targets, wandb=wandb, batch_idx=batch_idx)
 
 
             # storing

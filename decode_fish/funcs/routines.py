@@ -24,8 +24,7 @@ from omegaconf import open_dict
 from hydra import compose, initialize
 
 # Cell
-def sim_data(decode_dl, micro, batches, int_conc=4., int_rate=1., int_loc=.5, channels=1, n_bits=1, codebook=None, rate_fac=1., pos_noise_xy=0., pos_noise_z=0.,
-             emitter_noise_rate_fac=0, emitter_noise_int_fac=0, const_theta_sim=True, int_option=1):
+def sim_data(decode_dl, micro, point_process, batches, n_codes, rate_fac=1., pos_noise_xy=0., pos_noise_z=0., const_theta_sim=True, n_bits=4):
 
     gt_dfs = []
     xsim_col = []
@@ -43,20 +42,14 @@ def sim_data(decode_dl, micro, batches, int_conc=4., int_rate=1., int_loc=.5, ch
             background = background * micro.get_ch_mult()
             local_rate *= rate_fac
 
-            sim_vars = PointProcessUniform(local_rate[:,0], int_conc, int_rate, int_loc, channels=channels, n_bits=n_bits, sim_z=micro.slice_rec, codebook=codebook, int_option=int_option).sample(from_code_book=(codebook is not None))
+            sim_vars = point_process.sample(local_rate[:,0])
             ch_inp = list(micro.get_single_ch_inputs(*sim_vars[:-1], ycrop=ycrop, xcrop=xcrop))
             if pos_noise_xy or pos_noise_z:
-                ch_inp[1:4] = add_pos_noise(ch_inp[1:4], [pos_noise_xy, pos_noise_xy, pos_noise_z], n_bits)
+                cond = sim_vars[-1] < n_codes
+                cb_cool = torch.repeat_interleave(cond, cond * (n_bits - 1) + 1)
+                ch_inp[1][cb_cool], ch_inp[2][cb_cool], ch_inp[3][cb_cool] = add_pos_noise([ch_inp[1][cb_cool], ch_inp[2][cb_cool], ch_inp[3][cb_cool]],
+                                                                                           [pos_noise_xy, pos_noise_xy, pos_noise_z], n_bits)
             xsim = micro(*ch_inp, add_noise=True)
-
-            if emitter_noise_rate_fac:
-                noise_vars = PointProcessUniform(local_rate[:,0] * emitter_noise_rate_fac, int_conc=int_conc * emitter_noise_int_fac,
-                                               int_rate=int_rate, int_loc=int_loc,
-                                               sim_iters=5, channels=channels, n_bits=1,
-                                               sim_z=micro.slice_rec, codebook=None, int_option=int_option).sample(from_code_book=False)
-
-                noise_inp = micro.get_single_ch_inputs(*noise_vars[:-1], ycrop=ycrop, xcrop=xcrop)
-                xsim += micro(*noise_inp, add_noise=True)
 
             x = micro.noise(xsim, background, const_theta_sim=const_theta_sim).sample()
 

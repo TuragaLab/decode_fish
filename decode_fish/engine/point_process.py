@@ -23,27 +23,28 @@ class PointProcessUniform(Distribution):
             This results in the same average number of sampled emitters but allows us to sample multiple emitters within one voxel.
 
     """
-    def __init__(self, local_rate: torch.tensor, int_conc=0., int_rate=1., int_loc=1., sim_iters: int = 5, channels=1, n_bits=1, sim_z=True, codebook=None, int_option=1, code_weight=None):
+    def __init__(self, int_conc=0., int_rate=1., int_loc=1., sim_iters: int = 5, n_channels=1, sim_z=True, slice_rec=True, codebook=None, int_option=1, code_weight=None, device='cuda'):
 
         assert sim_iters >= 1
-        self.local_rate = local_rate
-        self.device = self._get_device(self.local_rate)
         self.sim_iters = sim_iters
         self.int_conc = int_conc
         self.int_rate = int_rate
         self.int_loc = int_loc
-        self.channels = channels
-        self.n_bits = n_bits
-        self.sim_z=sim_z
-        self.codebook=torch.tensor(codebook) if codebook is not None else None
+        self.n_channels = n_channels
+        self.sim_z = sim_z
+        self.slice_rec = slice_rec
         self.int_option = int_option
+        self.device = device
+
+        self.codebook = torch.tensor(codebook).to(self.device) if codebook is not None else None
+
         if self.codebook is not None:
-            self.channels = self.codebook.shape[-1]
+            self.n_channels = self.codebook.shape[-1]
             self.code_weight = code_weight.to(self.device) if code_weight is not None else torch.ones(len(self.codebook)).to(self.device)
 
-    def sample(self, from_code_book=False, phasing=False):
+    def sample(self, local_rate, from_code_book=True):
 
-        res_ = [self._sample(self.local_rate/self.sim_iters, from_code_book, phasing) for i in range(self.sim_iters)]
+        res_ = [self._sample(local_rate.to(self.device)/self.sim_iters, from_code_book) for i in range(self.sim_iters)]
         locations = torch.cat([i[0] for i in res_], dim=0)
         x_offset = torch.cat([i[1] for i in res_], dim=0)
         y_offset = torch.cat([i[2] for i in res_], dim=0)
@@ -53,7 +54,7 @@ class PointProcessUniform(Distribution):
 
         return list(locations.T), x_offset, y_offset, z_offset, intensities, res_[0][5], codes
 
-    def _sample(self, local_rate, from_code_book, phasing):
+    def _sample(self, local_rate, from_code_book):
 
         output_shape = list(local_rate.shape)
         local_rate = torch.clamp(local_rate,0.,1.)
@@ -61,18 +62,20 @@ class PointProcessUniform(Distribution):
         n_emitter = int(locations.sum().item())
         x_offset = D.Uniform(low=-0.5, high=0.5).sample(sample_shape=[n_emitter]).to(self.device)
         y_offset = D.Uniform(low=-0.5, high=0.5).sample(sample_shape=[n_emitter]).to(self.device)
-        '''1.0 only makes sense for slice rec.'''
-        z_offset = D.Uniform(low=-1.0, high=1.0).sample(sample_shape=[n_emitter]).to(self.device)
+        z_offset = D.Uniform(low=-0.5, high=0.5).sample(sample_shape=[n_emitter]).to(self.device)
 
-#         intensities = torch.zeros([n_emitter, self.channels]).to(self.device)
+        if self.slice_rec: # For slice rec we use larger range
+            z_offset *= 2
+
+#         intensities = torch.zeros([n_emitter, self.n_channels]).to(self.device)
         if self.int_option == 1:
-            intensities = D.Gamma(self.int_conc, self.int_rate).sample(sample_shape=[n_emitter, self.channels]).to(self.device) + self.int_loc
+            intensities = D.Gamma(self.int_conc, self.int_rate).sample(sample_shape=[n_emitter, self.n_channels]).to(self.device) + self.int_loc
         elif self.int_option == 2:
             intensities = D.Gamma(self.int_conc, self.int_rate).sample(sample_shape=[n_emitter, 1]).to(self.device) + self.int_loc
-            intensities = intensities.repeat_interleave(self.channels, 1)
+            intensities = intensities.repeat_interleave(self.n_channels, 1)
         elif self.int_option == 3:
             intensities = D.Gamma(self.int_conc, self.int_rate).sample(sample_shape=[n_emitter, 1]).to(self.device) + self.int_loc
-            intensities = intensities.repeat_interleave(self.channels, 1)
+            intensities = intensities.repeat_interleave(self.n_channels, 1)
             int_noise = D.Uniform(low=.7, high=1.5).sample(sample_shape=intensities.shape).to(self.device)
             intensities *= int_noise
 
@@ -82,27 +85,22 @@ class PointProcessUniform(Distribution):
 
         locations = locations.nonzero(as_tuple=False)
 
-        if self.channels > 1:
+        if self.n_channels > 1:
             code_draw = None
             if from_code_book:
-#                 code_draw = torch.randint(0, len(self.codebook), size=[n_emitter])
                 code_draw = torch.multinomial(self.code_weight, num_samples=n_emitter, replacement=True)
                 ch_draw = self.codebook[code_draw]
 
             else:
 
-                m_draw = torch.multinomial(torch.ones([n_emitter,self.channels])/self.channels, self.n_bits, replacement=False)
-                ch_draw = torch.zeros(intensities.shape).to(intensities.device, dtype=torch.float32)
-                ch_draw.scatter_(index=m_draw.to(intensities.device), dim=1, value=1)
+                m_draw = torch.multinomial(torch.ones([n_emitter,self.n_channels])/self.n_channels, 1, replacement=False)
+                ch_draw = torch.zeros(intensities.shape).to(self.device, dtype=torch.float32)
+                ch_draw.scatter_(index=m_draw.to(self.device), dim=1, value=1)
 
             intensities = intensities.to(self.device) * ch_draw.to(self.device)
-            output_shape.insert(1, self.channels)
+            output_shape.insert(1, self.n_channels)
 
         return locations, x_offset, y_offset, z_offset, intensities, tuple(output_shape), code_draw
-
-    @staticmethod
-    def _get_device(x):
-        return getattr(x, 'device')
 
 
 def list_to_locations(locations, output_shape):

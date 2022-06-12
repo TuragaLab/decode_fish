@@ -85,7 +85,7 @@ def rescale_train(cfg,
             ch_fac_loss = torch.sqrt(torch.mean((microscope.channel_facs - microscope.channel_facs.detach() / int_means)**2))
 
             ch_fac_loss.backward()
-            torch.nn.utils.clip_grad_norm_(microscope.parameters(), max_norm=cfg.training.mic.grad_clip, norm_type=2)
+#             torch.nn.utils.clip_grad_norm_(microscope.parameters(), max_norm=cfg.training.mic.grad_clip, norm_type=2)
 
             optim_dict['optim_mic'].step()
             optim_dict['sched_mic'].step()

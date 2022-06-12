@@ -69,7 +69,7 @@ def sim_data(decode_dl, micro, point_process, batches, n_codes, rate_fac=1., pos
     return torch.cat(xsim_col), cols_col, cat_emitter_dfs(gt_dfs, decode_dl.batch_size)
 
 # Cell
-def get_prediction(model, vol, post_proc, col_offset_map=None, micro=None, cuda=True, return_rec=False):
+def get_prediction(model, vol, post_proc, col_offset_map=None, micro=None, cuda=True, return_rec=False, filt_rad=10):
 
     with torch.no_grad():
 
@@ -86,7 +86,7 @@ def get_prediction(model, vol, post_proc, col_offset_map=None, micro=None, cuda=
             ch_inp = micro.get_single_ch_inputs(*micro_inp)
             ae_img_3d = micro(*ch_inp)
 
-            filt_inds = get_roi_filt_inds(*ch_inp[0], micro.psf.psf_volume.shape, vol.shape, slice_rec=micro.slice_rec, min_dist=0)
+            filt_inds = get_roi_filt_inds(*ch_inp[0], micro.psf.psf_volume.shape, vol.shape, slice_rec=micro.slice_rec, min_dist=10)
             ch_inp = mic_inp_apply_inds(*ch_inp, filt_inds)
             if len(ch_inp[1]):
                 psf_recs = micro(*ch_inp, ret_psfs=True, add_noise=False)

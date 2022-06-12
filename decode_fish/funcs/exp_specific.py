@@ -149,10 +149,13 @@ def rsfish_to_df(file_str):
     return df
 
 # Cell
-def read_MOp_tiff(image_path,  z_to_batch=False):
+def read_MOp_tiff(image_path,  z_to_batch=False, sort_cols=False):
     img_stack = imread(image_path, key=range(0,7*22))
     img_stack = img_stack.reshape([22,7,2048,2048])
     img_stack = torch.tensor(img_stack.astype('float32'))
+    if sort_cols:
+        ch_cols = np.array([0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0])
+        img_stack  = torch.cat([img_stack[ch_cols==0], img_stack[ch_cols==1]], 0)
 
     if z_to_batch:
         return img_stack[None].permute([2,1,0,3,4])

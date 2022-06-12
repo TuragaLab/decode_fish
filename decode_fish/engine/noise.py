@@ -48,6 +48,7 @@ class sCMOS(nn.Module):
         theta = (self.theta_scale.to(self.theta_par.device) * self.theta_par)
         if const_theta_sim:
             theta = self.theta_const * self.sim_scale
+            theta = theta * torch.zeros_like(theta).uniform_(0.3,3.)
         else:
             theta = theta * self.sim_scale
         if ch_inds is None:

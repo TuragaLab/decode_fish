@@ -53,12 +53,12 @@ def my_app(cfg):
     else:
         crop = np.s_[:,:,:,:]
         
-    if cfg.scale_train:
+    if cfg.scale_train and cfg.image_path != model_cfg.data_path.image_path:
         
         model_cfg.training.bs = 50
         model_cfg.training.num_iters = 200
-        model_cfg.training.mic.opt.lr = 0.01
-        model_cfg.training.mic.sched.step_size = 100
+        model_cfg.training.mic.opt.lr = 0.02
+        model_cfg.training.mic.sched.step_size = 500
         model_cfg.data_path.image_path = cfg.image_path
         
         codebook, targets = hydra.utils.instantiate(model_cfg.codebook)
@@ -81,17 +81,13 @@ def my_app(cfg):
     res_df = window_predict(model, post_proc, image_vol, window_size=[None, 128, 128], crop=crop, device='cuda', 
                              chrom_map=get_color_shift_inp(micro.color_shifts, micro.col_shifts_yx)[:,:,None], scale=micro.get_ch_mult())      
     
-    #res_df = exclude_borders(res_df, border_size_zyx=[0,4000,4000], img_size=[2048*100,2048*100,2048*100])
-    # res_df['gene'] = targets[res_df['code_inds']]
-    
-    ###
-    max_vol = image_vol * micro.get_ch_mult().to(image_vol.device)
-    max_p = cpu(max_vol).max(0).max(0)[0]
-    fids = get_peaks(max_p, 18000, 20)
+
+    artifact_coords = pd.read_csv('/groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm//datasets/CodFish/MERFISH/MOp/mouse1_sample1_raw/artifact_coords.csv')
     
     res_df['zm'] = res_df['z']%100
     res_df = exclude_borders(res_df, border_size_zyx=[0,15000,15000], img_size=[2048*100,2048*100,2048*100])
-    res_df = remove_fids(res_df, px_to_nm(fids), tolerance=1000)
+    
+    res_df = remove_fids(res_df, px_to_nm(artifact_coords), tolerance=1000)
     res_df = remove_doublets(res_df, tolerance=200)
     ###
     

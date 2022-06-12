@@ -95,7 +95,7 @@ def extract_roi(vol_5d: torch.Tensor, coordinates: torch.Tensor, size_xy: int=10
 
     return single_bead, crop
 
-def plot_channels(volume, n_rows=1, dfs=None, codebook=None, proj_func=np.max, size=6, vmax=None, display=True, sc_sz=20):
+def plot_channels(volume, n_rows=2, dfs=None, codebook=None, proj_func=np.max, size=6, vmax=None, display=True, sc_sz=20):
 
     volume = cpu(volume)
 
@@ -125,6 +125,7 @@ def plot_channels(volume, n_rows=1, dfs=None, codebook=None, proj_func=np.max, s
             axes[i, j].axis('off')
             axes[i, j].set_xlim(0, w)
             axes[i, j].set_ylim(0, h)
+            axes[i, j].set_title(f'{volume[curr_ind].min():.2f} : {volume[curr_ind].max():.2f}', size=20)
 
             if dfs is not None:
                 for k, df in enumerate(dfs):

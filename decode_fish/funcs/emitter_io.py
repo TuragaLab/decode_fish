@@ -148,15 +148,21 @@ def zero_int_ch(res_df, codebook):
     int_arr = res_df.loc[:,int_m].values
     int_sig = res_df.loc[:,int_s].values
 
-    int_arr[codebook[res_df['code_inds'].values] == 0] = 0.
-    int_sig[codebook[res_df['code_inds'].values] == 0] = 0.
+    int_arr_nz = int_arr+ 0
 
+    int_arr_nz[codebook[res_df['code_inds'].values] == 0] = 0.
+    int_sig[codebook[res_df['code_inds'].values] == 0] = 0.
 
     ret_df = res_df.drop(columns=int_m)
     ret_df = ret_df.drop(columns=int_s)
 
-    ret_df[int_m] = int_arr
+    ret_df[int_m] = int_arr_nz
     ret_df[int_s] = int_sig
+
+    ret_df['tot_int'] = int_arr_nz.sum(1)
+    ret_df['tot_int_sig'] = int_sig.sum(1)
+
+    ret_df['int_ratio'] = ((int_arr).sum(-1) - int_arr_nz.sum(-1)) / int_arr_nz.sum(-1)
 
     return ret_df
 
@@ -211,7 +217,7 @@ def remove_fids(res_df, fid_df, tolerance=1000):
     res_c = DF.copy(res_df)
     frames = res_c['frame_idx'].values + 0
     res_c['frame_idx'] = 0
-    _, match_fid, _ = matching(fid_df, res_c, tolerance=tolerance, allow_multiple_matches=True, match_genes=False,print_res=False)
+    _, match_fid, _ = matching(fid_df, res_c, tolerance=tolerance, allow_multiple_matches=True, match_genes=False, print_res=False, ignore_z=True)
     inds = ~res_c['loc_idx'].isin(match_fid['loc_idx_pred'])
     res_clean = res_c.loc[inds]
     res_clean['frame_idx'] = frames[inds]

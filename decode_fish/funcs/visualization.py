@@ -164,7 +164,7 @@ def gt_plot(x, pred_df, gt_df, px_size, gt_rec=None, psf=None, fig_size=(24,6)):
     return fig
 
 # Cell
-def eval_random_crop(decode_dl, model, post_proc, micro, proj_func=np.max, cuda=False, samples=1, int_threshold=1, plot='rec', crop_sz_xy=40, ret_preds=False):
+def eval_random_crop(decode_dl, model, post_proc, micro, proj_func=np.max, cuda=False, samples=1, int_threshold=1, plot='rec', crop_sz_xy=40, ret_preds=False, filt_rad=10):
 
     with torch.no_grad():
 
@@ -192,7 +192,7 @@ def eval_random_crop(decode_dl, model, post_proc, micro, proj_func=np.max, cuda=
 
             rand_ch = np.random.randint(0, x.shape[1])
             print(rand_ch)
-            pred_df, rec, res_dict, psf_recs, psf_bgs, rois, ch_inp = get_prediction(model, x, post_proc, colshift_crop, micro=micro, cuda=True, return_rec=True)
+            pred_df, rec, res_dict, psf_recs, psf_bgs, rois, ch_inp = get_prediction(model, x, post_proc, colshift_crop, micro=micro, cuda=True, return_rec=True, filt_rad=filt_rad)
             pred_df = nm_to_px(pred_df, post_proc.px_size_zyx)
 
             sub_df = pred_df[cpu(post_proc.codebook)[pred_df['code_inds']][:,rand_ch] > 0]

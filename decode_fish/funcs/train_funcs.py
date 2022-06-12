@@ -278,6 +278,7 @@ def train(cfg,
                     ch_out_inp = mic_inp_apply_inds(*ch_out_inp, filt_inds)
                     if len(ch_out_inp[1]):
                         psf_recs = microscope(*ch_out_inp, ret_psfs=True, add_noise=False)
+                        n_recs = len(psf_recs)
 # #                         print('N rec inds ', len(psf_recs))
 
                         rois = extract_psf_roi(ch_out_inp[0], x, torch.tensor(psf_recs.shape))
@@ -324,6 +325,9 @@ def train(cfg,
                 optim_dict['sched_mic'].step()
                 optim_dict['sched_psf'].step()
 
+                if cfg.training.mic.ch_facs_as_theta:
+                    microscope.noise.theta_par.data = microscope.get_ch_mult()[0,:,0,0,0].detach()
+
 
         # Logging
         if batch_idx == cfg.training.checkpoint:
@@ -346,6 +350,7 @@ def train(cfg,
             if batch_idx > cfg.training.start_mic:
                 if cfg.training.mic.enabled and calc_log_p_x:
                     wandb.log({'AE Losses/p_x_given_z': log_p_x_given_z.detach().cpu()}, step=batch_idx)
+                    wandb.log({'AE Losses/n_recs': n_recs}, step=batch_idx)
                     wandb.log({'AE Losses/RMSE(rec)': torch.sqrt(((rois-(psf_recs+bgs))**2).mean()).detach().cpu()}, step=batch_idx)
 #                     wandb.log({'AE Losses/RMSE(rec)': torch.sqrt(((x[:,:1]-(ae_img[:,:1]+out_inp['background'][:,:1]))**2).mean()).detach().cpu()}, step=batch_idx)
                     wandb.log({'AE Losses/sum(psf)': F.relu(microscope.psf.psf_volume/microscope.psf.psf_volume.max())[0].sum().detach().cpu()}, step=batch_idx)

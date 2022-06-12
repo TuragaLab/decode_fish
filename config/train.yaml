@@ -190,6 +190,7 @@ training:
         grad_clip: 0.1
         mean_diff: True
         freq: 1
+        ch_facs_as_theta: False
 
         par_grads:
             channel_facs: False

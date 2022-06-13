@@ -84,7 +84,8 @@ class Microscope(nn.Module):
 #         self.register_parameter(name='psf_vol', param=self.psf.psf_volume)
 
     def get_ch_mult(self):
-        return (self.channel_facs * (len(self.channel_facs) / self.channel_facs.sum()) * self.ch_scale)[None,:,None,None,None]
+#         return (self.channel_facs * (len(self.channel_facs) / self.channel_facs.sum()) * self.ch_scale)[None,:,None,None,None]
+        return (self.channel_facs * self.ch_scale)[None,:,None,None,None]
 
     def add_psf_noise(self, psf_stack):
 

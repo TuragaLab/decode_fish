@@ -245,7 +245,38 @@ def train(cfg,
             optim_dict['optim_net'].step()
             optim_dict['sched_net'].step()
 
-#             print('Grad upd. ', time.time()-t0); t0 = time.time()
+            if cfg.training.mic.par_grads.channel_facs and batch_idx > 5000:
+
+                with torch.no_grad():
+                    net_inp = torch.concat([x,colshift_crop], 1) if colshift_crop is not None else x
+                    out_inp = model.tensor_to_dict(model(net_inp))
+                    proc_out_inp = post_proc.get_micro_inp(out_inp)
+
+                    ch_out_inp = microscope.get_single_ch_inputs(*proc_out_inp, ycrop=ycrop, xcrop=xcrop)
+
+                if len(proc_out_inp[1]) > 0:
+
+                    optim_dict['optim_mic'].zero_grad()
+
+                    # Get ch_fac loss
+                    ch_inds = ch_out_inp[0][1]
+                    int_vals = ch_out_inp[-2]
+
+                    target_mean_int = model.int_dist.int_conc.item() / model.int_dist.int_rate.item() + model.int_dist.int_loc.item()
+
+                    int_means = torch.ones(cfg.genm.exp_type.n_channels).cuda()
+                    for i in range(cfg.genm.exp_type.n_channels):
+                        if i in ch_inds:
+                            int_means[i] = int_vals[ch_inds == i].mean()
+                            if not cfg.training.target_mean:
+                                int_means[i] = int_means[i] / int_vals.mean()
+                            else:
+                                int_means[i] = int_means[i] / target_mean_int
+
+                    ch_fac_loss = torch.sqrt(torch.mean((microscope.channel_facs - microscope.channel_facs.detach() / int_means)**2))
+                    ch_fac_loss.backward()
+
+                    optim_dict['optim_mic'].step()
 
         ch_out_inp = [[],[]]
         if batch_idx > min(cfg.training.start_mic,cfg.training.start_int) and batch_idx % cfg.training.mic.freq == 0:
@@ -262,15 +293,21 @@ def train(cfg,
                 calc_log_p_x = False
 
                 # Get ch_fac loss
-                ch_inds = ch_out_inp[0][1]
-                int_vals = ch_out_inp[-2]
+#                 ch_inds = ch_out_inp[0][1]
+#                 int_vals = ch_out_inp[-2]
 
-                int_means = torch.ones(cfg.genm.exp_type.n_channels).cuda()
-                for i in range(cfg.genm.exp_type.n_channels):
-                    if i in ch_inds:
-                        int_means[i] = int_vals[ch_inds == i].mean() / int_vals.mean()
+#                 target_mean_int = model.int_dist.int_conc.item() / int_rate=model.int_dist.int_rate.item() + int_loc=model.int_dist.int_loc.item()
 
-                ch_fac_loss = torch.sqrt(torch.mean((microscope.channel_facs - microscope.channel_facs.detach() / int_means)**2))
+#                 int_means = torch.ones(cfg.genm.exp_type.n_channels).cuda()
+#                 for i in range(cfg.genm.exp_type.n_channels):
+#                     if i in ch_inds:
+#                         int_means[i] = int_vals[ch_inds == i].mean()
+#                         if not cfg.training.target_mean:
+#                             int_means[i] = int_means[i] / int_vals.mean()
+#                         else:
+#                             int_means[i] = int_means[i] / target_mean_int
+
+#                 ch_fac_loss = torch.sqrt(torch.mean((microscope.channel_facs - microscope.channel_facs.detach() / int_means)**2))
 
                 # Get autoencoder loss
                 if cfg.training.mic.roi_rec:
@@ -307,7 +344,7 @@ def train(cfg,
                 if calc_log_p_x:
 
 #                     print(ch_fac_loss)
-                    log_p_x_given_z += ch_fac_loss
+#                     log_p_x_given_z += ch_fac_loss
 
                     if cfg.training.psf.norm_reg:
                         log_p_x_given_z += cfg.training.psf.norm_reg * (microscope.psf.com_loss())

@@ -168,6 +168,7 @@ training:
     cat_logits: 0
     resume: False
     
+    target_mean: False
     pred_em_noise: False
     
     net:

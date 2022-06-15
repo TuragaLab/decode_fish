@@ -76,10 +76,6 @@ def rescale_train(cfg,
             ch_inds = ch_out_inp[0][1]
             int_vals = ch_out_inp[-2]
 
-#             int_means = torch.ones(cfg.genm.exp_type.n_channels).cuda()
-#             for i in range(cfg.genm.exp_type.n_channels):
-#                 if i in ch_inds:
-#                     int_means[i] = int_vals[ch_inds == i].mean() / int_vals.mean()
 
             target_mean_int = model.int_dist.int_conc.item() / model.int_dist.int_rate.item() + model.int_dist.int_loc.item()
 

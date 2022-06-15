@@ -57,7 +57,9 @@ def smooth(x,window_len=11,window='flat'):
     y=np.convolve(w/w.sum(),s,mode='valid')
     return y
 
-def gaussian_sphere(shape, radius, position):
+def gaussian_sphere(shape, radius, position=None):
+
+    if position is None: position = [shape[0]//2, shape[1]//2, shape[2]//2]
     grid = [slice(-x0, dim - x0) for x0, dim in zip(position, shape)]
     position = np.ogrid[grid]
     arr = np.exp(-position[0]**2 / (2 * (radius[0] ** 2))) * np.exp(-position[1]**2 / (2 * (radius[1] ** 2))) * np.exp(-position[2]**2 / (2 * (radius[2] ** 2))) / (2 * np.pi * (radius[0] * radius[1] * radius[2]))

@@ -131,18 +131,13 @@ network:
     n_p_ch: ${add:${genm.exp_type.n_genes}, ${bool_fac:${genm.exp_type.em_noise_inf},${genm.exp_type.n_channels}}}
     n_bg_ch: ${genm.exp_type.n_channels}
     n_int_ch: ${n_int_ref[${genm.exp_type.int_inf}]}
-    n_out_l: 1
     is_2D: False
-    chrom_map: False
+    n_chrom_map_ch: True
     pred_z: ${genm.exp_type.pred_z}
     inp_scale: 
     inp_offset: 
     p_offset: -4.0
     order: 'ce'
-    int_conc: ${genm.intensity_dist.int_conc}
-    int_rate: ${genm.intensity_dist.int_rate}
-    int_loc:  ${genm.intensity_dist.int_loc}
-    resid_x: True
     
 post_proc_isi:
     _target_: decode_fish.funcs.output_trafo.ISIPostProcess

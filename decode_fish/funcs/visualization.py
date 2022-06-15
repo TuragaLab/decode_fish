@@ -228,9 +228,9 @@ def eval_random_crop(decode_dl, model, post_proc, micro, proj_func=np.max, cuda=
 
 
 # Cell
-def plot_micro_pars(micro, figsize=[24,3]):
+def plot_micro_pars(micro, figsize=[20,3]):
 
-    f, (ax1, ax2, ax3, ax4, ax5, ax6) = plt.subplots(1, 6, sharey=False, figsize=figsize)
+    f, (ax1, ax2, ax3, ax4, ax5) = plt.subplots(1, 5, sharey=False, figsize=figsize)
 
     ax1.plot(cpu(micro.channel_facs))
     ax1.set_title('Channel scaling factors')
@@ -240,28 +240,26 @@ def plot_micro_pars(micro, figsize=[24,3]):
     ax2.set_title('Z factors (PSF scaling)')
     ax2.set_xlabel('Z bin')
 
-    ax3.plot(cpu(micro.theta_par))
-    ax3.set_title('Channel theta scaling')
-    ax3.set_xlabel('Channel')
-
     labels = ['x','y','z']
     for i in range(3):
-        ax4.plot(cpu(micro.channel_shifts[:,i]), label=labels[i])
-    ax4.set_title('Round shifts')
-    ax4.set_xlabel('Round')
+        ax3.plot(cpu(micro.channel_shifts[:,i]), label=labels[i])
+    ax3.set_title('Round shifts [pixel]')
+    ax3.set_xlabel('Round')
 
-    im = ax5.imshow(cpu(micro.color_shifts)[0])
+    im = ax4.imshow(cpu(micro.color_shifts)[0])
     add_colorbar(im)
-    ax5.set_title('Color shifts map x')
+    ax4.set_title('Color shifts map x [pixel]')
 
-    im = ax6.imshow(cpu(micro.color_shifts)[1])
+    im = ax5.imshow(cpu(micro.color_shifts)[1])
     add_colorbar(im)
-    ax6.set_title('Color shifts map y')
+    ax5.set_title('Color shifts map y [pixel]')
 
-def plot_slice_psf_pars(micro, gt_psf=None, normed=False, figsize=[32,16]):
+def plot_slice_psf_pars(psf_vol, psf_init, gt_psf=None, normed=False, figsize=[32,16]):
 
-    psf_vol = abs(cpu(micro.psf.psf_volume))
-    psf_init = abs(cpu(micro.psf_init_vol))
+    psf_vol = abs(psf_vol)
+    psf_init = abs(psf_init)
+
+    n_cols = len(psf_vol)
 
     if normed:
         psf_vol /= psf_vol.sum(-1).sum(-1)[...,None,None]
@@ -271,12 +269,7 @@ def plot_slice_psf_pars(micro, gt_psf=None, normed=False, figsize=[32,16]):
     n_sl = psf_init.shape[1]
     mid_px = psf_init.shape[-1]//2
 
-    f, axes = plt.subplots(2 + 2 * micro.psf.n_cols + (1 if gt_psf is not None else 0), n_sl, sharey=False, figsize=figsize)
-
-    mlist = [psf_init.max().item(), psf_vol.max().item()]
-    if gt_psf is not None:
-        mlist += [gt_psf.max().item()]
-    plt_lim = np.max(mlist)
+    f, axes = plt.subplots(2 + 2 * n_cols + (1 if gt_psf is not None else 0), n_sl, sharey=False, figsize=figsize)
 
     for z in range(n_sl):
 
@@ -286,11 +279,16 @@ def plot_slice_psf_pars(micro, gt_psf=None, normed=False, figsize=[32,16]):
         axes[0,z].set_axis_off()
         axes[0,z].margins(x=0, y=0, tight=True)
 
+        mlist = [psf_init[:,z].max().item(), psf_vol[:,z].max().item()]
+        if gt_psf is not None:
+            mlist += [gt_psf[:,z].max().item()]
+        plt_lim = np.max(mlist)
+
         axes[-1, z].plot(psf_init[0,z,mid_px], label='Init.')
         axes[-1, z].set_axis_off()
         axes[-1, z].set_ylim(0,plt_lim)
 
-        for n in range(micro.psf.n_cols):
+        for n in range(n_cols):
 
             im = axes[1+2*n,z].imshow(psf_vol[n,z], vmax=None)
             add_colorbar(im)
@@ -315,7 +313,7 @@ def plot_slice_psf_pars(micro, gt_psf=None, normed=False, figsize=[32,16]):
     axes[0,0].set_title('Initial PSF', loc='left')
     axes[-1,0].set_title(f'Intensity profile', loc='left')
 
-    for n in range(micro.psf.n_cols):
+    for n in range(n_cols):
         axes[1+2*n,0].set_title(f'Learned PSF col. {n}', loc='left')
         axes[2+2*n,0].set_title(f'Diff.', loc='left')
 

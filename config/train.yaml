@@ -124,7 +124,7 @@ sim:
             scale: 0
  
 network:
-    _target_: decode_fish.engine.model.UnetDecodeNoBn
+    _target_: decode_fish.engine.model.UnetDecodeNoBn_2S
     depth: 2
     ch_in: ${genm.exp_type.n_channels} 
     f_maps: 32
@@ -161,6 +161,7 @@ training:
     start_mic: 0 
     old_loss: False
     int_option: 1
+    start_channel_scaling: 5000
     
     z_sig_fac: 0.5
     loss_option: 1
@@ -174,7 +175,6 @@ training:
     net:
         enabled: True
         bl_loss_scale: 0.01
-        bl_loss: mse
         cnt_loss_scale: 1
         grad_clip: 0.005
         sched:   
@@ -191,7 +191,6 @@ training:
         grad_clip: 0.1
         mean_diff: True
         freq: 1
-        ch_facs_as_theta: False
 
         par_grads:
             channel_facs: False

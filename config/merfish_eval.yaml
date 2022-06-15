@@ -4,7 +4,7 @@ file_nr: 150
 out_id: 
 crop: s_[:,:,:,:,:]
 scale_train: False
-file_prefix: aligned_scaled5_images
+file_prefix: aligned_scaled4_images
 
 out_file: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/decode_fish/data/results/MERFISH/merfish_${sweep_name}_${run_name}_${out_id}_${file_nr}.csv
 

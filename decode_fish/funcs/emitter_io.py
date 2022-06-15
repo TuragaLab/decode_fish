@@ -123,7 +123,7 @@ def sel_int_ch(res_df, codebook, sel_sig=True):
         int_arr_nz = int_arr[codebook[res_df['code_inds'].values].nonzero()].reshape([int_arr.shape[0], -1])
         ret_df = res_df.drop(columns=int_m)
         ret_df[int_m[:4]] = int_arr_nz
-        ret_df['tot_int'] = int_arr_nz.sum(1)
+        ret_df['tot_int'] = int_arr_nz.sum(-1)
         ret_df['int_ratio'] = ((int_arr).sum(-1) - int_arr_nz.sum(-1)) / int_arr_nz.sum(-1)
 
         if sel_sig:
@@ -159,8 +159,8 @@ def zero_int_ch(res_df, codebook):
     ret_df[int_m] = int_arr_nz
     ret_df[int_s] = int_sig
 
-    ret_df['tot_int'] = int_arr_nz.sum(1)
-    ret_df['tot_int_sig'] = int_sig.sum(1)
+    ret_df['tot_int'] = int_arr_nz.sum(-1)
+    ret_df['tot_int_sig'] = int_sig.sum(-1)
 
     ret_df['int_ratio'] = ((int_arr).sum(-1) - int_arr_nz.sum(-1)) / int_arr_nz.sum(-1)
 

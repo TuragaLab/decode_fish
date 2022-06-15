@@ -1,0 +1,36 @@
+sweep_name: 
+run_name: 
+test_csv: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/decode_fish/data/qual_nets/starfish_test.csv
+model_cfg: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/models/fishcod/MERFISH_starfish/MERFISH_sweep_gen_9/z_facs:Falsexnorm:none//train.yaml
+num_iters: 300
+bs: 20
+resample: False
+rate_fac: 1.
+batch_norm: False
+ignore: ''
+
+genm:
+    noise:
+        theta: .1
+    microscope:
+        psf_noise: 0.
+    emitter_noise:
+        rate_fac: 3.
+    intensity_dist:
+        int_conc: 3.
+        int_rate: 1.
+        int_loc: 1. 
+    prob_generator:
+        low: 0.01
+        high: 0.1
+    pos_noise:
+        pos_noise_xy: 0.5
+        pos_noise_z: 0.04
+    phasing: 0.1
+
+output:
+    group: mnet_train 
+    save_dir: ${base_dir}/models/fishcod/${output.project}/${output.group}/${run_name}
+    log_dir : ${base_dir}/decode_fish/runs
+
+save_file: # /groups/turaga/home/speisera/Dropbox (mackelab)/Artur/WorkDB/deepstorm/decode_fish/data/qual_nets

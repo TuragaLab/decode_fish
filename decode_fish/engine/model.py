@@ -559,10 +559,10 @@ class UnetDecodeNoBn_2S(nn.Module):
 
         s_x = x[:,:-self.n_chrom_map_ch] if self.n_chrom_map_ch else x
         single_ch_out = self.network[0](s_x.flatten(0,1)[:,None]).reshape(s_x.shape[0],-1,*s_x.shape[2:])
-        m_x = torch.cat([single_ch_out, x[:,-n_chrom_map_ch:]], 1) if self.n_chrom_map_ch else single_ch_out
+        m_x = torch.cat([single_ch_out, x[:,-self.n_chrom_map_ch:]], 1) if self.n_chrom_map_ch else single_ch_out
         unet_out = self.network[1](m_x)
 
-        res_x = x[:,:-n_chrom_map_ch] if self.n_chrom_map_ch else x
+        res_x = x[:,:-self.n_chrom_map_ch] if self.n_chrom_map_ch else x
         net_out = self.network[-1](unet_out, res_x)
 
         return net_out

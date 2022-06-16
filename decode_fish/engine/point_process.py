@@ -64,7 +64,7 @@ class PointProcessUniform(Distribution):
         y_offset = D.Uniform(low=-0.5, high=0.5).sample(sample_shape=[n_emitter]).to(self.device)
         z_offset = D.Uniform(low=-0.5, high=0.5).sample(sample_shape=[n_emitter]).to(self.device)
 
-        if self.slice_rec: # For slice rec we use larger range
+        if self.slice_rec: # For slice rec we use a larger range
             z_offset *= 2
 
 #         intensities = torch.zeros([n_emitter, self.n_channels]).to(self.device)
@@ -88,8 +88,9 @@ class PointProcessUniform(Distribution):
         if self.n_channels > 1:
             code_draw = None
             if from_code_book:
+
                 code_draw = torch.multinomial(self.code_weight, num_samples=n_emitter, replacement=True)
-                ch_draw = self.codebook[code_draw]
+                ch_draw = self.codebook[code_draw].to(self.device, dtype=torch.float32)
 
             else:
 

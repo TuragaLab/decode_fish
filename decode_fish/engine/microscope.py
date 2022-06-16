@@ -80,9 +80,9 @@ class Microscope(nn.Module):
 
             self.register_parameter(name='color_shifts', param=torch.nn.Parameter(torch.zeros([self.psf.n_cols, ys, xs])))
 
-        self.register_parameter(name='channel_shifts', param=torch.nn.Parameter(torch.zeros((int(self.noise.channels/self.psf.n_cols), 3))))
+        self.register_parameter(name='channel_shifts', param=torch.nn.Parameter(torch.zeros((int(self.noise.n_channels/self.psf.n_cols), 3))))
         self.ch_scale = 1. if ch_facs is None else torch.tensor(ch_facs).cuda()
-        self.register_parameter(name='channel_facs', param=torch.nn.Parameter(torch.ones(int(self.noise.channels)).cuda()))
+        self.register_parameter(name='channel_facs', param=torch.nn.Parameter(torch.ones(int(self.noise.n_channels)).cuda()))
         self.register_parameter(name='z_facs', param=self.psf.z_scale)
         self.register_parameter(name='sc_fac', param=torch.nn.Parameter(torch.ones(1).cuda()))
         self.register_parameter(name='theta_par', param=self.noise.theta_par)
@@ -104,7 +104,7 @@ class Microscope(nn.Module):
         shifts = self.channel_shifts - self.channel_shifts.mean(0)[None]
 
         if self.psf.n_cols > 1:
-            multi_col_shifts = torch.zeros([self.noise.channels, 3]).to(shifts.device)
+            multi_col_shifts = torch.zeros([self.noise.n_channels, 3]).to(shifts.device)
             for i in range(self.psf.n_cols):
                 multi_col_shifts[torch.tensor(self.ch_cols)==i,:] = shifts
         else:

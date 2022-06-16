@@ -1,12 +1,12 @@
 sweep_name: sweep_mop_8c
 run_name: 
 file_nr: 150
-out_id: 
 crop: s_[:,:,:,:,:]
 scale_train: False
 file_prefix: aligned_scaled4_images
 
-out_file: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/decode_fish/data/results/MERFISH/merfish_${sweep_name}_${run_name}_${out_id}_${file_nr}.csv
+out_file: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/decode_fish/data/results/MERFISH/${sweep_name}/${run_name}_${file_nr}.csv
+out_ch_mults: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/decode_fish/data/results/MERFISH/${sweep_name}/${run_name}_${file_nr}.pt
 
 model_cfg: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/models/fishcod/MERFISH_MOp/${sweep_name}/${run_name}/train.yaml
 image_path: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm//datasets/CodFish/MERFISH/MOp/mouse1_sample1_raw/${file_prefix}${file_nr}.tif

@@ -2,8 +2,9 @@
 
 __all__ = ['simfish_to_df', 'matlab_fq_to_df', 'load_sim_fish', 'big_fishq_to_df', 'rsfish_to_df', 'read_MOp_tiff',
            'read_starfish_tiff', 'get_benchmark_from_starfish', 'get_starfish_benchmark', 'get_starfish_codebook',
-           'get_istdeco', 'get_mop_codebook', 'get_mop_benchmark', 'get_mop_fov', 'get_mop_colors',
-           'get_train_eval_benchmark_MOp', 'get_train_eval_benchmark_starfish', 'df_pp_mop', 'df_pp_starfish']
+           'get_istdeco', 'get_mop_codebook', 'get_mop_benchmark', 'get_mop_fov', 'get_mop_colors', 'clean_bench_df',
+           'clean_istd_df', 'get_train_eval_benchmark_MOp', 'get_train_eval_benchmark_starfish', 'df_pp_mop',
+           'df_pp_starfish']
 
 # Cell
 from ..imports import *
@@ -285,6 +286,24 @@ def get_mop_colors():
 #     cols = (pd.read_csv('/groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/datasets/CodFish/MERFISH/MOp/additional_files/data_organization_raw.csv',encoding='latin')['color (nm)'].values == 750)
     return np.array([0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
        0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0])
+
+def clean_bench_df(bench_df, fids=None):
+    bench_df = nm_to_px((bench_df), [1.085,1.085,1.085])
+    bench_df['x'] += 70
+    bench_df['y'] += 70
+    bench_df = exclude_borders(bench_df, border_size_zyx=[0,15000,15000], img_size=[2048*100,2048*100,2048*100])
+    bench_df = remove_fids(bench_df, px_to_nm(fids), tolerance=1000)
+    bench_df = remove_doublets(bench_df, tolerance=200)
+    bench_df['class'] = bench_df['gene'].str.contains('Blank')
+    return bench_df
+
+def clean_istd_df(bench_df, fids=None):
+    bench_df['loc_idx'] = np.arange(len(bench_df))
+    bench_df = exclude_borders(bench_df, border_size_zyx=[0,15000,15000], img_size=[2048*100,2048*100,2048*100])
+    bench_df = remove_fids(bench_df, px_to_nm(fids), tolerance=1000)
+    bench_df = remove_doublets(bench_df, tolerance=200)
+    bench_df['class'] = bench_df['gene'].str.contains('Blank')
+    return bench_df
 
 # Cell
 from .predict import window_predict

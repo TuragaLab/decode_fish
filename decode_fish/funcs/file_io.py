@@ -8,7 +8,6 @@ from ..imports import *
 from .utils import *
 from tifffile import imread
 from ..engine.microscope import Microscope
-from ..engine.psf import crop_psf
 from ..engine.psf import LinearInterpolatedPSF
 from .emitter_io import *
 from .dataset import *

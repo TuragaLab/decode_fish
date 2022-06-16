@@ -10,7 +10,7 @@ import torch.nn.functional as F
 from torch.optim.lr_scheduler import MultiStepLR
 from torch.utils.data import DataLoader
 from decode_fish.engine.microscope import Microscope
-from decode_fish.engine.model import UnetDecodeNoBn
+from decode_fish.engine.model import UnetDecodeNoBn_2S
 import shutil
 from decode_fish.engine.point_process import PointProcessUniform
 from decode_fish.engine.gmm_loss import PointProcessGaussian
@@ -92,6 +92,7 @@ def my_app(cfg):
     ###
     
     res_df.to_csv(cfg.out_file, index=False)
+    torch.save(micro.get_ch_mult().flatten(), cfg.out_ch_mults)
     
 if __name__ == "__main__":
     my_app()

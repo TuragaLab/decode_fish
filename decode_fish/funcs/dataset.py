@@ -358,9 +358,10 @@ class GaussianSmoothing(TransformBase):
     def __init__(self, smoothing_filter_size, div_factor=1, device='cuda', z_size=48):
         self.smoothing_filter_size = smoothing_filter_size
         self.div_factor = div_factor
+        ''' FIX KERNEL SIZE'''
         self.gaussian_filter = torch_gaussian_filter(kernel_size=[get_uneven(np.min([z_size, smoothing_filter_size])),
-                                                                  smoothing_filter_size*2-1,
-                                                                  smoothing_filter_size*2-1],
+                                                                                             smoothing_filter_size*2-1,
+                                                                                             smoothing_filter_size*2-1],
                                                      sigma=smoothing_filter_size, dim=3).to(device)
 
     def __call__(self, image, **kwargs):

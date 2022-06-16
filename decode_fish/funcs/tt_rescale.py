@@ -17,7 +17,7 @@ from torch import distributions as D
 from torch.utils.data import DataLoader
 import torch_optimizer
 from ..engine.microscope import Microscope, get_roi_filt_inds, extract_psf_roi, mic_inp_apply_inds, add_pos_noise, concat_micro_inp
-from ..engine.model import UnetDecodeNoBn
+from ..engine.model import UnetDecodeNoBn_2S
 from ..engine.point_process import PointProcessUniform, get_phased_ints
 from ..engine.gmm_loss import PointProcessGaussian
 import shutil

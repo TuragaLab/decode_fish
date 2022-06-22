@@ -13,7 +13,8 @@ from numba import cuda
 
 # Cell
 @cuda.jit
-def place_roi(frames, roi_grads, frame_s_b, frame_s_c, frame_s_z, frame_s_y, frame_s_x, rois, roi_s_n, roi_s_z, roi_s_y, roi_s_x, b, c, z, y, x):
+def place_roi(frames: torch.float32, roi_grads: torch.float32, frame_s_b: int, frame_s_c: int, frame_s_z: int, frame_s_y: int, frame_s_x: int, rois: torch.float32,
+              roi_s_n: int, roi_s_z: int, roi_s_y: int, roi_s_x: int, b: torch.int64, c: torch.int64, z: torch.int64, y: torch.int64, x: torch.int64):
 
     kx = cuda.grid(1)
     # One thread for every pixel in the roi stack. Exit if outside
@@ -57,6 +58,7 @@ class CudaPlaceROI(torch.autograd.Function):
 
         threadsperblock = 256
         blocks = ((roi_s_n * roi_s_z * roi_s_y * roi_s_x) + (threadsperblock - 1)) // threadsperblock
+
         place_roi[blocks, threadsperblock](frames, rois_grads, frame_s_b, frame_s_c, frame_s_z, frame_s_y, frame_s_x, rois.detach(), roi_s_n, roi_s_z, roi_s_y, roi_s_x, b, c, z, y, x)
 
         ctx.save_for_backward(rois_grads)

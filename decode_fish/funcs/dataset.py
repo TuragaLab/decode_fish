@@ -74,9 +74,6 @@ class DecodeDataset:
 
         return ret_dict
 
-#         return x, local_rate, background, self.dataset_tfms[0].slice_h_glob, self.dataset_tfms[0].slice_w_glob, self.dataset_tfms[0].slice_d_glob
-#         return x.to(self.device), local_rate.to(self.device), background.to(self.device)
-
     def __repr__(self):
         print (f'{self.__class__.__name__} Summary:')
         print (f'Dataset tfms: {len(self.dataset_tfms)}')
@@ -180,8 +177,7 @@ def get_forward_scaling(img):
 
     offset = np.median(img)
     scale = np.max(np.array(img))/5
-#     offset = np.median(np.array(img), axis=(1,2,3))
-#     scale = np.max(np.array(img), axis=(1,2,3))/3
+
     return offset, scale
 
 # Cell

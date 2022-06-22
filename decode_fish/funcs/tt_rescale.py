@@ -4,7 +4,7 @@ __all__ = ['rescale_train']
 
 # Cell
 from ..imports import *
-from .evaluation import *
+from .matching import *
 from .file_io import *
 from .emitter_io import *
 from .utils import *
@@ -32,7 +32,7 @@ from .exp_specific import *
 # Cell
 def rescale_train(cfg,
           model,
-          microscope,
+          micro,
           post_proc,
           dl,
           optim_dict):
@@ -41,7 +41,7 @@ def rescale_train(cfg,
     model.cuda()
 
     # Controls which genmodel parameters are optimized
-    for name, p in microscope.named_parameters():
+    for name, p in micro.named_parameters():
         if name == 'channel_facs':
             p.requires_grad = True
         else:
@@ -58,34 +58,37 @@ def rescale_train(cfg,
             if cfg.genm.microscope.col_shifts_enabled:
                 zcrop, ycrop, xcrop = ret_dict['crop_z'], ret_dict['crop_y'], ret_dict['crop_x']
                 zcrop, ycrop, xcrop = zcrop.flatten(), ycrop.flatten(), xcrop.flatten()
-                colshift_crop = get_color_shift_inp(microscope.color_shifts, microscope.col_shifts_yx, ycrop, xcrop, cfg.sim.random_crop.crop_sz)
+                colshift_crop = get_color_shift_inp(micro.color_shifts, micro.col_shifts_yx, ycrop, xcrop, cfg.sim.random_crop.crop_sz)
             else:
                 zcrop, ycrop, xcrop, colshift_crop = None, None, None, None
 
-            x = x * microscope.get_ch_mult().detach()
+            x = x * micro.get_ch_mult().detach()
 
             out_inp = torch.concat([x,colshift_crop], 1) if colshift_crop is not None else x
             out_inp = model.tensor_to_dict(model(out_inp))
+            out_inp['logits'][:,252:] = -20.
             proc_out_inp = post_proc.get_micro_inp(out_inp)
 
         if len(proc_out_inp[1]) > 0:
 
-            ch_out_inp = microscope.get_single_ch_inputs(*proc_out_inp, ycrop=ycrop, xcrop=xcrop)
+            ch_out_inp = micro.get_single_ch_inputs(*proc_out_inp, ycrop=ycrop, xcrop=xcrop)
 
             # Get ch_fac loss
             ch_inds = ch_out_inp[0][1]
             int_vals = ch_out_inp[-2]
 
-
-            target_mean_int = model.int_dist.int_conc.item() / model.int_dist.int_rate.item() + model.int_dist.int_loc.item()
+            target_mean_int = cfg.genm.intensity_dist.int_conc / cfg.genm.intensity_dist.int_rate + cfg.genm.intensity_dist.int_loc
 
             int_means = torch.ones(cfg.genm.exp_type.n_channels).cuda()
             for i in range(cfg.genm.exp_type.n_channels):
                 if i in ch_inds:
-                    int_means[i] = int_vals[ch_inds == i].mean() / target_mean_int
-#             int_means_col.append(int_means.detach())
-#             print(int_means)
-            ch_fac_loss = torch.sqrt(torch.mean((microscope.channel_facs - microscope.channel_facs.detach() / int_means)**2))
+                    int_means[i] = int_vals[ch_inds == i].mean()
+                    if not cfg.training.target_mean:
+                        int_means[i] = int_means[i] / int_vals.mean()
+                    else:
+                        int_means[i] = int_means[i] / target_mean_int
+
+            ch_fac_loss = torch.sqrt(torch.mean((micro.channel_facs - micro.channel_facs.detach() / int_means)**2))
 
             ch_fac_loss.backward()
 #             torch.nn.utils.clip_grad_norm_(microscope.parameters(), max_norm=cfg.training.mic.grad_clip, norm_type=2)
@@ -93,7 +96,11 @@ def rescale_train(cfg,
             optim_dict['optim_mic'].step()
             optim_dict['sched_mic'].step()
 
-#             losses.append(ch_fac_loss.item())
+            try:
+                losses.append(ch_fac_loss.item())
+                int_means_col.append(cpu(int_means))
+            except Exception:
+                pass
 
             # Logging
             if batch_idx % cfg.output.log_interval == 0:

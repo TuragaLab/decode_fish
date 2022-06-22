@@ -307,7 +307,7 @@ def clean_istd_df(bench_df, fids=None):
 
 # Cell
 from .predict import window_predict
-from .evaluation import matching
+from .matching import matching
 
 
 def get_train_eval_benchmark_MOp(datapath, crop):

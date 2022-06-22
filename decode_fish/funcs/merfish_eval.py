@@ -11,7 +11,7 @@ import shutil
 
 from numba import njit
 from scipy.spatial import cKDTree
-from .evaluation import matching
+from .matching import matching
 
 import io, requests
 from sklearn.neighbors import NearestNeighbors
@@ -21,7 +21,7 @@ from sklearn.neighbors import NearestNeighbors
 import pprint
 
 # Cell
-def plot_gene_numbers(bench_counts, res_counts, title='', log=True, corr=True):
+def plot_gene_numbers(bench_counts, res_counts, title='', log=True, corr=True, algo1='Baseline', algo2='DECODE'):
 
     if corr:
         r = np.corrcoef(bench_counts, res_counts)[0, 1]
@@ -34,15 +34,15 @@ def plot_gene_numbers(bench_counts, res_counts, title='', log=True, corr=True):
     plt.scatter(bench_counts, res_counts, 50, zorder=2)
     plt.plot(x, x, '-k', zorder=1)
 
-    plt.xlabel('Gene copy number Benchmark')
-    plt.ylabel('Gene copy number DECODE')
+    plt.xlabel(f'Gene copy number {algo1}')
+    plt.ylabel(f'Gene copy number {algo2}')
     if log:
         plt.xscale('log')
         plt.yscale('log')
     plt.title(f'{title} r = {r}');
 
 # Cell
-def plot_gene_panels(res_df, bench_df, targets, matches=None):
+def plot_gene_panels(res_df, bench_df, targets, matches=None, algo1='Baseline', algo2='DECODE'):
 
     bench_counts = DF(data=None, index=targets)
     bench_counts['Res_all'] = res_df.groupby('gene')['gene'].count()
@@ -62,7 +62,7 @@ def plot_gene_panels(res_df, bench_df, targets, matches=None):
 
     plt.figure(figsize=(15,5))
     plt.subplot(131)
-    plot_gene_numbers(bench_counts['Bench_all'].values, bench_counts['Res_all'].values, 'All', log=False)
+    plot_gene_numbers(bench_counts['Bench_all'].values, bench_counts['Res_all'].values, 'All', log=False,  algo1=algo1, algo2=algo2)
 
     binds = []
     for i,g in enumerate(targets):
@@ -70,23 +70,27 @@ def plot_gene_panels(res_df, bench_df, targets, matches=None):
             binds.append(g)
 
     plt.subplot(132)
-    plot_gene_numbers(bench_counts.loc[binds, 'Bench_all'].values, bench_counts.loc[binds,'Res_all'].values, 'Blanks', log=False, corr=False)
+    plot_gene_numbers(bench_counts.loc[binds, 'Bench_all'].values, bench_counts.loc[binds,'Res_all'].values, 'Blanks', log=False, corr=False,  algo1=algo1, algo2=algo2)
 
     if 'Res_fp' in bench_counts:
         plt.subplot(133)
-        plot_gene_numbers(bench_counts['Bench_all'].values, bench_counts['Res_fp'].values, 'False Pos.', log=False)
+        plot_gene_numbers(bench_counts['Bench_all'].values, bench_counts['Res_fp'].values, 'False Pos.', log=False,  algo1=algo1, algo2=algo2)
 
 # Cell
-def make_roc(df, var='code_err', ascending=True, n_max=30000):
+# def make_roc(df, var='code_err', ascending=True, n_max=30000):
 
-    if n_max is None:
-        n_max = len(df)
-    x = np.arange(0,n_max,100)
-    df = df.sort_values(var, ascending=ascending)
-    n_blanks = []
-    c_blanks = 0
-    for i in range(1, len(x)):
-        c_blanks += (df[x[i-1]:x[i]]['class'] == 1).sum()
-        n_blanks.append((c_blanks).sum())
+#     if n_max is None:
+#         n_max = len(df)
+#     x = np.arange(0,n_max,100)
+#     df = df.sort_values(var, ascending=ascending)
+#     n_blanks = []
+#     c_blanks = 0
+#     for i in range(1, len(x)):
+#         c_blanks += (df[x[i-1]:x[i]]['class'] == 1).sum()
+#         n_blanks.append((c_blanks).sum())
 
-    return x[1:], n_blanks
+#     return x[1:], n_blanks
+
+def make_roc(df, var='int_ratio', ascending=True):
+
+    return df.sort_values(var, ascending=ascending)['class'].cumsum().values

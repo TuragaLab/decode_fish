@@ -3,7 +3,7 @@ from decode_fish.funcs.file_io import *
 from decode_fish.funcs.emitter_io import *
 from decode_fish.funcs.utils import *
 from decode_fish.funcs.output_trafo import *
-from decode_fish.funcs.evaluation import *
+from decode_fish.funcs.matching import *
 import shutil
 from decode_fish.engine.point_process import PointProcessUniform
 
@@ -35,7 +35,7 @@ def my_app(cfg):
     model_dir = cfg.model_dir
     
     if cfg.model_names is not None:
-        model_names = list(cfg.model_names)
+        model_names = [cfg.model_names]
     else:
         model_names = [s.split('/')[-1] for s in glob.glob(cfg.model_dir+'/*')]
         
@@ -82,7 +82,7 @@ def my_app(cfg):
             if 'istdeco' in f: del f['istdeco']
             g = f.create_group('istdeco')
 
-            istd_df = get_istdeco_df(xsimn, codebook.reshape([140,8,2], order='F'), psf_sig=(1.5, 1.5), n_iter=400, bg=100.)
+            istd_df = get_istdeco_df(xsimn, codebook.reshape([140,8,2], order='F'), psf_sig=(1.5, 1.5), n_iter=100, bg=100.)
             istd_df = crop_f(istd_df)
 
             q_max = 0.3*istd_df['quality'].max()

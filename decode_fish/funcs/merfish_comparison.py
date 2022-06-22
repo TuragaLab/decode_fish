@@ -17,7 +17,7 @@ import shutil
 from .visualization import *
 from .predict import window_predict
 from .predict import *
-from .evaluation import *
+from .matching import *
 
 from omegaconf import open_dict
 from hydra import compose, initialize
@@ -37,21 +37,21 @@ import optuna
 optuna.logging.set_verbosity(optuna.logging.INFO)
 
 # Cell
-def get_istdeco_df(sim_data, codebook, psf_sig=(1.7, 1.7), n_iter=100, bg=100.):
+def get_istdeco_df(volume, codebook, psf_sig=(1.7, 1.7), n_iter=100, bg=100., device='cuda'):
 
     istd_results = pd.DataFrame()
 
     n_rounds = codebook.shape[1]
     n_cols = codebook.shape[2]
 
-    for i in range(len(sim_data)):
+    for i in tqdm(range(len(volume))):
 
-        image_data = np.array(sim_data)[i,:,0]
+        image_data = np.array(volume)[i,:,0]
         image_data = image_data.reshape([n_rounds,n_cols,image_data.shape[-2],image_data.shape[-1]], order='F')
 
         init_th = np.percentile(image_data,50)
 
-        istdeco_model = ISTDeco(image_data, codebook, psf_sig, b=bg)
+        istdeco_model = ISTDeco(image_data, codebook, psf_sig, b=bg).to(device)
         X, Q, loss = istdeco_model.run(niter=n_iter)
 
         # Get codes
@@ -71,7 +71,7 @@ def get_istdeco_df(sim_data, codebook, psf_sig=(1.7, 1.7), n_iter=100, bg=100.):
                 'code_inds': code_id
         })
 
-        istd_results = pd.concat([istd_results,df]) #istd_results.append(df)
+        istd_results = istd_results.append(df)
 
     istd_results = px_to_nm(istd_results)
 

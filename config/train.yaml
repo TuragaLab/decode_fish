@@ -50,22 +50,22 @@ genm:
         em_noise_inf: True
         sample_from_codebook: False
         phasing: False
-        const_theta_sim: True
+        randomize_noise_range:
         slice_rec: False
         pred_z: True
     PSF:
-        _target_: decode_fish.engine.psf.LinearInterpolatedPSF 
-        device: ${device.gpu_device}
+        _target_: decode_fish.engine.psf.PSFloader 
+        psf_file: ${data_path.psf_path}
         gauss_radii: [1.,1.,1.]
         psf_extent_zyx : [21,21,21]
         n_cols: 1
         mode: bilinear
+        device: ${device.gpu_device}
     noise:
-        _target_: decode_fish.engine.noise.sCMOS
+        _target_: decode_fish.engine.noise.GammaNoise
         theta: 2. 
         baseline: 0.
-        channels: ${genm.exp_type.n_channels} 
-        sim_scale: 1.
+        n_channels: ${genm.exp_type.n_channels} 
     intensity_dist:
         int_conc: 3.
         int_rate: 3.
@@ -77,6 +77,7 @@ genm:
         slice_rec: ${genm.exp_type.slice_rec} 
         norm: 'none'    
         ch_facs:
+        ch_cols:
         col_shifts_enabled: False
         col_shifts_yxds: [2048, 2048, 50]
     foci:
@@ -88,7 +89,6 @@ genm:
         mode: 'bin'
     emitter_noise:
         rate_fac: 2.
-        int_fac: 0.25
     prob_generator:
         low: 1e-8
         high: 0.005
@@ -132,7 +132,7 @@ network:
     n_bg_ch: ${genm.exp_type.n_channels}
     n_int_ch: ${n_int_ref[${genm.exp_type.int_inf}]}
     is_2D: False
-    n_chrom_map_ch: True
+    n_chrom_map_ch: 0
     pred_z: ${genm.exp_type.pred_z}
     inp_scale: 
     inp_offset: 
@@ -149,23 +149,16 @@ post_proc_isi:
 training:
     bs: 2
     start_iter: 0
-    num_iters: 30000
+    num_iters: 40000
     checkpoint: 9900
     schedule: 
-    start_int: 0
-    start_mic: 0 
-    old_loss: False
     int_option: 1
     start_channel_scaling: 5000
     
-    z_sig_fac: 0.5
     loss_option: 1
-    count_mult: 0
-    cat_logits: 0
     resume: False
     
     target_mean: False
-    pred_em_noise: False
     
     net:
         enabled: True
@@ -185,7 +178,6 @@ training:
         roi_rec: True
         grad_clip: 0.1
         mean_diff: True
-        freq: 1
 
         par_grads:
             channel_facs: False
@@ -206,7 +198,6 @@ training:
     psf:
         enabled: True
         grad_clip: 0.1
-        norm_reg: 0.0
         l1_reg: 0.0003
 
         opt:

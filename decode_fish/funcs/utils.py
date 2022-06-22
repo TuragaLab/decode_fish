@@ -3,7 +3,7 @@
 __all__ = ['seed_everything', 'free_mem', 'center_crop', 'smooth', 'gaussian_sphere', 'expand_codebook', 'tiff_imread',
            'load_tiff_image', 'load_tiff_from_list', 'gpu', 'cpu', 'prepend_line', 'zip_longest_special', 'param_iter',
            'generate_perlin_noise_2d_torch', 'generate_fractal_noise_2d_torch', 'generate_perlin_noise_3d_torch',
-           'generate_fractal_noise_3d_torch', 'estimate_noise_scale', 'get_color_shift_inp']
+           'generate_fractal_noise_3d_torch', 'get_color_shift_inp', 'estimate_noise_scale']
 
 # Cell
 from ..imports import *
@@ -255,6 +255,19 @@ def generate_fractal_noise_3d_torch(shape, res, octaves=1, persistence=0.5, devi
     return noise
 
 # Cell
+def get_color_shift_inp(color_shifts, outp_size=[2048,2048], ycrop=0, xcrop=0, window_size=None):
+
+    upsamp = torch.nn.UpsamplingBilinear2d(size = [2048,2048])
+    colshift_inp = kornia.filters.gaussian_blur2d(color_shifts[None],  (9,9), (3,3))
+    colshift_inp = upsamp(colshift_inp)
+    colshift_inp = colshift_inp.detach()
+
+    if window_size:
+        colshift_inp = torch.concat([colshift_inp[:,:,ycrop[i]:ycrop[i]+window_size, xcrop[i]:xcrop[i]+window_size][:,:,None] for i in range(len(ycrop))], 0)
+
+    return colshift_inp
+
+# Cell
 def estimate_noise_scale(img, bg_est, percentile=99, plot=True):
     """ Returns an estimate of theta given a volume and a background estimate
 
@@ -283,16 +296,3 @@ def estimate_noise_scale(img, bg_est, percentile=99, plot=True):
         plt.legend()
 
     return fit_theta
-
-# Cell
-def get_color_shift_inp(color_shifts, outp_size=[2048,2048], ycrop=0, xcrop=0, window_size=None):
-
-    upsamp = torch.nn.UpsamplingBilinear2d(size = [2048,2048])
-    colshift_inp = kornia.filters.gaussian_blur2d(color_shifts[None],  (9,9), (3,3))
-    colshift_inp = upsamp(colshift_inp)
-    colshift_inp = colshift_inp.detach()
-
-    if window_size:
-        colshift_inp = torch.concat([colshift_inp[:,:,ycrop[i]:ycrop[i]+window_size, xcrop[i]:xcrop[i]+window_size][:,:,None] for i in range(len(ycrop))], 0)
-
-    return colshift_inp

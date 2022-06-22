@@ -524,7 +524,7 @@ class UnetDecodeNoBn_2S(nn.Module):
         n_chrom_map_ch: number of colors of. If you dont want to use chromatic abberation map as an additional input set to 0
     """
     def __init__(self, ch_in=1, depth=3, inp_scale=1., inp_offset=0., order='ce', f_maps=64,
-                 is_2D=False, pred_z=True, p_offset=-5., int_conc=4., int_rate=1., int_loc=1., n_p_ch=1, n_bg_ch=1, n_int_ch=1, n_chrom_map_ch=False):
+                 is_2D=False, pred_z=True, p_offset=-5., int_conc=4., int_rate=1., int_loc=1., n_p_ch=1, n_bg_ch=1, n_int_ch=1, n_chrom_map_ch=0):
         super().__init__()
 
         self.inp_scale = inp_scale

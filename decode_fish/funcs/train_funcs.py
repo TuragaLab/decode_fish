@@ -4,7 +4,7 @@ __all__ = ['eval_logger', 'save_train_state', 'exp_train_eval', 'train']
 
 # Cell
 from ..imports import *
-from .evaluation import *
+from .matching import *
 from .file_io import *
 from .emitter_io import *
 from .utils import *
@@ -18,7 +18,7 @@ from torch import distributions as D
 from torch.utils.data import DataLoader
 import torch_optimizer
 from ..engine.microscope import Microscope, get_roi_filt_inds, extract_psf_roi, mic_inp_apply_inds, add_pos_noise
-from ..engine.model import UnetDecodeNoBn
+from ..engine.model import UnetDecodeNoBn_2S
 from ..engine.point_process import PointProcessUniform, get_phased_ints
 from ..engine.gmm_loss import PointProcessGaussian
 import shutil
@@ -100,18 +100,18 @@ def exp_train_eval(bench_df, res_df, targets, wandb, batch_idx):
 # Cell
 def train(cfg,
           model,
-          microscope,
+          micro,
           post_proc,
           dl,
           optim_dict):
 
     """
     Training loop for autoencoder learning. Alternates between a simulator training step to train the inference network
-    and an autoencoder step to train the PSF (and microscope) parameters.
+    and an autoencoder step to train the PSF (and micro) parameters.
 
     Args:
         model (torch.nn.Module): DECODE 3D UNet.
-        microscope (torch.nn.Module): Microscope class that transforms emitter locations into simulated images.
+        micro (torch.nn.Module): Microscope class that transforms emitter locations into simulated images.
         post_proc (torch.nn.Module): Post processing class that transforms emitter probilities deterministically into binary outputs.
         dl  (torch.utils.data.dataloader.DataLoader): Dataloader that returns a random sub volume from the real volume, an estiamted emitter density and background.
         optim_dict (dict of torch.optim.Optimizer and torch.optim.lr_scheduler): Dict. with optimizer and scheduler objects for the network and gen. model parameters.
@@ -123,32 +123,27 @@ def train(cfg,
 
     model.cuda().train()
 
-    # Save initial psf state
-    torch.save(microscope.psf.state_dict(), str(save_dir) + '/psf_init.pkl' )
-
     # Load codebook
     codebook, targets = hydra.utils.instantiate(cfg.codebook)
 
+    # If our network is also trained to predict single-channel emitters, expand the codebook with single-bit codes
     sim_codebook = torch.tensor(codebook, dtype=torch.bool) if not cfg.genm.exp_type.em_noise_inf else torch.tensor(expand_codebook(codebook), dtype=torch.bool)
     post_proc.codebook = sim_codebook
     code_weight = torch.ones(len(sim_codebook))
     code_weight[len(codebook):] *= cfg.genm.emitter_noise.rate_fac
 
     # Load particle sampler
-    point_process = PointProcessUniform(int_conc=model.int_dist.int_conc.detach(), int_rate=model.int_dist.int_rate.detach(), int_loc=model.int_dist.int_loc.detach(),
-                                       sim_iters=5, n_channels=cfg.genm.exp_type.n_channels, sim_z=cfg.genm.exp_type.pred_z, slice_rec=cfg.genm.exp_type.slice_rec,
+    point_process = PointProcessUniform(**cfg.genm.intensity_dist, sim_iters=5, n_channels=cfg.genm.exp_type.n_channels, sim_z=cfg.genm.exp_type.pred_z, slice_rec=cfg.genm.exp_type.slice_rec,
                                         codebook=sim_codebook, int_option=cfg.training.int_option, code_weight=code_weight)
 
     # Controls which genmodel parameters are optimized
-    for name, p in microscope.named_parameters(recurse=False):
+    for name, p in micro.named_parameters(recurse=False):
         p.requires_grad = cfg.training.mic.par_grads[name]
-    for name, p in microscope.psf.named_parameters():
-        p.requires_grad = cfg.training.mic.par_grads['psf_vol']
+    micro.psf.psf_volume.requires_grad_(cfg.training.mic.par_grads['psf_vol'])
 
     calc_log_p_x = False
     int_sig = None
-
-    col_shift_map = cfg.genm.microscope.col_shifts_enabled
+    zcrop, ycrop, xcrop, colshift_crop = None, None, None, None
 
     # Hacky way to switch between network / genmodel training
     if cfg.training.schedule is not None:
@@ -166,20 +161,21 @@ def train(cfg,
                 switch_iter += sched.pop(0)
 
         t0 = time.time()
-        ret_dict = next(iter(dl))
         # Get real data window and rate/background for the simulation
+        ret_dict = next(iter(dl))
         x, local_rate, background = ret_dict['x'], ret_dict['local_rate'], ret_dict['background']
 
-        if col_shift_map:
+        # If we learn color shifts (aberation maps) we also need to know where we picked the data
+        if cfg.genm.microscope.col_shifts_enabled:
             zcrop, ycrop, xcrop = ret_dict['crop_z'], ret_dict['crop_y'], ret_dict['crop_x']
             zcrop, ycrop, xcrop = zcrop.flatten(), ycrop.flatten(), xcrop.flatten()
-            colshift_crop = get_color_shift_inp(microscope.color_shifts, microscope.col_shifts_yx, ycrop, xcrop, cfg.sim.random_crop.crop_sz)
-        else:
-            zcrop, ycrop, xcrop, colshift_crop = None, None, None, None
+            colshift_crop = get_color_shift_inp(micro.color_shifts, micro.col_shifts_yx, ycrop, xcrop, cfg.sim.random_crop.crop_sz)
 
-        background = background * microscope.get_ch_mult().detach()
-        x = x * microscope.get_ch_mult().detach()
+        # Scale real data and extracted background by the learned channel_facs
+        background = background * micro.get_ch_mult().detach()
+        x = x * micro.get_ch_mult().detach()
 
+        # Shuffle background across channels so the network doesn't overfit to much
         if cfg.sim.bg_estimation.shuffle_ch:
             background = background.index_select(1, torch.randperm(background.shape[1]).cuda())
 
@@ -188,43 +184,53 @@ def train(cfg,
         if cfg.training.net.enabled:
 
             optim_dict['optim_net'].zero_grad()
-
+            # Sample emitters
             sim_vars = point_process.sample(local_rate[:,0])
 
             # sim_vars = locs_sl, x_os_sl, y_os_sl, z_os_sl, ints_sl, output_shape, codes
-#             print('Sim, ', time.time()-t0); t0 = time.time()
-            ch_inp = list(microscope.get_single_ch_inputs(*sim_vars[:-1], ycrop=ycrop, xcrop=xcrop))
-            cond = sim_vars[-1] < len(codebook)
-            cb_cool = torch.repeat_interleave(cond, cond * (cfg.genm.exp_type.n_bits - 1) + 1)
-            ch_inp[1][cb_cool], ch_inp[2][cb_cool], ch_inp[3][cb_cool] = add_pos_noise([ch_inp[1][cb_cool], ch_inp[2][cb_cool], ch_inp[3][cb_cool]],
-                                                                                       [cfg.genm.pos_noise.pos_noise_xy, cfg.genm.pos_noise.pos_noise_xy, cfg.genm.pos_noise.pos_noise_z], cfg.genm.exp_type.n_bits)
-            xsim = microscope(*ch_inp, add_noise=True)
+            # locs_sl has the discrete positions of the barcodes in 4D (batch, 0, z, y, x), the channels are later determined. z = 0 for slice data
+            # x_os_sl, y_os_sl, z_os_sl subpixel offsets. dim: N_barcodes
+            # ints_sl array of intensities. dim: N_barcodes * n_channels
+            # codes are the code indices.
 
+#             print('Sim, ', time.time()-t0); t0 = time.time()
+
+            # Extract the single channel inputs that the microscope takes as input (the microscope is 'unaware' of the codebook). Also applies color/round dependent shifts
+            # ch_inp[0] not was has discrete positions in 5D (batch, channel, z, y, x)
+            # offsets and intensities are now of shape N_psfs
+            ch_inp = list(micro.get_single_ch_inputs(*sim_vars[:-1], ycrop=ycrop, xcrop=xcrop))
+
+            # Add random noise to multiple psfs belonging to the same barcode such that the mean position (which is the network target) remains unchanged
+            ch_inp[1], ch_inp[2], ch_inp[3] = add_pos_noise([ch_inp[1], ch_inp[2], ch_inp[3]],
+                                                            [cfg.genm.pos_noise.pos_noise_xy, cfg.genm.pos_noise.pos_noise_xy, cfg.genm.pos_noise.pos_noise_z], cfg.genm.exp_type.n_bits, sim_vars[-1] < len(codebook))
+
+            # Generate simulated images
+            xsim = micro(*ch_inp, add_noise=True)
+
+            # Add phasing. Seems to help slightly but slows down training
             if cfg.genm.phasing:
 
-                phasing_inp = list(microscope.get_single_ch_inputs(*sim_vars[:4], get_phased_ints(sim_vars[4], microscope.ch_cols, microscope.psf.n_cols) ,sim_vars[5], ycrop=ycrop, xcrop=xcrop))
+                phasing_inp = list(micro.get_single_ch_inputs(*sim_vars[:4], get_phased_ints(sim_vars[4], micro.ch_cols, micro.psf.n_cols) ,sim_vars[5], ycrop=ycrop, xcrop=xcrop))
                 phasing_inp[1:4] = add_pos_noise(phasing_inp[1:4], [cfg.genm.pos_noise.pos_noise_xy, cfg.genm.pos_noise.pos_noise_xy, cfg.genm.pos_noise.pos_noise_z], cfg.genm.exp_type.n_bits, rm_mean=False)
-                xsim += microscope(*phasing_inp, add_noise=True) * cfg.genm.phasing * torch.rand(xsim.shape, device=xsim.device)
+                # Phased PSFs are dimmer, also add some randomness
+                xsim += micro(*phasing_inp, add_noise=True) * cfg.genm.phasing * torch.rand(xsim.shape, device=xsim.device)
+
 #             print('Micro, ', time.time()-t0); t0 = time.time()
 
-            xsim_noise = microscope.noise(xsim, background, const_theta_sim=cfg.genm.exp_type.const_theta_sim).sample()
+            # Sammple camera noise
+            xsim_noise = micro.noise(xsim, background, randomize_range=cfg.genm.exp_type.randomize_noise_range).sample()
 
 #             print('Noise. ', time.time()-t0); t0 = time.time()
 
+            # Network takes the simulated image and the aberation maps
             net_inp = torch.concat([xsim_noise,colshift_crop], 1) if colshift_crop is not None else xsim_noise
             out_sim = model.tensor_to_dict(model(net_inp))
 
 #             print('Model forw. ', time.time()-t0); t0 = time.time()
 
+            # Calculate loss
             ppg = PointProcessGaussian(**out_sim)
-
-            count_prob, spatial_prob = ppg.log_prob(*sim_vars[:5], codes=sim_vars[-1],
-                                                    n_bits=cfg.genm.exp_type.n_bits, channels=cfg.genm.exp_type.n_channels,
-                                                    loss_option=cfg.training.loss_option,
-                                                    count_mult=cfg.training.count_mult, cat_logits=cfg.training.cat_logits,
-                                                    slice_rec=cfg.genm.exp_type.slice_rec, z_sig_fac=cfg.training.z_sig_fac,
-                                                    int_inf=cfg.genm.exp_type.int_inf)
-
+            count_prob, spatial_prob = ppg.log_prob(*sim_vars[:5], codes=sim_vars[-1], n_channels=cfg.genm.exp_type.n_channels, loss_option=cfg.training.loss_option, int_inf=cfg.genm.exp_type.int_inf)
             gmm_loss = -(spatial_prob + cfg.training.net.cnt_loss_scale*count_prob).mean()
 
             background_loss = F.mse_loss(out_sim['background'], background)
@@ -241,15 +247,21 @@ def train(cfg,
             optim_dict['optim_net'].step()
             optim_dict['sched_net'].step()
 
+            # After a warm-up period we also optimize channel factors in each iteration (less frequent updates would probably be enough)
+            # Channels factors are stored in the microscope but DO NOT influence the simulation. They are just used to scale real data such that the inferred intensities are constant across channels
+
             if cfg.training.mic.par_grads.channel_facs and batch_idx > cfg.training.start_channel_scaling:
 
                 with torch.no_grad():
 
+                    # Run network on real data
                     net_inp = torch.concat([x,colshift_crop], 1) if colshift_crop is not None else x
                     out_inp = model.tensor_to_dict(model(net_inp))
-                    proc_out_inp = post_proc.get_micro_inp(out_inp)
+                    # Remove single emitters. They have a different intentsity distribution the emitters that belong to barcodes apparently
+                    out_inp['logits'][:,len(codebook):] = -20.
 
-                    ch_out_inp = microscope.get_single_ch_inputs(*proc_out_inp, ycrop=ycrop, xcrop=xcrop)
+                    proc_out_inp = post_proc.get_micro_inp(out_inp)
+                    ch_out_inp = micro.get_single_ch_inputs(*proc_out_inp, ycrop=ycrop, xcrop=xcrop)
 
                 if len(proc_out_inp[1]) > 0:
 
@@ -259,9 +271,11 @@ def train(cfg,
                     ch_inds = ch_out_inp[0][1]
                     int_vals = ch_out_inp[-2]
 
-                    target_mean_int = model.int_dist.int_conc.item() / model.int_dist.int_rate.item() + model.int_dist.int_loc.item()
+                    target_mean_int = cfg.genm.intensity_dist.int_conc / cfg.genm.intensity_dist.int_rate + cfg.genm.intensity_dist.int_loc
 
                     int_means = torch.ones(cfg.genm.exp_type.n_channels).cuda()
+
+                    # Collect inensities across channels
                     for i in range(cfg.genm.exp_type.n_channels):
                         if i in ch_inds:
                             int_means[i] = int_vals[ch_inds == i].mean()
@@ -270,69 +284,72 @@ def train(cfg,
                             else:
                                 int_means[i] = int_means[i] / target_mean_int
 
-                    ch_fac_loss = torch.sqrt(torch.mean((microscope.channel_facs - microscope.channel_facs.detach() / int_means)**2))
+                    # Loss becomes zero if int_means are all 1.
+                    ch_fac_loss = torch.sqrt(torch.mean((micro.channel_facs - micro.channel_facs.detach() / int_means)**2))
                     ch_fac_loss.backward()
                     int_sig = torch.sqrt(torch.var(int_means))
 
                     optim_dict['optim_mic'].step()
 
         ch_out_inp = [[],[]]
-        if batch_idx > min(cfg.training.start_mic,cfg.training.start_int) and batch_idx % cfg.training.mic.freq == 0:
+        if cfg.training.mic.enabled:
 
 #             out_inp = model.tensor_to_dict(model(x))
             net_inp = torch.concat([x,colshift_crop], 1) if colshift_crop is not None else x
             out_inp = model.tensor_to_dict(model(net_inp))
             proc_out_inp = post_proc.get_micro_inp(out_inp)
 
-            if cfg.training.mic.enabled and batch_idx > cfg.training.start_mic and len(proc_out_inp[1]) > 0: # and len(proc_out_inp[1]) < 300:
+            if cfg.training.mic.enabled and len(proc_out_inp[1]) > 0: # and len(proc_out_inp[1]) < 300:
 # #                 print('Pre filt ', len(proc_out_inp[1]))
-                ch_out_inp = microscope.get_single_ch_inputs(*proc_out_inp, ycrop=ycrop, xcrop=xcrop)
+                ch_out_inp = micro.get_single_ch_inputs(*proc_out_inp, ycrop=ycrop, xcrop=xcrop)
                 optim_dict['optim_mic'].zero_grad()
                 calc_log_p_x = False
 
                 # Get autoencoder loss
                 if cfg.training.mic.roi_rec:
-                    filt_inds = get_roi_filt_inds(*ch_out_inp[0], microscope.psf.psf_volume.shape, x.shape, slice_rec=cfg.genm.exp_type.slice_rec, min_dist=10)
+                    # Select isolated emitters
+                    filt_inds = get_roi_filt_inds(*ch_out_inp[0], micro.psf.psf_volume.shape, x.shape, slice_rec=cfg.genm.exp_type.slice_rec, min_dist=10)
                     ch_out_inp = mic_inp_apply_inds(*ch_out_inp, filt_inds)
+
                     if len(ch_out_inp[1]):
-                        psf_recs = microscope(*ch_out_inp, ret_psfs=True, add_noise=False)
+                        # Get PSF reconstructions
+                        psf_recs = micro(*ch_out_inp, ret_psfs=True, add_noise=False)
                         n_recs = len(psf_recs)
 # #                         print('N rec inds ', len(psf_recs))
 
+                        # Extract rois and background from real data / network output
                         rois = extract_psf_roi(ch_out_inp[0], x, torch.tensor(psf_recs.shape))
                         bgs = extract_psf_roi(ch_out_inp[0], out_inp['background'], torch.tensor(psf_recs.shape))
 
+                        # Correct for difference in the mean between reconstructions and rois
                         if cfg.training.mic.mean_diff:
                             mean_diff = rois.mean([1,2,3,4], keepdim=True) - (psf_recs.detach()+bgs).mean([1,2,3,4], keepdim=True)
                             rois -= mean_diff
 
-#                         if cfg.training.mic.edge_diff:
-#                             bg_edges = torch.cat([bgs[:,0,0,:2,:].flatten(1,2), bgs[:,0,0,-2:,:].flatten(1,2), bgs[:,0,0,:,:2].flatten(1,2), bgs[:,0,0,:,-2:].flatten(1,2)], 1)
-#                             rois_edges = torch.cat([rois[:,0,0,:2,:].flatten(1,2), rois[:,0,0,-2:,:].flatten(1,2), rois[:,0,0,:,:2].flatten(1,2), rois[:,0,0,:,-2:].flatten(1,2)], 1)
-#                             edge_diff = rois_edges.mean(-1) - bg_edges.mean(-1)
-#                             rois -= edge_diff[:,None,None,None,None]
-
-                        log_p_x_given_z = -microscope.noise(psf_recs, bgs, const_theta_sim=False, ch_inds=ch_out_inp[0][1]).log_prob(rois.clamp_min_(1.))
+                        log_p_x_given_z = -micro.noise(psf_recs, bgs, ch_inds=ch_out_inp[0][1]).log_prob(rois.clamp_min_(1.))
 
                         log_p_x_given_z = log_p_x_given_z.mean()
                         calc_log_p_x = True
 
                 else:
-                    ae_img = microscope(*ch_out_inp, add_noise=False)
-                    log_p_x_given_z = -microscope.noise(ae_img, out_inp['background'], const_theta_sim=False).log_prob(x.clamp_min_(1.)).mean()
+                    # Reconstruct full 5D volume instead, will probably run out of memory
+                    ae_img = micro(*ch_out_inp, add_noise=False)
+                    log_p_x_given_z = -micro.noise(ae_img, out_inp['background']).log_prob(x.clamp_min_(1.)).mean()
                     calc_log_p_x = True
 
                 if calc_log_p_x:
 
-                    if cfg.training.psf.norm_reg:
-                        log_p_x_given_z += cfg.training.psf.norm_reg * (microscope.psf.com_loss())
+                    # Regularization to keep the psf centered
+#                     if cfg.training.psf.norm_reg:
+#                         log_p_x_given_z += cfg.training.psf.norm_reg * (micro.psf.com_loss())
 
-                    if cfg.training.psf.l1_reg:
-                        log_p_x_given_z += cfg.training.psf.l1_reg * (microscope.psf.l1_diff_norm(microscope.psf_init_vol))
+                    # L1 regularization on the difference to the initial psf. Doesn't seem to help anymore
+#                     if cfg.training.psf.l1_reg:
+#                         log_p_x_given_z += cfg.training.psf.l1_reg * (micro.psf.l1_diff_norm(micro.psf_init_vol))
 
                     log_p_x_given_z.backward()
-                    if cfg.training.mic.grad_clip: torch.nn.utils.clip_grad_norm_(microscope.parameters(recurse=False), max_norm=cfg.training.mic.grad_clip, norm_type=2)
-                    if cfg.training.mic.grad_clip: torch.nn.utils.clip_grad_norm_(microscope.psf.parameters(), max_norm=cfg.training.psf.grad_clip, norm_type=2)
+                    if cfg.training.mic.grad_clip: torch.nn.utils.clip_grad_norm_(micro.parameters(recurse=False), max_norm=cfg.training.mic.grad_clip, norm_type=2)
+                    if cfg.training.mic.grad_clip: torch.nn.utils.clip_grad_norm_(micro.psf.parameters(), max_norm=cfg.training.psf.grad_clip, norm_type=2)
 
                     optim_dict['optim_mic'].step()
                     optim_dict['optim_psf'].step()
@@ -343,7 +360,7 @@ def train(cfg,
 
         # Logging
         if batch_idx == cfg.training.checkpoint:
-            save_train_state(save_dir, model, microscope, optim_dict, batch_idx, checkpoint=True)
+            save_train_state(save_dir, model, micro, optim_dict, batch_idx, checkpoint=True)
 
         if batch_idx % 10 == 0:
 
@@ -356,12 +373,12 @@ def train(cfg,
                 if int_sig is not None:
                     wandb.log({'AE Losses/int_sig': int_sig.item()}, step=batch_idx)
 
-            if batch_idx > cfg.training.start_mic:
+            if cfg.training.mic.enabled:
                 if cfg.training.mic.enabled and calc_log_p_x:
                     wandb.log({'AE Losses/p_x_given_z': log_p_x_given_z.detach().cpu()}, step=batch_idx)
                     wandb.log({'AE Losses/n_recs': n_recs}, step=batch_idx)
                     wandb.log({'AE Losses/RMSE(rec)': torch.sqrt(((rois-(psf_recs+bgs))**2).mean()).detach().cpu()}, step=batch_idx)
-                    wandb.log({'AE Losses/sum(psf)': F.relu(microscope.psf.psf_volume/microscope.psf.psf_volume.max())[0].sum().detach().cpu()}, step=batch_idx)
+                    wandb.log({'AE Losses/sum(psf)': F.relu(micro.psf.psf_volume/micro.psf.psf_volume.max())[0].sum().detach().cpu()}, step=batch_idx)
 
 #         if batch_idx > 0 and batch_idx % 1500 == 0:
 #             torch.save({'state_dict':model.state_dict(), 'scaling':[model.inp_scale, model.inp_offset]}, save_dir/f'model_{batch_idx}.pkl')
@@ -396,7 +413,7 @@ def train(cfg,
                             bench_df = hydra.utils.call(cfg.evaluation.code_stats.bench_func, crop=crop)
 
                         res_df = window_predict(model, post_proc, dl.dataset.volumes, window_size=[None, 64, 64], device='cuda', crop=crop,
-                                                chrom_map=get_color_shift_inp(microscope.color_shifts, microscope.col_shifts_yx)[:,:,None], scale=microscope.get_ch_mult().detach())
+                                                chrom_map=get_color_shift_inp(micro.color_shifts, micro.col_shifts_yx)[:,:,None], scale=micro.get_ch_mult().detach())
 
                         res_df = res_df[res_df['code_inds'] < len(codebook)]
                         res_df['gene'] = targets[res_df['code_inds']]
@@ -408,7 +425,7 @@ def train(cfg,
 
 
             # storing
-            save_train_state(save_dir, model, microscope, optim_dict, batch_idx)
+            save_train_state(save_dir, model, micro, optim_dict, batch_idx)
 
 #             print('Log., ', time.time()-t0); t0 = time.time()
 

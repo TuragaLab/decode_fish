@@ -9,12 +9,11 @@ from .emitter_io import *
 from .utils import *
 from .dataset import *
 from .plotting import *
-from ..engine.noise import estimate_noise_scale
 from ..engine.microscope import *
 import shutil
-from .evaluation import *
+from .matching import *
 from .predict import window_predict
-from .evaluation import matching
+from .matching import matching
 from .merfish_eval import *
 from .exp_specific import *
 from ..engine.point_process import *
@@ -24,7 +23,7 @@ from omegaconf import open_dict
 from hydra import compose, initialize
 
 # Cell
-def sim_data(decode_dl, micro, point_process, batches, n_codes, rate_fac=1., pos_noise_xy=0., pos_noise_z=0., const_theta_sim=True, n_bits=4):
+def sim_data(decode_dl, micro, point_process, batches, n_codes, rate_fac=1., pos_noise_xy=0., pos_noise_z=0., randomize_range=None, n_bits=4):
 
     gt_dfs = []
     xsim_col = []
@@ -51,7 +50,7 @@ def sim_data(decode_dl, micro, point_process, batches, n_codes, rate_fac=1., pos
                                                                                            [pos_noise_xy, pos_noise_xy, pos_noise_z], n_bits)
             xsim = micro(*ch_inp, add_noise=True)
 
-            x = micro.noise(xsim, background, const_theta_sim=const_theta_sim).sample()
+            x = micro.noise(xsim, background, randomize_range=randomize_range).sample()
 
             if micro.col_shifts_enabled:
                 colshift_crop = get_color_shift_inp(micro.color_shifts, micro.col_shifts_yx, ycrop, xcrop, decode_dl.dataset.dataset_tfms[0].crop_sz[-1])

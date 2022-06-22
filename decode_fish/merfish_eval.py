@@ -4,7 +4,7 @@ from decode_fish.funcs.emitter_io import *
 from decode_fish.funcs.utils import *
 from decode_fish.funcs.dataset import *
 from decode_fish.funcs.output_trafo import *
-from decode_fish.funcs.evaluation import *
+from decode_fish.funcs.matching import *
 from decode_fish.funcs.plotting import *
 import torch.nn.functional as F
 from torch.optim.lr_scheduler import MultiStepLR
@@ -34,14 +34,13 @@ def my_app(cfg):
 
     model_cfg = OmegaConf.load(cfg.model_cfg)
     
-    psf, noise, micro = load_psf_noise_micro(model_cfg)
+    micro = load_psf_noise_micro(model_cfg)
     post_proc = hydra.utils.instantiate(model_cfg.post_proc_isi)
     model = hydra.utils.instantiate(model_cfg.network)
     
     path = Path(model_cfg.output.save_dir)
     load_model_state(model, path/f'model.pkl')
     micro.load_state_dict(torch.load(path/'microscope.pkl'), strict=False)
-    post_proc.samp_threshold = 0.5
     
     model.eval().cuda()
     
@@ -61,6 +60,8 @@ def my_app(cfg):
         model_cfg.training.mic.sched.step_size = 500
         model_cfg.data_path.image_path = cfg.image_path
         
+        model_cfg.training.target_mean = False
+        
         codebook, targets = hydra.utils.instantiate(model_cfg.codebook)
         post_proc.codebook = torch.tensor(expand_codebook(codebook)) if model_cfg.genm.exp_type.em_noise_inf else torch.tensor(codebook)
         image_vol, decode_dl = get_dataloader(model_cfg)
@@ -70,7 +71,7 @@ def my_app(cfg):
         
         rescale_train(cfg=model_cfg,
              model=model, 
-             microscope=micro, 
+             micro=micro, 
              post_proc=post_proc,
              dl=decode_dl, 
              optim_dict=optim_dict)

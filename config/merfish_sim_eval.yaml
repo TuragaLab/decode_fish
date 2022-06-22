@@ -1,9 +1,9 @@
-data_dir: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/decode_fish/data/merfish_sims/sim_data4/
+data_dir: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/decode_fish/data/merfish_sims/sim_data5/
 data_file: dens_0.05_int_1.0.h5
-sweep_name: sim_2d_1
+sweep_name: sim_2d_2
 # model_dir: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/models/fishcod/Fig_sim_density/psf_opt_runs/
 model_dir: /groups/turaga/home/speisera/Mackebox/Artur/WorkDB/deepstorm/models/fishcod/MERFISH_sim_2D/${sweep_name}/
-model_names: 
+model_names: hd
 crop_sz: 128
 eval_dec: True
 eval_istdeco: True

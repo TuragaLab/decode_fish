@@ -4,13 +4,13 @@ from decode_fish.funcs.emitter_io import *
 from decode_fish.funcs.utils import *
 from decode_fish.funcs.dataset import *
 from decode_fish.funcs.output_trafo import *
-from decode_fish.funcs.evaluation import *
+from decode_fish.funcs.matching import *
 from decode_fish.funcs.plotting import *
 import torch.nn.functional as F
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
 from decode_fish.engine.microscope import Microscope
-from decode_fish.engine.model import UnetDecodeNoBn
+from decode_fish.engine.model import UnetDecodeNoBn_2S
 import shutil
 from decode_fish.engine.point_process import PointProcessUniform
 from decode_fish.engine.gmm_loss import PointProcessGaussian
@@ -26,7 +26,7 @@ def my_app(cfg):
     seed_everything(cfg.seed)
     
     img_3d, decode_dl = get_dataloader(cfg)
-    psf, noise, micro = load_psf_noise_micro(cfg)
+    micro = load_psf_noise_micro(cfg)
     
     inp_offset, inp_scale = get_forward_scaling(img_3d[0])
     if cfg.network.inp_scale is not None:
@@ -40,7 +40,6 @@ def my_app(cfg):
     code_ref, targets = hydra.utils.instantiate(cfg.codebook)
     post_proc.codebook = torch.tensor(code_ref)
     
-    psf  .to(cfg.device.gpu_device)
     model.to(cfg.device.gpu_device)
     micro.to(cfg.device.gpu_device)
     
@@ -59,7 +58,7 @@ def my_app(cfg):
     optim_dict = {}
     optim_dict['optim_net'] = hydra.utils.instantiate(cfg.training.net.opt, params=model.network.parameters())
     optim_dict['optim_mic'] = hydra.utils.instantiate(cfg.training.mic.opt, params=micro.parameters(recurse=False))
-    optim_dict['optim_psf'] = hydra.utils.instantiate(cfg.training.psf.opt, params=micro.psf.parameters())
+    optim_dict['optim_psf'] = hydra.utils.instantiate(cfg.training.psf.opt, params=[micro.psf.psf_volume])
 
     optim_dict['sched_net'] = hydra.utils.instantiate(cfg.training.net.sched, optimizer=optim_dict['optim_net'])
     optim_dict['sched_mic'] = hydra.utils.instantiate(cfg.training.mic.sched, optimizer=optim_dict['optim_mic'])
@@ -89,12 +88,12 @@ def my_app(cfg):
         if cfg.training.mic.enabled:
             train_state_dict = torch.load(Path(cfg.data_path.micro_init)/'training_state.pkl')
             for k in optim_dict:
-                if 'mic' in k:
+                if 'mic' in k or 'psf' in k:
                     optim_dict[k].load_state_dict(train_state_dict[k])    
         
     train(cfg=cfg,
          model=model, 
-         microscope=micro, 
+         micro=micro, 
          post_proc=post_proc,
          dl=decode_dl, 
          optim_dict=optim_dict)

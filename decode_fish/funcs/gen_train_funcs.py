@@ -4,7 +4,7 @@ __all__ = ['gen_train_dataset']
 
 # Cell
 from ..imports import *
-from .evaluation import *
+from .matching import *
 from .file_io import *
 from .emitter_io import *
 from .utils import *

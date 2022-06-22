@@ -11,6 +11,7 @@ from torch.jit import script
 from typing import Union, List
 import torch.nn.functional as F
 from .place_psfs import CudaPlaceROI
+import kornia
 
 # Cell
 class Microscope(nn.Module):
@@ -52,7 +53,7 @@ class Microscope(nn.Module):
         super().__init__()
 
         self.psf = psf
-        self.psf_init_vol = psf.psf_volume.detach().to('cuda')
+        self.psf_init_vol = psf.psf_volume.detach().to('cuda') + 0
         self.psf_z_size = self.psf.psf_volume.shape[-3]
 
         self.scale = scale

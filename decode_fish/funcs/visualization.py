@@ -10,7 +10,7 @@ from .emitter_io import *
 from .utils import *
 from .dataset import *
 from .output_trafo import *
-from .evaluation import *
+from .matching import *
 from .plotting import *
 from torch.utils.data import DataLoader
 from ..engine.microscope import Microscope, get_roi_filt_inds, mic_inp_apply_inds, extract_psf_roi
@@ -280,8 +280,6 @@ def plot_slice_psf_pars(psf_vol, psf_init, gt_psf=None, normed=False, figsize=[3
         axes[0,z].margins(x=0, y=0, tight=True)
 
         mlist = [psf_init[:,z].max().item(), psf_vol[:,z].max().item()]
-        if gt_psf is not None:
-            mlist += [gt_psf[:,z].max().item()]
         plt_lim = np.max(mlist)
 
         axes[-1, z].plot(psf_init[0,z,mid_px], label='Init.')

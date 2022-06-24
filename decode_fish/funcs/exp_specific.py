@@ -293,7 +293,7 @@ def clean_bench_df(bench_df, fids=None):
     bench_df['y'] += 70
     bench_df = exclude_borders(bench_df, border_size_zyx=[0,15000,15000], img_size=[2048*100,2048*100,2048*100])
     bench_df = remove_fids(bench_df, px_to_nm(fids), tolerance=1000)
-    bench_df = remove_doublets(bench_df, tolerance=200)
+    bench_df = remove_doublets(bench_df, tolerance=300)
     bench_df['class'] = bench_df['gene'].str.contains('Blank')
     return bench_df
 
@@ -301,7 +301,7 @@ def clean_istd_df(bench_df, fids=None):
     bench_df['loc_idx'] = np.arange(len(bench_df))
     bench_df = exclude_borders(bench_df, border_size_zyx=[0,15000,15000], img_size=[2048*100,2048*100,2048*100])
     bench_df = remove_fids(bench_df, px_to_nm(fids), tolerance=1000)
-    bench_df = remove_doublets(bench_df, tolerance=200)
+    bench_df = remove_doublets(bench_df, tolerance=300)
     bench_df['class'] = bench_df['gene'].str.contains('Blank')
     return bench_df
 

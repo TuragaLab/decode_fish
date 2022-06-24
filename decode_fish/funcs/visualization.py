@@ -17,6 +17,7 @@ from ..engine.microscope import Microscope, get_roi_filt_inds, mic_inp_apply_ind
 from ..engine.point_process import PointProcessUniform
 from matplotlib.backends.backend_agg import FigureCanvas
 from .routines import get_prediction
+import kornia
 
 # Cell
 def get_simulation_statistics(decode_dl, micro, point_process, int_threshold=1, samples = 1):
@@ -228,7 +229,7 @@ def eval_random_crop(decode_dl, model, post_proc, micro, proj_func=np.max, cuda=
 
 
 # Cell
-def plot_micro_pars(micro, figsize=[20,3]):
+def plot_micro_pars(micro, figsize=[20,3], blur_cmap=True):
 
     f, (ax1, ax2, ax3, ax4, ax5) = plt.subplots(1, 5, sharey=False, figsize=figsize)
 
@@ -246,11 +247,16 @@ def plot_micro_pars(micro, figsize=[20,3]):
     ax3.set_title('Round shifts [pixel]')
     ax3.set_xlabel('Round')
 
-    im = ax4.imshow(cpu(micro.color_shifts)[0])
+    if blur_cmap:
+        color_shifts = cpu(kornia.filters.gaussian_blur2d(micro.color_shifts[None],  (9,9), (3,3))[0])
+    else:
+        color_shifts = cpu(micro.color_shifts)
+
+    im = ax4.imshow(color_shifts[0])
     add_colorbar(im)
     ax4.set_title('Color shifts map x [pixel]')
 
-    im = ax5.imshow(cpu(micro.color_shifts)[1])
+    im = ax5.imshow(color_shifts[1])
     add_colorbar(im)
     ax5.set_title('Color shifts map y [pixel]')
 

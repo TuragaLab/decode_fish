@@ -85,11 +85,10 @@ def my_app(cfg):
     if cfg.data_path.micro_init is not None:
         micro.load_state_dict(torch.load(Path(cfg.data_path.micro_init)/'microscope.pkl'), strict=False)
         
-        if cfg.training.mic.enabled:
-            train_state_dict = torch.load(Path(cfg.data_path.micro_init)/'training_state.pkl')
-            for k in optim_dict:
-                if 'mic' in k or 'psf' in k:
-                    optim_dict[k].load_state_dict(train_state_dict[k])    
+        train_state_dict = torch.load(Path(cfg.data_path.micro_init)/'training_state.pkl')
+        for k in optim_dict:
+            if 'mic' in k or 'psf' in k:
+                optim_dict[k].load_state_dict(train_state_dict[k])    
         
     train(cfg=cfg,
          model=model, 

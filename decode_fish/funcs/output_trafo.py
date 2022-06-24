@@ -135,8 +135,6 @@ class SIPostProcess(torch.nn.Module):
                  'y': y*self.px_size_zyx[1],
                  'z': z*self.px_size_zyx[0],
                  'prob': res_dict['Probs_si'][locations],
-#                  'int': res_dict['xyzi_mu'][:,[3]][ch0_locs],
-#                  'int_sig': res_dict['xyzi_sigma'][:,[3]][ch0_locs],
                  'x_sig': res_dict['xyzi_sigma'][:,[0]][ch0_locs]*self.px_size_zyx[0],
                  'y_sig': res_dict['xyzi_sigma'][:,[1]][ch0_locs]*self.px_size_zyx[1],
                  'z_sig': res_dict['xyzi_sigma'][:,[2]][ch0_locs]*self.px_size_zyx[2],

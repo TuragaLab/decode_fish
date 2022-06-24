@@ -89,7 +89,7 @@ def my_app(cfg):
     res_df = exclude_borders(res_df, border_size_zyx=[0,15000,15000], img_size=[2048*100,2048*100,2048*100])
     
     res_df = remove_fids(res_df, px_to_nm(artifact_coords), tolerance=1000)
-    res_df = remove_doublets(res_df, tolerance=200)
+    res_df = remove_doublets(res_df, tolerance=300)
     ###
     
     res_df.to_csv(cfg.out_file, index=False)

@@ -4,18 +4,16 @@ from decode_fish.funcs.emitter_io import *
 from decode_fish.funcs.utils import *
 from decode_fish.funcs.dataset import *
 from decode_fish.funcs.output_trafo import *
-from decode_fish.funcs.evaluation import *
+from decode_fish.funcs.matching import *
 from decode_fish.funcs.plotting import *
 import torch.nn.functional as F
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
 from decode_fish.engine.microscope import Microscope
-from decode_fish.engine.model import UnetDecodeNoBn
+from decode_fish.engine.model import UnetDecodeNoBn_2S
 import shutil
 from decode_fish.engine.point_process import PointProcessUniform
-from decode_fish.engine.gmm_loss import PointProcessGaussian
 import torch_optimizer
-from decode_fish.funcs.gen_train_funcs import *
 import wandb
 from decode_fish.funcs.merfish_codenet import *
 
@@ -33,8 +31,8 @@ def my_app(cfg):
     
     post_proc.codebook = expand_codebook(codebook)
     
-    net = conv_net(5, codebook.shape[1], bn=cfg.batch_norm).cuda()
-    # net = code_net(53).cuda()
+    net = conv_net(6, codebook.shape[1], bn=cfg.batch_norm).cuda()
+    #net = code_net(9).cuda()
     
     code_weight = torch.ones(len(post_proc.codebook))
     code_weight[len(codebook):] *= cfg.genm.emitter_noise.rate_fac

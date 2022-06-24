@@ -49,7 +49,6 @@ genm:
         int_inf: 'per_channel' # 'per_bit', 'per_channel'
         em_noise_inf: True
         sample_from_codebook: False
-        phasing: False
         randomize_noise_range:
         slice_rec: False
         pred_z: True

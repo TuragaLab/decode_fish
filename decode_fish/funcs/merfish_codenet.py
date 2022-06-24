@@ -31,21 +31,17 @@ import wandb
 # Cell
 class code_net(nn.Module):
 
-    def __init__(self, n_inputs=53, n_outputs=1):
+    def __init__(self, n_inputs=9, n_outputs=1):
         super(code_net, self).__init__()
 
         self.layers = nn.Sequential(
           nn.Linear(n_inputs, 256),
-          nn.BatchNorm1d(256),
           nn.ReLU(),
           nn.Linear(256, 128),
-          nn.BatchNorm1d(128),
           nn.ReLU(),
           nn.Linear(128, 64),
-          nn.BatchNorm1d(64),
           nn.ReLU(),
           nn.Linear(64, 32),
-          nn.BatchNorm1d(32),
           nn.ReLU(),
           nn.Linear(32, n_outputs)
         )
@@ -69,6 +65,9 @@ class conv_net(nn.Module):
         if bn:
             self.layers = nn.Sequential(
               nn.Linear(self.n_metrics + self.n_chs, 256),
+              nn.BatchNorm1d(256),
+              nn.ReLU(),
+              nn.Linear(256, 128),
               nn.BatchNorm1d(128),
               nn.ReLU(),
               nn.Linear(128, 64),
@@ -118,10 +117,21 @@ def input_from_df(df, codebook):
 
     return torch.tensor(inp_arr, dtype=torch.float32).cuda()
 
+# def input_from_df(df, codebook):
+
+#     n_ch = len(codebook[0])
+#     input_keys = ['prob', 'z', 'x_sig','y_sig','z_sig','int_ratio','tot_int','tot_int_0bit','tot_int_sig']
+#     offsets = [0.75, 50, 20., 20., 15.,2.,10.,10.,5.]
+#     scales = [1., 100., 20., 20., 15.,2.,10.,10.,5.]
+#     inp_arr = df[input_keys].values
+#     inp_arr = (inp_arr - np.array(offsets))/np.array(scales)
+
+#     return torch.tensor(inp_arr, dtype=torch.float32).cuda()
+
 # Cell
 def train_metric_net(net, model, decode_dl, post_proc, micro, point_process, cfg):
 
-    bce = torch.nn.BCEWithLogitsLoss()
+    bce = torch.nn.BCEWithLogitsLoss(pos_weight=torch.tensor([cfg.pos_weight]).cuda())
     opt = torch.optim.AdamW(net.parameters(), lr = 4e-3)
     sched = torch.optim.lr_scheduler.StepLR(opt, step_size=100, gamma=0.5)
     test_csv = pd.read_csv(cfg.test_csv)
@@ -130,7 +140,7 @@ def train_metric_net(net, model, decode_dl, post_proc, micro, point_process, cfg
     test_csv['int_ratio'] = sel_int_ch(test_csv, codebook)['int_ratio']
 
     ignores = [int(a) for a in str(cfg.ignore)]
-    zero_out = torch.ones(54).cuda()
+    zero_out = torch.ones(9).cuda()
     zero_out[ignores] = 0
 
     for i in tqdm(range(cfg.num_iters)):
@@ -158,7 +168,7 @@ def train_metric_net(net, model, decode_dl, post_proc, micro, point_process, cfg
             cond = sim_vars[-1] < len(codebook)
             cb_cool = torch.repeat_interleave(cond, cond * (cfg.genm.exp_type.n_bits - 1) + 1)
             ch_inp[1][cb_cool], ch_inp[2][cb_cool], ch_inp[3][cb_cool] = add_pos_noise([ch_inp[1][cb_cool], ch_inp[2][cb_cool], ch_inp[3][cb_cool]],
-                                                                                       [cfg.genm.pos_noise.pos_noise_xy*0.5, cfg.genm.pos_noise.pos_noise_xy*0.5, cfg.genm.pos_noise.pos_noise_z], cfg.genm.exp_type.n_bits)
+                                                                                       [cfg.genm.pos_noise.pos_noise_xy, cfg.genm.pos_noise.pos_noise_xy, cfg.genm.pos_noise.pos_noise_z], cfg.genm.exp_type.n_bits)
             xsim = micro(*ch_inp, add_noise=True)
 
             if cfg.genm.phasing:
@@ -167,7 +177,7 @@ def train_metric_net(net, model, decode_dl, post_proc, micro, point_process, cfg
                 phasing_inp[1:4] = add_pos_noise(phasing_inp[1:4], [cfg.genm.pos_noise.pos_noise_xy, cfg.genm.pos_noise.pos_noise_xy, cfg.genm.pos_noise.pos_noise_z], cfg.genm.exp_type.n_bits, rm_mean=False)
                 xsim += micro(*phasing_inp, add_noise=True) * cfg.genm.phasing * torch.rand(xsim.shape, device=xsim.device)
 
-            x = micro.noise(xsim, background, const_theta_sim=cfg.genm.exp_type.const_theta_sim).sample()
+            x = micro.noise(xsim, background, randomize_range=cfg.genm.exp_type.randomize_noise_range).sample()
 
             colshift_crop = get_color_shift_inp(micro.color_shifts, micro.col_shifts_yx, ycrop, xcrop, cfg.sim.random_crop.crop_sz)
             net_inp = torch.concat([x,colshift_crop], 1)
@@ -187,7 +197,11 @@ def train_metric_net(net, model, decode_dl, post_proc, micro, point_process, cfg
 
             pred_df.loc[:, 'class'] = 1
             pred_df.loc[pred_df['loc_idx'].isin(matches['loc_idx_pred']), 'class'] = 0
-            pred_df['int_ratio'] = zero_int_ch(pred_df, codebook)['int_ratio'].values
+            pred_zeroed = zero_int_ch(pred_df, codebook)
+            pred_df['int_ratio'] = pred_zeroed['int_ratio'].values
+            pred_df['tot_int'] = pred_zeroed['tot_int'].values
+            pred_df['tot_int_0bit'] = pred_zeroed['tot_int_0bit'].values
+            pred_df['tot_int_sig'] = pred_zeroed['tot_int_sig'].values
 
         opt.zero_grad()
 
@@ -202,7 +216,7 @@ def train_metric_net(net, model, decode_dl, post_proc, micro, point_process, cfg
         ''''''
 
         net_inp = input_from_df(pred_df, codebook)
-        net_inp *= zero_out[None]
+#         net_inp *= zero_out[None]
         net_out = net(net_inp)
 
         net_tar = torch.tensor(pred_df['class'].values, dtype=torch.float32).cuda()
@@ -216,8 +230,9 @@ def train_metric_net(net, model, decode_dl, post_proc, micro, point_process, cfg
         sched.step()
 
         wandb.log({'loss': loss.item()}, step=i)
-        wandb.log({'N_blanks': test_csv.nsmallest(12555, 'net_score')['class'].sum()}, step=i)
-
+#         wandb.log({'NN_blanks': test_csv.nsmallest(12555, 'net_score')['class'].sum()}, step=i)
+        wandb.log({'NN_blanks': test_csv.nsmallest(64252, 'net_score')['class'].sum()/88}, step=i)
+        wandb.log({'NN_preds': (test_csv.sort_values('net_score', ascending=True)['class'].cumsum().values <= 88).sum()/64252}, step=i)
         if i % 20 == 0 and cfg.save_file is not None:
             torch.save(net, cfg.save_file)
 

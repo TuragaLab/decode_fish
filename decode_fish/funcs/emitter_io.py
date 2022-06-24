@@ -159,9 +159,10 @@ def zero_int_ch(res_df, codebook):
     ret_df[int_s] = int_sig
 
     ret_df['tot_int'] = int_arr_nz.sum(-1)
+    ret_df['tot_int_0bit'] = int_arr.sum(-1) - int_arr_nz.sum(-1)
     ret_df['tot_int_sig'] = int_sig.sum(-1)
 
-    ret_df['int_ratio'] = ((int_arr).sum(-1) - int_arr_nz.sum(-1)) / int_arr_nz.sum(-1)
+    ret_df['int_ratio'] = ret_df['tot_int_0bit'] / ret_df['tot_int']
 
     return ret_df
 
